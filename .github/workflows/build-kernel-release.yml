@@ -5,21 +5,30 @@ permissions:
   actions: write   # Allows triggering actions
   
 on:
-  #push:
   workflow_dispatch:
     inputs:
-      build_a12:
-        description: 'Build Android 12 kernel?'
+      build_a12_5_10:
+        description: 'Build Android 12 5.10 kernel?'
         required: true
         type: boolean
         default: true
-      build_a13:
-        description: 'Build Android 13 kernel?'
+      build_a13_5_10:
+        description: 'Build Android 13 5.10 kernel?'
         required: true
         type: boolean
         default: true
-      build_a14:
-        description: 'Build Android 14 kernel?'
+      build_a13_5_15:
+        description: 'Build Android 13 5.15 kernel?'
+        required: true
+        type: boolean
+        default: true
+      build_a14_5_15:
+        description: 'Build Android 14 5.15 kernel?'
+        required: true
+        type: boolean
+        default: true
+      build_a14_6_1:
+        description: 'Build Android 14 6.1 kernel?'
         required: true
         type: boolean
         default: true
@@ -33,27 +42,27 @@ jobs:
   build-kernel-a12-5-10:
     uses: ./.github/workflows/build-kernel-a12-5.10.yml
     secrets: inherit
-    if: ${{ inputs.build_a12 || inputs.build_a12 == '' }}
+    if: ${{ inputs.build_a12_5_10 }}
 
   build-kernel-a13-5-10:
     uses: ./.github/workflows/build-kernel-a13-5.10.yml
     secrets: inherit
-    if: ${{ inputs.build_a13 == 'true' || inputs.build_a13 == '' }}
+    if: ${{ inputs.build_a13_5_10 }}
 
   build-kernel-a13-5-15:
     uses: ./.github/workflows/build-kernel-a13-5.15.yml
     secrets: inherit
-    if: ${{ inputs.build_a13 == 'true' || inputs.build_a13 == '' }}
+    if: ${{ inputs.build_a13_5_15 }}
 
   build-kernel-a14-5-15:
     uses: ./.github/workflows/build-kernel-a14-5.15.yml
     secrets: inherit
-    if: ${{ inputs.build_a14 == 'true' || inputs.build_a14 == '' }}
+    if: ${{ inputs.build_a14_5_15 }}
 
   build-kernel-a14-6-1:
     uses: ./.github/workflows/build-kernel-a14-6.1.yml
     secrets: inherit
-    if: ${{ inputs.build_a14 == 'true' || inputs.build_a14 == '' }}
+    if: ${{ inputs.build_a14_6_1 }}
 
   trigger-release:
     runs-on: ubuntu-latest
@@ -63,7 +72,7 @@ jobs:
         - build-kernel-a13-5-15
         - build-kernel-a14-5-15
         - build-kernel-a14-6-1
-    if: ${{ inputs.make_release == 'true' }}
+    if: ${{ inputs.make_release }}
     env:
       REPO_OWNER: TheWildJames
       REPO_NAME: GKI_KernelSU_SUSFS
@@ -75,16 +84,8 @@ jobs:
         Module: 
         -> https://github.com/sidex15/ksu_module_susfs
         
-        Official Manager:
-        -> https://github.com/tiann/KernelSU
-        
         Non-Official Managers:
         -> https://github.com/rifsxd/KernelSU-Next
-        -> https://github.com/backslashxx/KernelSU
-        -> https://github.com/rsuntk/KernelSU
-        -> https://github.com/5ec1cff/KernelSU
-        -> https://github.com/silvzr/KernelSU
-        -> https://github.com/sidex15/KernelSU
         
         Features:
         [+] KernelSU-Next
