@@ -7,18 +7,28 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      build_a12:
-        description: 'Build Android 12 kernel?'
+      build_a12_5_10:
+        description: 'Build Android 12 5.10 kernel?'
         required: true
         type: boolean
         default: true
-      build_a13:
-        description: 'Build Android 13 kernel?'
+      build_a13_5_10:
+        description: 'Build Android 13 5.10 kernel?'
         required: true
         type: boolean
         default: true
-      build_a14:
-        description: 'Build Android 14 kernel?'
+      build_a13_5_15:
+        description: 'Build Android 13 5.15 kernel?'
+        required: true
+        type: boolean
+        default: true
+      build_a14_5_15:
+        description: 'Build Android 14 5.15 kernel?'
+        required: true
+        type: boolean
+        default: true
+      build_a14_6_1:
+        description: 'Build Android 14 6.1 kernel?'
         required: true
         type: boolean
         default: true
@@ -32,27 +42,27 @@ jobs:
   build-kernel-a12-5-10:
     uses: ./.github/workflows/build-kernel-a12-5.10.yml
     secrets: inherit
-    if: ${{ inputs.build_a12 }}
+    if: ${{ inputs.build_a12_5_10 }}
 
   build-kernel-a13-5-10:
     uses: ./.github/workflows/build-kernel-a13-5.10.yml
     secrets: inherit
-    if: ${{ inputs.build_a13 }}
+    if: ${{ inputs.build_a13_5_10 }}
 
   build-kernel-a13-5-15:
     uses: ./.github/workflows/build-kernel-a13-5.15.yml
     secrets: inherit
-    if: ${{ inputs.build_a13 }}
+    if: ${{ inputs.build_a13_5_15 }}
 
   build-kernel-a14-5-15:
     uses: ./.github/workflows/build-kernel-a14-5.15.yml
     secrets: inherit
-    if: ${{ inputs.build_a14 }}
+    if: ${{ inputs.build_a14_5_15 }}
 
   build-kernel-a14-6-1:
     uses: ./.github/workflows/build-kernel-a14-6.1.yml
     secrets: inherit
-    if: ${{ inputs.build_a14 }}
+    if: ${{ inputs.build_a14_6_1 }}
 
   trigger-release:
     runs-on: ubuntu-latest

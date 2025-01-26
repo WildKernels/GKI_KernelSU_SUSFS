@@ -54,7 +54,7 @@ Flashing this kernel will void your warranty, and there is always a risk of bric
 # To-DO
 
 - [X] Build AnyKernel3 zips
-- [ ] Make GitHub Actions
+- [X] Make GitHub Actions
 
 ---
 

@@ -41,10 +41,10 @@ jobs:
             kernel_version: "5.15"
             sub_level: "167"
             os_patch_level: "2024-11"
-          - android_version: "android14"
-            kernel_version: "5.15"
-            sub_level: "X"
-            os_patch_level: "lts"
+          #- android_version: "android14"
+          #  kernel_version: "5.15"
+          #  sub_level: "X"
+          #  os_patch_level: "lts"
 
     steps:
       - name: Maximize build space
