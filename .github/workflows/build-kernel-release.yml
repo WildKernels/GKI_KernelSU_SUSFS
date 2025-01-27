@@ -84,8 +84,16 @@ jobs:
         Module: 
         -> https://github.com/sidex15/ksu_module_susfs
         
+        Official Manager:
+        -> https://github.com/tiann/KernelSU
+        
         Non-Official Managers:
         -> https://github.com/rifsxd/KernelSU-Next
+        -> https://github.com/backslashxx/KernelSU
+        -> https://github.com/rsuntk/KernelSU
+        -> https://github.com/5ec1cff/KernelSU
+        -> https://github.com/silvzr/KernelSU
+        -> https://github.com/sidex15/KernelSU
         
         Features:
         [+] KernelSU-Next

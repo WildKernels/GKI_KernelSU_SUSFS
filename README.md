@@ -54,14 +54,14 @@ Flashing this kernel will void your warranty, and there is always a risk of bric
 # To-DO
 
 - [X] Build AnyKernel3 zips
-- [ ] Make GitHub Actions
+- [X] Make GitHub Actions
 
 ---
 
 ### If you need your kernel version added please let me know and I will build it!
 
 [Telegram](https://t.me/TheWildJames)  
-[Telegram Group](https://t.me/wildkernelplus)  
+[Telegram Group](https://t.me/wildpluskernel)  
 [Build Scripts](https://github.com/TheWildJames/kernel_build_scripts)
 
 # Special thanks to the following people for their contributions!
