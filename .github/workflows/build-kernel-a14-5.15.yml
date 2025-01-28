@@ -12,10 +12,13 @@ on:
       next_branch_other:
         required: false
         type: string
+      runner:
+        required: true
+        type: string
   
 jobs:
   build-kernel-a14-5-15-kernelsu-susfs:
-    runs-on: ubuntu-22.04
+    runs-on: ${{ inputs.runner }}
     strategy:
       matrix:
         include:
@@ -58,15 +61,23 @@ jobs:
 
     steps:
       - name: Maximize build space
+        if: ${{ inputs.runner == 'ubuntu-22.04' }}
         uses: easimon/maximize-build-space@master
         with:
           root-reserve-mb: 8192
           temp-reserve-mb: 2048
-          swap-size-mb: 8192
+          swap-size-mb: 20000
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
+
+      - name: Clear GitHub Workspace
+        if: ${{ inputs.runner == 'ubuntu-22.04-local' }}
+        run: |
+          echo "Clearing the GitHub workspace..."
+          rm -rf $GITHUB_WORKSPACE/*
+          echo "Workspace cleared."
 
       - name: Set CONFIG Environment Variable
         run: |
@@ -276,7 +287,17 @@ jobs:
           
           echo "Building the kernel..."
           rm -rf ./common/android/abi_gki_protected_exports_*
-          tools/bazel build --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist
+          tools/bazel build --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist &
+          COMMAND_PID=$!
+
+          # Monitor memory and disk usage while command.sh is running
+          while kill -0 "$COMMAND_PID" 2>/dev/null; do
+              echo "Memory Usage:"
+              free -h
+              echo "Disk Usage:"
+              df -h
+              sleep 10
+          done
 
       - name: Create Bootimgs Folder and Copy Images
         run: |
@@ -345,3 +366,10 @@ jobs:
           path: |
             *.zip
             *.img
+
+      - name: Clear GitHub Workspace
+        if: ${{ inputs.runner == 'ubuntu-22.04-local' }}
+        run: |
+          echo "Clearing the GitHub workspace..."
+          rm -rf $GITHUB_WORKSPACE/*
+          echo "Workspace cleared."

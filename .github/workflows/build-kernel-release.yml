@@ -7,6 +7,14 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      runner:
+        description: "Choose the runner"
+        required: true
+        default: "ubuntu-22.04"
+        type: choice
+        options:
+          - ubuntu-22.04
+          - ubuntu-22.04-local
       build_a12_5_10:
         description: 'Build Android 12 5.10 kernel?'
         required: true
@@ -38,7 +46,7 @@ on:
         type: boolean
         default: false
       lto_type:
-        description: "Choose the lto type"
+        description: "Choose the lto type will fail on full if using a github hosted runner"
         required: true
         type: choice
         options:
@@ -70,6 +78,7 @@ jobs:
       lto_type: ${{ inputs.lto_type }}
       next_branch: ${{ inputs.next_branch }}
       next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   build-kernel-a13-5-10:
     uses: ./.github/workflows/build-kernel-a13-5.10.yml
@@ -79,6 +88,7 @@ jobs:
       lto_type: ${{ inputs.lto_type }}
       next_branch: ${{ inputs.next_branch }}
       next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   build-kernel-a13-5-15:
     uses: ./.github/workflows/build-kernel-a13-5.15.yml
@@ -88,6 +98,7 @@ jobs:
       lto_type: ${{ inputs.lto_type }}
       next_branch: ${{ inputs.next_branch }}
       next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   build-kernel-a14-5-15:
     uses: ./.github/workflows/build-kernel-a14-5.15.yml
@@ -97,6 +108,7 @@ jobs:
       lto_type: ${{ inputs.lto_type }}
       next_branch: ${{ inputs.next_branch }}
       next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   build-kernel-a14-6-1:
     uses: ./.github/workflows/build-kernel-a14-6.1.yml
@@ -106,6 +118,7 @@ jobs:
       lto_type: ${{ inputs.lto_type }}
       next_branch: ${{ inputs.next_branch }}
       next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   trigger-release:
     runs-on: ubuntu-latest
