@@ -7,6 +7,14 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      runner:
+        description: "Choose the runner"
+        required: true
+        default: "ubuntu-22.04"
+        type: choice
+        options:
+          - ubuntu-22.04
+          - ubuntu-22.04-local
       build_a12_5_10:
         description: 'Build Android 12 5.10 kernel?'
         required: true
@@ -37,32 +45,80 @@ on:
         required: true
         type: boolean
         default: false
+      lto_type:
+        description: "Choose the lto type will fail on full if using a github hosted runner"
+        required: true
+        type: choice
+        options:
+          - none
+          - thin
+          - full
+        default: thin
+      next_branch:
+        description: "Choose next branch"
+        required: true
+        type: choice
+        options:
+          - Stable
+          - Dev
+          - Other
+        default: Stable
+      next_branch_other:
+        description: "If 'Other' is selected, specify your custom branch"
+        required: false
+        type: string  # This input is required if 'Other' is chosen
+        default: ""  # Default is empty, but can be filled in if 'Other' is selected
 
 jobs:
   build-kernel-a12-5-10:
     uses: ./.github/workflows/build-kernel-a12-5.10.yml
     secrets: inherit
     if: ${{ inputs.build_a12_5_10 }}
+    with:
+      lto_type: ${{ inputs.lto_type }}
+      next_branch: ${{ inputs.next_branch }}
+      next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   build-kernel-a13-5-10:
     uses: ./.github/workflows/build-kernel-a13-5.10.yml
     secrets: inherit
     if: ${{ inputs.build_a13_5_10 }}
+    with:
+      lto_type: ${{ inputs.lto_type }}
+      next_branch: ${{ inputs.next_branch }}
+      next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   build-kernel-a13-5-15:
     uses: ./.github/workflows/build-kernel-a13-5.15.yml
     secrets: inherit
     if: ${{ inputs.build_a13_5_15 }}
+    with:
+      lto_type: ${{ inputs.lto_type }}
+      next_branch: ${{ inputs.next_branch }}
+      next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   build-kernel-a14-5-15:
     uses: ./.github/workflows/build-kernel-a14-5.15.yml
     secrets: inherit
     if: ${{ inputs.build_a14_5_15 }}
+    with:
+      lto_type: ${{ inputs.lto_type }}
+      next_branch: ${{ inputs.next_branch }}
+      next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   build-kernel-a14-6-1:
     uses: ./.github/workflows/build-kernel-a14-6.1.yml
     secrets: inherit
     if: ${{ inputs.build_a14_6_1 }}
+    with:
+      lto_type: ${{ inputs.lto_type }}
+      next_branch: ${{ inputs.next_branch }}
+      next_branch_other: ${{ inputs.next_branch_other }}
+      runner: ${{ inputs.runner }}
 
   trigger-release:
     runs-on: ubuntu-latest
@@ -77,9 +133,9 @@ jobs:
       REPO_OWNER: TheWildJames
       REPO_NAME: GKI_KernelSU_SUSFS
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_NAME: "*TEST BUILD* GKI Kernels With KernelSU Next & SUSFS v1.5.3 *TEST BUILD*"
+      RELEASE_NAME: "*TEST BUILD* GKI Kernels With KernelSU Next & SUSFS v1.5.4 *TEST BUILD*"
       RELEASE_NOTES: |
-        This release contains KernelSU Next and SUSFS v1.5.3
+        This release contains KernelSU Next and SUSFS v1.5.4
         
         Module: 
         -> https://github.com/sidex15/ksu_module_susfs
@@ -97,7 +153,7 @@ jobs:
         
         Features:
         [+] KernelSU-Next
-        [+] SUSFS v1.5.3
+        [+] SUSFS v1.5.4
         [+] Wireguard Support
         [+] Maphide LineageOS Detections
         [+] Futile Maphide for jit-zygote-cache Detections
@@ -123,10 +179,9 @@ jobs:
             # Fetch the latest tag from GitHub (this is the latest tag based on the GitHub API)
             LATEST_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags --jq '.[0].name')
             if [ -z "$LATEST_TAG" ]; then
-              LATEST_TAG="v1.5.3-0"  # Default to v1.5.3-0 if no tag exists
+              LATEST_TAG="v1.5.4-0"
             fi
-
-            # Increment the suffix (e.g., v1.5.3-0 becomes v1.5.3-1)
+            
             NEW_TAG=$(echo "$LATEST_TAG" | awk -F- '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-%d", $1, suffix}')
     
             # Output the new tag to be used

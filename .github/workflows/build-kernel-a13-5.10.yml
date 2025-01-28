@@ -2,10 +2,23 @@ name: Build Android 13 5.10 GKI Kernels
 
 on:
   workflow_call:  # This allows this workflow to be called from another workflow
+    inputs:
+      lto_type:
+        required: true
+        type: string
+      next_branch:
+        required: true
+        type: string
+      next_branch_other:
+        required: false
+        type: string
+      runner:
+        required: true
+        type: string
   
 jobs:
   build-kernel-a13-5-10-kernelsu-susfs:
-    runs-on: ubuntu-22.04
+    runs-on: ${{ inputs.runner }}
     strategy:
       matrix:
         include:
@@ -44,6 +57,7 @@ jobs:
 
     steps:
       - name: Maximize build space
+        if: ${{ inputs.runner == 'ubuntu-22.04' }}
         uses: easimon/maximize-build-space@master
         with:
           root-reserve-mb: 8192
@@ -53,6 +67,13 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
+      
+      - name: Clear GitHub Workspace
+        if: ${{ inputs.runner == 'ubuntu-22.04-local' }}
+        run: |
+          echo "Clearing the GitHub workspace..."
+          rm -rf $GITHUB_WORKSPACE/*
+          echo "Workspace cleared."
 
       - name: Set CONFIG Environment Variable
         run: |
@@ -136,13 +157,26 @@ jobs:
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
 
+      - name: Determine the branch for kernelsu
+        run: |
+          if [[ "${{ inputs.next_branch }}" == "Stable" ]]; then
+            echo "BRANCH=-" >> $GITHUB_ENV
+          elif [[ "${{ inputs.next_branch }}" == "Dev" ]]; then
+            echo "BRANCH=-s next" >> $GITHUB_ENV
+          elif [[ "${{ inputs.next_branch }}" == "Other" && -n "${{ inputs.next_branch_other }}" ]]; then
+            echo "BRANCH=-s ${{ inputs.next_branch_other }}" >> $GITHUB_ENV
+          else
+            echo "Error: Custom branch not provided for 'Other'" >&2
+            exit 1
+          fi
+
       - name: Add KernelSU
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
           
           echo "Adding KernelSU..."
-          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -
+          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH
 
       - name: Apply SUSFS Patches
         run: |
@@ -237,7 +271,7 @@ jobs:
           cd "$CONFIG"
           
           echo "Building the kernel..."
-          LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
+          LTO=${{ inputs.lto_type }} BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
 
       - name: Create Bootimgs Folder and Copy Images
         run: |
@@ -306,3 +340,10 @@ jobs:
           path: |
             *.zip
             *.img
+
+      - name: Clear GitHub Workspace
+        if: ${{ inputs.runner == 'ubuntu-22.04-local' }}
+        run: |
+          echo "Clearing the GitHub workspace..."
+          rm -rf $GITHUB_WORKSPACE/*
+          echo "Workspace cleared."
