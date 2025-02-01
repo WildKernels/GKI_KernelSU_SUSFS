@@ -11,6 +11,10 @@ jobs:
         include:
         - android_version: "android12"
           kernel_version: "5.10"
+          sub_level: "66"
+          os_patch_level: "2022-1"
+        - android_version: "android12"
+          kernel_version: "5.10"
           sub_level: "198"
           os_patch_level: "2024-01"
         - android_version: "android12"
