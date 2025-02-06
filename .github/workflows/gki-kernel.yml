@@ -281,8 +281,9 @@ jobs:
 
           sed -i '$s|echo "\$res"|echo "\$res-Wild+"|' ./common/scripts/setlocalversion
 
-          # Run perl command to modify UTS_VERSION
-          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sat Apr 20 04:20:00 UTC 2024"}' ./common/scripts/mkcompile_h
+          # 使用当前系统时间而不是硬编码时间
+          current_time=$(date -u "+%Y-%m-%d %H:%M:%S")
+          perl -pi -e "s{UTS_VERSION=.*}{UTS_VERSION=\"#1 SMP PREEMPT $current_time UTC\"}" ./common/scripts/mkcompile_h
           
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
