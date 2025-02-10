@@ -317,7 +317,8 @@ jobs:
 
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
-
+          sed -i '$s|echo "\$res"|echo "\5.10.209-a12-candy💙"|' ./common/scripts/setlocalversion
+          
       - name: Build the Kernel
         run: |
           echo "Changing to configuration directory: $CONFIG..."
