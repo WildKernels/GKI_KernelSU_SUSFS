@@ -84,16 +84,6 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
-  build-kernel-a14-5-15:
-    uses: ./.github/workflows/kernel-a14-5.15.yml
-    secrets: inherit
-    with:
-      runner: ${{ inputs.runner }}
-      lto_type: ${{ inputs.lto_type }}
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
-
   build-kernel-a14-6-1:
     uses: ./.github/workflows/kernel-a14-6.1.yml
     secrets: inherit
@@ -120,7 +110,7 @@ jobs:
         - build-kernel-a12-5-10
         - build-kernel-a13-5-10
         - build-kernel-a13-5-15
-        - build-kernel-a14-5-15
+      #  - build-kernel-a14-5-15
         - build-kernel-a14-6-1
         - build-kernel-a15-6-6
     if: ${{ inputs.make_release }}
