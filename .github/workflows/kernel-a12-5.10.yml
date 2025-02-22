@@ -30,22 +30,31 @@ jobs:
         include:
         - sub_level: "66"
           os_patch_level: "2022-01"
+          revision: "r11"
         - sub_level: "168"
           os_patch_level: "2023-04"
+          revision: "r9"
         - sub_level: "198"
           os_patch_level: "2024-01"
+          revision: "r17"
         - sub_level: "205"
           os_patch_level: "2024-03"
+          revision: "r9"
         - sub_level: "209"
           os_patch_level: "2024-05"
+          revision: "r13"
         - sub_level: "218"
           os_patch_level: "2024-08"
+          revision: "r14"
         - sub_level: "226"
           os_patch_level: "2024-11"
+          revision: "r8"
         - sub_level: "233"
           os_patch_level: "2025-02"
+          revision: "r1"
         - sub_level: "X"
           os_patch_level: "lts"
+          revision: "r1"
     uses: ./.github/workflows/gki-kernel.yml
     secrets: inherit
     with:
@@ -53,6 +62,7 @@ jobs:
       kernel_version: "5.10"
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
+      revision: ${{ matrix.revision }}
       runner: ${{ inputs.runner }}
       lto_type: ${{ inputs.lto_type }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
