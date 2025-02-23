@@ -185,7 +185,8 @@ jobs:
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash $BRANCH
           elif [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
             echo "Adding KernelSU Next..."
-            curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH
+            #curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH
+            curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Adding KernelSU MKSU..."
             curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash $BRANCH
@@ -209,10 +210,10 @@ jobs:
             cd ./KernelSU
             patch -p1 --forward < 10_enable_susfs_for_ksu.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
-            echo "Applying SUSFS patches for KernelSU-Next..."
+            #echo "Applying SUSFS patches for KernelSU-Next..."
             cd ./KernelSU-Next
-            cp ../../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./
-            patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
+            #cp ../../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./
+            #patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Applying SUSFS patches for MKSU..."
             cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
