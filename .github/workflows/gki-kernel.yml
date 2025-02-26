@@ -41,7 +41,6 @@ jobs:
 
     steps:
       - name: Maximize build space
-        if: ${{ inputs.runner == 'ubuntu-22.04' }}
         uses: easimon/maximize-build-space@master
         with:
           root-reserve-mb: 8192
