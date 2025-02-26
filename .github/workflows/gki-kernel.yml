@@ -18,12 +18,6 @@ on:
       os_patch_level:
         required: true
         type: string
-      runner:
-        required: true
-        type: string
-      lto_type:
-        required: true
-        type: string
       kernelsu_variant:
         required: true
         type: string
@@ -39,7 +33,7 @@ on:
 
 jobs:
   build-kernel-kernelsu-susfs:
-    runs-on: ${{ inputs.runner }}
+    runs-on: ubuntu-latest
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
@@ -339,9 +333,9 @@ jobs:
             cd "$CONFIG"
             echo "Building the kernel..."
             if [ -f "build/build.sh" ]; then
-              LTO=${{ inputs.lto_type }} BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
+              LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
             else
-              tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist || exit 1
+              tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
             fi
             
       - name: Create Bootimgs Folder and Copy Images

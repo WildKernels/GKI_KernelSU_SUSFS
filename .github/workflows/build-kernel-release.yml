@@ -12,23 +12,6 @@ on:
         required: true
         type: boolean
         default: true
-      runner:
-        description: "Choose runner"
-        required: true
-        type: choice
-        options:
-          - ubuntu-22.04
-          - ubuntu-22.04-local
-        default: ubuntu-22.04
-      lto_type:
-        description: "Choose LTO type (full will not run on basic runners)"
-        required: true
-        type: choice
-        options:
-          - full
-          - thin
-          - none
-        default: thin
       kernelsu_variant:
         description: "Choose KernelSU"
         required: true
@@ -58,8 +41,6 @@ jobs:
     uses: ./.github/workflows/kernel-a12-5.10.yml
     secrets: inherit
     with:
-      runner: ${{ inputs.runner }}
-      lto_type: ${{ inputs.lto_type }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
@@ -68,8 +49,6 @@ jobs:
     uses: ./.github/workflows/kernel-a13-5.10.yml
     secrets: inherit
     with:
-      runner: ${{ inputs.runner }}
-      lto_type: ${{ inputs.lto_type }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
@@ -78,8 +57,6 @@ jobs:
     uses: ./.github/workflows/kernel-a13-5.15.yml
     secrets: inherit
     with:
-      runner: ${{ inputs.runner }}
-      lto_type: ${{ inputs.lto_type }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
@@ -88,8 +65,6 @@ jobs:
     uses: ./.github/workflows/kernel-a14-5.15.yml
     secrets: inherit
     with:
-      runner: ${{ inputs.runner }}
-      lto_type: ${{ inputs.lto_type }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
@@ -98,8 +73,6 @@ jobs:
     uses: ./.github/workflows/kernel-a14-6.1.yml
     secrets: inherit
     with:
-      runner: ${{ inputs.runner }}
-      lto_type: ${{ inputs.lto_type }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
@@ -108,8 +81,6 @@ jobs:
     uses: ./.github/workflows/kernel-a15-6.6.yml
     secrets: inherit
     with:
-      runner: ${{ inputs.runner }}
-      lto_type: ${{ inputs.lto_type }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
@@ -282,7 +253,7 @@ jobs:
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
           echo "$RELEASE_NOTES" >> $GITHUB_ENV
           echo "" >> $GITHUB_ENV
-          echo "LTO: ${{ inputs.lto_type }}" >> $GITHUB_ENV
+          echo "LTO: thin" >> $GITHUB_ENV
           echo "" >> $GITHUB_ENV
           echo "Commit Hashes and Links:" >> $GITHUB_ENV
           echo "KernelSU:" >> $GITHUB_ENV

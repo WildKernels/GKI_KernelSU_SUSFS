@@ -6,12 +6,6 @@ permissions:
 on:
   workflow_call:  # This allows this workflow to be called from another workflow
     inputs:
-      runner:
-        required: true
-        type: string
-      lto_type:
-        required: true
-        type: string
       kernelsu_variant:
         required: true
         type: string
@@ -61,8 +55,6 @@ jobs:
       kernel_version: "6.1"
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
-      runner: ${{ inputs.runner }}
-      lto_type: ${{ inputs.lto_type }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
