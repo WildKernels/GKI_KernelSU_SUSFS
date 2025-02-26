@@ -111,6 +111,9 @@ jobs:
         -> Futile Maphide for jit-zygote-cache Detections
         -> Magic Mount Support
 
+        Notes:
+        -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
+
         Module: 
         -> https://github.com/sidex15/ksu_module_susfs
         
