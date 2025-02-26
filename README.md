@@ -53,6 +53,7 @@ To get boot.img format:
 
 - **KernelSU**: Developed by [tiann](https://github.com/tiann).
 - **KernelSU-Next**: Developed by [rifsxd](https://github.com/rifsxd/KernelSU-Next).
+- **Magic-KSU**: Developed by [5ec1cff](https://github.com/5ec1cff/KernelSU).  
 - **SUSFS**: Developed by [simonpunk](https://gitlab.com/simonpunk/susfs4ksu.git).
 - **SUSFS Module**: Developed by [sidex15](https://github.com/sidex15).
 - **Sultan Kernels**: Developed by [kerneltoast](https://github.com/kerneltoast).

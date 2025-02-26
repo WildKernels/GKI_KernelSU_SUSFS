@@ -71,7 +71,7 @@ jobs:
         #if: inputs.use_cache == true
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: $CONFIG
+          key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}
           max-size: 2G
 
       - name: Cache toolchain
@@ -325,7 +325,6 @@ jobs:
         with:
           timeout_minutes: 60
           max_attempts: 3
-          retry_on: timeout
           command: |
             cd "$CONFIG"
             echo "Building the kernel..."
