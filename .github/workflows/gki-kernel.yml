@@ -70,7 +70,7 @@ jobs:
         id: ccache-cache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
+          path: ./.ccache
           key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-${{ github.sha }}
           restore-keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-
@@ -78,8 +78,19 @@ jobs:
       # Configure ccache (optional)
       - name: Configure ccache
         run: |
+          ccache --set-config=cache_dir=$(pwd)/.ccache
           ccache --max-size=2G
           ccache --set-config=compression=true
+
+      
+      - name: Cache toolchain
+        id: cache-toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            kernel-build-tools
+            mkbootimg
+          key: toolchain-${{ runner.os }}-v1
 
       # Step 2: Download toolchain if cache was not found
       - name: Download toolchain (if cache not found)
