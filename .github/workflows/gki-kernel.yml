@@ -65,23 +65,21 @@ jobs:
       - name: Install ccache
         run: sudo apt update && sudo apt install -y ccache
 
-      # Cache the ccache directory
-      - name: Cache ccache
-        id: ccache-cache
+      - name: Set up ccache
+        run: |
+          mkdir -p $HOME/.ccache  # Ensure the directory exists
+          ccache --version
+          ccache --max-size=2G
+          ccache --set-config=compression=true
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+      
+      - name: Restore ccache from cache
         uses: actions/cache@v4
         with:
-          path: ./.ccache
+          path: ~/.ccache
           key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-${{ github.sha }}
           restore-keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-
-
-      # Configure ccache (optional)
-      - name: Configure ccache
-        run: |
-          ccache --set-config=cache_dir=$(pwd)/.ccache
-          ccache --max-size=2G
-          ccache --set-config=compression=true
-
       
       - name: Cache toolchain
         id: cache-toolchain
