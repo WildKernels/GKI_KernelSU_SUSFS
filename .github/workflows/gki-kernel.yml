@@ -52,9 +52,6 @@ jobs:
           remove-haskell: "true"
           remove-codeql: "true"
 
-      - name: Clean up workspace
-        run: rm -rf ${{ github.workspace }}/*
-
       - name: Set CONFIG Environment Variable
         run: |
           # Set CONFIG dynamically based on inputs values
