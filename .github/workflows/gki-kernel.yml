@@ -67,7 +67,7 @@ jobs:
 
       - name: Set up ccache
         run: |
-          mkdir -p $HOME/.ccache  # Ensure the directory exists
+          mkdir -p ~/.cache/bazel # Ensure the directory exists
           ccache --version
           ccache --max-size=2G
           ccache --set-config=compression=true
