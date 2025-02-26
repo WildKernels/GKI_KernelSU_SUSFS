@@ -40,6 +40,10 @@ on:
 jobs:
   build-kernel-kernelsu-susfs:
     runs-on: ${{ inputs.runner }}
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
 
     steps:
       - name: Maximize build space
@@ -67,21 +71,25 @@ jobs:
 
           echo "CONFIG set to: $CONFIG"
 
-      - name: Setup ccache
-        #if: inputs.use_cache == true
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}
-          max-size: 2G
+      # Install ccache
+      - name: Install ccache
+        run: sudo apt update && sudo apt install -y ccache
 
-      - name: Cache toolchain
-        id: cache-toolchain
+      # Cache the ccache directory
+      - name: Cache ccache
+        id: ccache-cache
         uses: actions/cache@v4
         with:
-          path: |
-            kernel-build-tools
-            mkbootimg
-          key: toolchain-${{ runner.os }}-v1
+          path: ~/.ccache
+          key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-
+
+      # Configure ccache (optional)
+      - name: Configure ccache
+        run: |
+          ccache --max-size=2G
+          ccache --set-config=compression=true
 
       # Step 2: Download toolchain if cache was not found
       - name: Download toolchain (if cache not found)
@@ -242,7 +250,7 @@ jobs:
           cd ../common
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
-      - name: Apply Hide Stuff Patches
+      - name: Apply New Hooks Patches
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
@@ -319,19 +327,21 @@ jobs:
             sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-Wild+"/' ./common/arch/arm64/configs/gki_defconfig
             #tools/bazel build --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist
           fi
-          
-      - name: Build the Kernel
+
+      - name: Build with retry
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 60
+          timeout_minutes: 30
           max_attempts: 3
           command: |
+            set -e
+            set -x
             cd "$CONFIG"
             echo "Building the kernel..."
             if [ -f "build/build.sh" ]; then
-              LTO=${{ inputs.lto_type }} BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang"
+              LTO=${{ inputs.lto_type }} BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
             else
-              tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist 
+              tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist || exit 1
             fi
             
       - name: Create Bootimgs Folder and Copy Images
