@@ -106,6 +106,7 @@ jobs:
         Features:
         -> KernelSU-${{ inputs.kernelsu_variant }}-${{ inputs.kernelsu_branch }}
         -> SUSFS ඞ v1.5.5 
+        -> Manual Hooks for Better Hiding
         -> Wireguard Support
         -> Simple Maphide for LineageOS Detections
         -> Futile Maphide for jit-zygote-cache Detections
