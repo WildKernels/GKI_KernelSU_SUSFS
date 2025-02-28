@@ -33,6 +33,9 @@ on:
       kernelsu_branch_other:
         required: false
         type: string
+      revision:
+        required: false
+        type: string
 
 jobs:
   build-kernel-kernelsu-susfs:
@@ -182,7 +185,8 @@ jobs:
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash $BRANCH
           elif [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
             echo "Adding KernelSU Next..."
-            curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH
+            #curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH
+            curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Adding KernelSU MKSU..."
             curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash $BRANCH
@@ -197,7 +201,6 @@ jobs:
           
           # Copy SUSFS patches
           cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
-          cp ../kernel_patches/fix.patch ./KernelSU/
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
 
@@ -207,10 +210,10 @@ jobs:
             cd ./KernelSU
             patch -p1 --forward < 10_enable_susfs_for_ksu.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
-            echo "Applying SUSFS patches for KernelSU-Next..."
+            #echo "Applying SUSFS patches for KernelSU-Next..."
             cd ./KernelSU-Next
-            cp ../../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./
-            patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
+            #cp ../../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./
+            #patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Applying SUSFS patches for MKSU..."
             cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
@@ -220,6 +223,9 @@ jobs:
             echo "Applying MKSU specific SUSFS patch..."
             cp ../../kernel_patches/mksu_susfs.patch ../KernelSU/
             patch -p1 < mksu_susfs.patch
+            cp ../../kernel_patches/fix.patch ./KernelSU/
+            patch -p1 < fix.patch
+            
           else
             echo "Invalid KernelSU variant selected!"
             exit 1
@@ -228,8 +234,6 @@ jobs:
           # Change to common directory and apply common SUSFS patch
           cd ../common
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
-          cd ../KernelSU
-          patch -p1 < fix.patch
           
       - name: Apply Hide Stuff Patches
         run: |
@@ -294,7 +298,7 @@ jobs:
           else
             rm -rf ./common/android/abi_gki_protected_exports_*
             sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-            sed -i 's/^CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-Wild+"/' ./common/scripts/setlocalversion
+           sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-Wild+"/' ./common/arch/arm64/configs/gki_defconfig
             tools/bazel build --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist
           fi
 
