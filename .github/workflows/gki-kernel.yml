@@ -174,6 +174,20 @@ jobs:
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
 
+      - name: Copy file
+        run: |
+          cp -r $CONFIG source-clean-$CONFIG
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-clean-${{ env.CONFIG }}
+          path: source-clean-${{ env.CONFIG }}
+
+      - name: Remove file
+        run: |
+          rm -rf source-clean-$CONFIG
+
       - name: Determine the branch for KernelSU
         run: |
           if [[ "${{ inputs.kernelsu_branch }}" == "Stable" ]]; then
@@ -220,24 +234,24 @@ jobs:
 
           if [ "${{ inputs.kernelsu_variant }}" == "Official" ]; then
             echo "Applying SUSFS patches for Official KernelSU..."
-            cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             cd ./KernelSU
+            cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
             patch -p1 --forward < 10_enable_susfs_for_ksu.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
             echo "Applying SUSFS patches for KernelSU-Next..."
             cd ./KernelSU-Next
-            cp ../../kernel_patches/0001-kernel-patch-susfs-v1.5.5-to-KernelSU-Next-v1.0.5.patch ./
+            cp ../../kernel_patches/next/0001-kernel-patch-susfs-v1.5.5-to-KernelSU-Next-v1.0.5.patch ./
             patch -p1 --forward < 0001-kernel-patch-susfs-v1.5.5-to-KernelSU-Next-v1.0.5.patch || true
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Applying SUSFS patches for MKSU..."
-            cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
-            cd ./KernelSU
+             cd ./KernelSU
+            cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
             patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
             
             echo "Applying MKSU specific SUSFS patch..."
-            cp ../../kernel_patches/mksu_susfs.patch ../KernelSU/
+            cp ../../kernel_patches/mksu/mksu_susfs.patch ../KernelSU/
             patch -p1 < mksu_susfs.patch
-            cp ../../kernel_patches/fix.patch ./KernelSU/
+            cp ../../kernel_patches/mksu/fix.patch ./KernelSU/
             patch -p1 < fix.patch
             
           else
@@ -253,9 +267,20 @@ jobs:
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
-          # Apply additional patch
-          cp ../../kernel_patches/new_hooks.patch ./
-          patch -p1 -F 3 < new_hooks.patch
+
+          #if [ "${{ inputs.kernelsu_variant }}" == "Official" ]; then
+          #  echo "Applying hooks for Official KernelSU..."
+          #  cp ../../kernel_patches/hooks/ksu_hooks.patch ./
+          #  patch -p1 -F 3 < ksu_hooks.patch
+          if [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
+            echo "Applying hooks for KernelSU-Next..."
+            cp ../../kernel_patches/next/next_hooks.patch ./
+            patch -p1 -F 3 < next_hooks.patch
+          #elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
+          #  echo "Applying hooks for MKSU..."
+          #  cp ../../kernel_patches/hooks/ksu_hooks.patch ./
+          #  patch -p1 -F 3 < ksu_hooks.patch
+          fi
           
       - name: Apply Hide Stuff Patches
         run: |
@@ -274,7 +299,10 @@ jobs:
 
           # Add KSU configuration settings
           echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_WITH_KPROBES=n" >> ./common/arch/arm64/configs/gki_defconfig
+          
+          if [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
+            echo "CONFIG_KSU_WITH_KPROBES=n" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
 
           # Add SUSFS configuration settings
           echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -292,19 +320,40 @@ jobs:
           echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
 
+          if [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
+          else
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
+          
           # Add additional tmpfs config setting
           echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
 
-          # Add additional tmpfs config setting
+          # Add additional config setting
           echo "CONFIG_IP_NF_TARGET_TTL=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_IP6_NF_TARGET_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_IP6_NF_MATCH_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
 
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
+      
+      - name: Config Kernel Name
+        #if: ${{ inputs.kernel_version != '6.6' }}
+        run: |
+          cd "$CONFIG/common"
+          # Add bbrv3 config setting
+          #cp ../../kernel_patches/bbr/tcp_bbr.c ./net/ipv4/
+
+          cd ..
+          echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig 
+          echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_BIC=n" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig 
+
 
       - name: Config Kernel Name
         run: |
@@ -327,11 +376,26 @@ jobs:
             #tools/bazel build --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist
           fi
 
+      - name: Copy file
+        run: |
+          cp -r $CONFIG source-patched-$CONFIG
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-patched-${{ env.CONFIG }}
+          path: source-patched-${{ env.CONFIG }}
+
+      - name: Remove file
+        run: |
+          rm -rf source-patched-$CONFIG
+
       - name: Build with retry
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
+          retry_on: timeout
           command: |
             set -e
             set -x

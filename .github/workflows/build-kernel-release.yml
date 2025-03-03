@@ -75,9 +75,11 @@ jobs:
         -> Simple Maphide for LineageOS Detections
         -> Futile Maphide for jit-zygote-cache Detections
         -> Magic Mount Support
+        -> BBR Support
 
         Notes:
         -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
+        -> Kernel Flasher is broken with latest susfs, try https://github.com/libxzr/HorizonKernelFlasher!
 
         Module: 
         -> https://github.com/sidex15/ksu_module_susfs
@@ -239,23 +241,42 @@ jobs:
             fi
             
             NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-    
+            
             # Output the new tag to be used
             echo "New tag: $NEW_TAG"
-    
+            
             # Set the new tag as an environment variable to be used in later steps
             echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
+            
             # Create the tag in the repository
             git tag $NEW_TAG
             git push --tags
-            
-      # Download Artifacts for A12 (Only if A12 Build is successful or input is true or empty)
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./downloaded-artifacts
 
+      - name: List & Filter Kernel Artifacts
+        shell: bash
+        run: |
+          echo "Fetching available artifacts..."
+          gh run list --json artifacts -q '.artifacts[].name' | grep '^kernel-' > kernel_artifacts.txt || true
+          
+          # Check if there are matching artifacts
+          if [ ! -s kernel_artifacts.txt ]; then
+            echo "No kernel-* artifacts found."
+            exit 0
+          fi
+          
+          echo "Artifacts to download:"
+          cat kernel_artifacts.txt
+  
+      - name: Download Kernel Artifacts
+        shell: bash
+        run: |
+          mkdir -p ./downloaded-artifacts
+          
+          while IFS= read -r artifact; do
+            echo "Downloading artifact: $artifact"
+            gh run download --name "$artifact" --dir ./downloaded-artifacts
+          done < kernel_artifacts.txt
+          
       # Create GitHub Release and upload files if make_release is true
       - name: Create GitHub Release
         uses: actions/create-release@v1
