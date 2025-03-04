@@ -174,6 +174,20 @@ jobs:
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
 
+      - name: Copy file
+        run: |
+          cp -r $CONFIG source-clean-$CONFIG
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-clean-${{ env.CONFIG }}
+          path: source-clean-${{ env.CONFIG }}
+
+      - name: Remove file
+        run: |
+          rm -rf source-clean-$CONFIG
+
       - name: Determine the branch for KernelSU
         run: |
           if [[ "${{ inputs.kernelsu_branch }}" == "Stable" ]]; then
@@ -326,11 +340,11 @@ jobs:
           sed -i 's/check_defconfig//' ./common/build.config.gki
       
       - name: Config Kernel Name
-        if: ${{ inputs.kernel_version != '6.6' }}
+        #if: ${{ inputs.kernel_version != '6.6' }}
         run: |
           cd "$CONFIG/common"
           # Add bbrv3 config setting
-          cp ../../kernel_patches/bbr/tcp_bbr.c ./net/ipv4/
+          #cp ../../kernel_patches/bbr/tcp_bbr.c ./net/ipv4/
 
           cd ..
           #echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig 
@@ -361,6 +375,20 @@ jobs:
             sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-MoBie"/' ./common/arch/arm64/configs/gki_defconfig
             #tools/bazel build --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist
           fi
+
+      - name: Copy file
+        run: |
+          cp -r $CONFIG source-patched-$CONFIG
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-patched-${{ env.CONFIG }}
+          path: source-patched-${{ env.CONFIG }}
+
+      - name: Remove file
+        run: |
+          rm -rf source-patched-$CONFIG
 
       - name: Build with retry
         uses: nick-fields/retry@v3

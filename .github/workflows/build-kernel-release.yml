@@ -7,6 +7,36 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      build_a12_510:
+        description: 'Build a12 5.10?'
+        required: true
+        type: boolean
+        default: true
+      build_a13_510:
+        description: 'Build a13 5.10?'
+        required: true
+        type: boolean
+        default: true
+      build_a13_515:
+        description: 'Build a13 5.15?'
+        required: true
+        type: boolean
+        default: true
+      build_a14_515:
+        description: 'Build a14 5.15?'
+        required: true
+        type: boolean
+        default: true
+      build_a14_61:
+        description: 'Build a14 6.1?'
+        required: true
+        type: boolean
+        default: true
+      build_a15_66:
+        description: 'Build a15  6.6?'
+        required: true
+        type: boolean
+        default: true
       make_release:
         description: 'Do you want to create a release?'
         required: true
@@ -38,6 +68,7 @@ on:
 
 jobs:
   build-kernel-a12-5-10:
+    if: ${{ inputs.build_a12_510 }}
     uses: ./.github/workflows/kernel-a12-5.10.yml
     secrets: inherit
     with:
@@ -46,6 +77,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a13-5-10:
+    if: ${{ inputs.build_a13_510 }}
     uses: ./.github/workflows/kernel-a13-5.10.yml
     secrets: inherit
     with:
@@ -54,6 +86,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a13-5-15:
+    if: ${{ inputs.build_a13_515 }}
     uses: ./.github/workflows/kernel-a13-5.15.yml
     secrets: inherit
     with:
@@ -62,6 +95,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a14-5-15:
+    if: ${{ inputs.build_a14_515 }}
     uses: ./.github/workflows/kernel-a14-5.15.yml
     secrets: inherit
     with:
@@ -70,6 +104,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a14-6-1:
+    if: ${{ inputs.build_a14_61 }}
     uses: ./.github/workflows/kernel-a14-6.1.yml
     secrets: inherit
     with:
@@ -78,6 +113,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a15-6-6:
+    if: ${{ inputs.build_a15_66 }}
     uses: ./.github/workflows/kernel-a15-6.6.yml
     secrets: inherit
     with:
@@ -111,10 +147,11 @@ jobs:
         -> Simple Maphide for LineageOS Detections
         -> Futile Maphide for jit-zygote-cache Detections
         -> Magic Mount Support
-        -> BBRv3 on 5.10-6.1
+        -> BBR Support
 
         Notes:
         -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
+        -> Kernel Flasher is broken with latest susfs, try https://github.com/libxzr/HorizonKernelFlasher!
 
         Module: 
         -> https://github.com/sidex15/ksu_module_susfs
@@ -284,23 +321,47 @@ jobs:
             fi
             
             NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-    
+            
             # Output the new tag to be used
             echo "New tag: $NEW_TAG"
-    
+            
             # Set the new tag as an environment variable to be used in later steps
             echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
+            
             # Create the tag in the repository
             git tag $NEW_TAG
             git push --tags
-            
-      # Download Artifacts for A12 (Only if A12 Build is successful or input is true or empty)
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./downloaded-artifacts
 
+      - name: Get Current Workflow Run ID
+        run: |
+          echo "RUN_ID=${{ github.run_id }}" >> $GITHUB_ENV
+          echo "Current Workflow Run ID: ${{ github.run_id }}"
+
+      - name: List Available Artifacts
+        run: |
+          echo "Fetching artifacts from current workflow run: $RUN_ID"
+          gh run view $RUN_ID --log | grep "Artifacts:" -A 10 | sed 's/Artifacts: //' > artifacts.txt || echo "No artifacts found."
+
+      - name: Filter Kernel Artifacts
+        run: |
+          echo "Filtering artifacts matching kernel-*..."
+          grep "^kernel-" artifacts.txt > filtered_artifacts.txt || true
+          echo "Filtered artifacts:"
+          cat filtered_artifacts.txt || echo "No kernel-* artifacts found."
+
+      - name: Download Filtered Artifacts
+        run: |
+          mkdir -p ./downloaded-artifacts
+          while IFS= read -r artifact; do
+            echo "Downloading artifact: $artifact"
+            gh run download --name "$artifact" --dir ./downloaded-artifacts
+          done < filtered_artifacts.txt
+
+      - name: List Downloaded Artifacts
+        run: |
+          echo "Downloaded kernel-* artifacts:"
+          ls -R ./downloaded-artifacts || echo "No kernel-* artifacts were downloaded."
+          
       # Create GitHub Release and upload files if make_release is true
       - name: Create GitHub Release
         uses: actions/create-release@v1
