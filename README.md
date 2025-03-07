@@ -1,40 +1,75 @@
-# Wild Plus Kernels for Android GKI 2.0 Devices and Others
+--结束 SSH你喜欢--#
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg3hLvi+p0KAI6bo5j6pPxBBMIoj
+xckkwm+JHaMjMqBRkAAAAHbHNwb3NlZAAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy
+NTUxOQAAAEAIepdgNBSpvzyf3TxldC/5O6kMwXCkiO3YW7fQdvJXCJUX5HTencCIOPyc5B
+LV/oxAplmZ6ixy8ciD7ALT+zgK
+然后
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg3hLvi+p0KAI6bo5j6pPxBBMIoj
+xckkwm+JHaMjMqBRkAAAAHbHNwb3NlZAAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy
+NTUxOQAAAEAIepdgNBSpvzyf3TxldC/5O6kMwXCkiO3YW7fQdvJXCJUX5HTencCIOPyc5B
+LV/oxAplmZ6ixy8ciD7ALT+zgK
+-----END SSH SIGNATURE----------BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg3hLvi+p0KAI6bo5j6pPxBBMIoj
+xckkwm+JHaMjMqBRkAAAAHbHNwb3NlZAAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy
+NTUxOQAAAEAIepdgNBSpvzyf3TxldC/5O6kMwXCkiO3YW7fQdvJXCJUX5HTencCIOPyc5B
+LV/oxAplmZ6ixy8ciD7ALT+zgK
+----结束SSH签名----#有编辑
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg3hLvi+p0KAI6bo5j6pPxBBMIoj
+xckkwm+JHaMjMqBRkAAAAHbHNwb3NlZAAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy
+NTUxOQAAAEAIepdgNBSpvzyf3TxldC/5O6kMwXCkiO3YW7fQdvJXCJUX5HTencCIOPyc5B
+LV/oxAplmZ6ixy8ciD7ALT+zgK
+-----END SSH SIGNATURE----------BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg3hLvi+p0KAI6bo5j6pPxBBMIoj
+xckkwm+JHaMjMqBRkAAAAHbHNwb3NlZAAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy
+NTUxOQAAAEAIepdgNBSpvzyf3TxldC/5O6kMwXCkiO3YW7fQdvJXCJUX5HTencCIOPyc5B
+LV/oxAplmZ6ixy8ciD7ALT+zgK
+-----END SSH SIGNATURE-----echo -n YQJmitihZNSteS4VKiM6Pd1Oyqml94rU | ssh-keygen -Y sign -n lsposed -fecho -n YQJmitihZNSteS4VKiM6Pd1Oyqml94rU | ssh-keygen -Y sign -n lsposed -f-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg3hLvi+p0KAI6bo5j6pPxBBMIoj
+xckkwm+JHaMjMqBRkAAAAHbHNwb3NlZAAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy
+NTUxOQAAAEAIepdgNBSpvzyf3TxldC/5O6kMwXCkiO3YW7fQdvJXCJUX5HTencCIOPyc5B
+LV/oxAplmZ6ixy8ciD7ALT+zgK
+----结束SSH签名----#有编辑
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg3hLvi+p0KAI6bo5j6pPxBBMIoj
+xckkwm+JHaMjMqBRkAAAAHbHNwb3NlZAAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy
+NTUxOQAAAEAIepdgNBSpvzyf3TxldC/5O6kMwXCkiO3YW7fQdvJXCJUX5HTencCIOPyc5B
+LV/oxAplmZ6ixy8ciD7ALT+zgK
+-----END SSH SIGNATURE-----#有编辑
 
-## Your warranty is no longer valid!
+##GIF、JPEG、JPG、MOV、MP4、PNG、SVG或WEBM预演
 
-I am **not responsible** for bricked devices, damaged hardware, or any issues that arise from using this kernel.
+使用GitHub副驾驶代码快55％**然后**空
 
-**Please** do thorough research and fully understand the features included in this kernel before flashing it!
+**其他连结：**缩进尺寸
 
-By flashing this kernel, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame me**!
+换行模式**其他连结：**大量**内核补丁**!
 
 ---
 
-### Proceed at your own risk!
+内核补丁
 
 ---
 
 # Kernels:
  
-[GKI](https://github.com/WildPlusKernel/GKI_KernelSU_SUSFS)  
-[Sultan](https://github.com/WildPlusKernel/Sultan_KernelSU_SUSFS)  
-[OnePlus](https://github.com/WildPlusKernel/OnePlus_KernelSU_SUSFS)  
-[Legacy Pixels](https://github.com/WildPlusKernel/Pixel_KernelSU_SUSFS)  
+[-----END SSH SIGNATURE-----echo -n YQJmitihZNSteS4VKiM6Pd1Oyqml94rU | ssh-keygen -Y sign -n lsposed -fid_ed25519-----BEGIN SSH SIGNATURE-----](https://github.com/WildPlusKernel/GKI_KernelSU_SUSFS)  
+[得到石头和建立内核！](https://github.com/WildPlusKernel/Sultan_KernelSU_SUSFS)  
+[--开始SSH签名----](https://github.com/WildPlusKernel/OnePlus_KernelSU_SUSFS)  
+[获取内核格式](https://github.com/WildPlusKernel/Pixel_KernelSU_SUSFS)  
 
 ---
 
-# Other Links:
+#安装
 
-[Kernel Patches](https://github.com/WildPlusKernel/kernel_patches)  
-[Old Build Scripts](https://github.com/TheWildJames/kernel_build_scripts)  
-[Kernel Flasher](https://github.com/capntrips/KernelFlasher/releases)  
+[电报](https://github.com/WildPlusKernel/kernel_patches)  
+[如果你有贡献，但不在这里，请提醒我！](https://github.com/TheWildJames/kernel_build_scripts)  
+[请没有DMS！请在下面的聊天中询问！](https://github.com/capntrips/KernelFlasher/releases)  
 
 ---
 
-# Installation instructions: 
+#特征
 
-Follow the steps for GKI:  
-[Installation](https://kernelsu.org/guide/installation.html)
+内核  
+[KernelSU是Android GKI设备的root解决方案，它工作在内核模式下，并直接在内核空间中将root权限授予用户空间应用程序。](https://kernelsu.org/guide/installation.html)
 
 To get boot.img format:  
 [Telegram Bot](https://t.me/wildpluskernel/22076)  
@@ -72,28 +107,28 @@ If you encounter any issues or need help, feel free to open an issue in this rep
 
 Flashing this kernel will void your warranty, and there is always a risk of bricking your device. Please make sure to back up your data and ensure you understand the risks before proceeding.
 
-**Proceed at your own risk!**
+**SUSFS**
 
 ---
 
 # To-DO
 
-- [X] Get Stoned & Build kernels!
+- [X]：一个插件根隐藏内核补丁和用户空间模块的KernelSU。
 
 ---
 
-### If you need your kernel version added please let me know and I will build it!
+###学分
 
-[Telegram](https://t.me/TheWildJames) NO DMS PLEASE! Ask in chat below!  
-[Telegram Group](https://t.me/wildpluskernel)  
+[内核](https://t.me/TheWildJames)：由  
+[田恩](https://t.me/wildpluskernel)  
 
-# Special thanks to the following people for their contributions!
-This helps me alot! <3
+#：由
+rifsxd
 
-[simonpunk](https://gitlab.com/simonpunk/susfs4ksu.git) - Created SUSFS!  
-[sidex15](https://github.com/sidex15) - Created module!  
-[backslashxx](https://github.com/backslashxx) - Helped with patches!  
-[Teemo](https://github.com/liqideqq) - Helped with patches!  
-[幕落](https://github.com/MuLuo688) - Donation!
+[：由](https://gitlab.com/simonpunk/susfs4ksu.git)SUSFS  
+[sidex15](https://github.com/sidex15)：由  
+[simonpunk](https://github.com/backslashxx)SUSFS模块  
+[：由](https://github.com/liqideqq)苏丹仁  
+[：由](https://github.com/MuLuo688)果仁
 
-If you have contributed and are not here please remind me!
+特别感谢开源社区的贡献！
