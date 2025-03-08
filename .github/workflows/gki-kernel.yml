@@ -258,6 +258,8 @@ jobs:
             patch -p1 < mksu_susfs.patch || true
             cp ../../kernel_patches/mksu/fix.patch ../KernelSU/
             patch -p1 < fix.patch || true
+            cp ../../kernel_patches/mksu/apk_sign.c_fix.patch ../KernelSU/
+            patch -p1 < apk_sign.c_fix.patch  || true
             
           else
             echo "Invalid KernelSU variant selected!"
