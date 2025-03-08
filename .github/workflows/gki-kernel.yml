@@ -6,6 +6,10 @@ permissions:
 on:
   workflow_call: # This allows this workflow to be called from another workflow
     inputs:
+      make_release:
+        required: true
+        type: boolean
+        default: true
       android_version:
         required: true
         type: string
@@ -179,6 +183,7 @@ jobs:
           cp -r $CONFIG source-clean-$CONFIG
 
       - name: Upload artifact
+        if: ${{ inputs.make_release == false }}
         uses: actions/upload-artifact@v4
         with:
           name: source-clean-${{ env.CONFIG }}
@@ -381,6 +386,7 @@ jobs:
           cp -r $CONFIG source-patched-$CONFIG
 
       - name: Upload artifact
+        if: ${{ inputs.make_release == false }}
         uses: actions/upload-artifact@v4
         with:
           name: source-patched-${{ env.CONFIG }}

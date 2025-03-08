@@ -6,6 +6,10 @@ permissions:
 on:
   workflow_call:  # This allows this workflow to be called from another workflow
     inputs:
+      make_release:
+        required: true
+        type: boolean
+        default: true
       kernelsu_variant:
         required: true
         type: string
@@ -38,6 +42,10 @@ jobs:
             os_patch_level: "2024-07"
           - sub_level: "90"
             os_patch_level: "2024-08"
+          - sub_level: "93"
+            os_patch_level: "2024-09"
+          - sub_level: "99"
+            os_patch_level: "2024-10"
           - sub_level: "112"
             os_patch_level: "2024-11"
           - sub_level: "115"
@@ -51,6 +59,7 @@ jobs:
     uses: ./.github/workflows/gki-kernel.yml
     secrets: inherit
     with:
+      make_release: ${{ inputs.make_release }}
       android_version: "android14"
       kernel_version: "6.1"
       sub_level: ${{ matrix.sub_level }}
