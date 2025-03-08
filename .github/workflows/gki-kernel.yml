@@ -256,7 +256,7 @@ jobs:
             echo "Applying MKSU specific SUSFS patch..."
             cp ../../kernel_patches/mksu/mksu_susfs.patch ../KernelSU/
             patch -p1 < mksu_susfs.patch
-            cp ../../kernel_patches/mksu/fix.patch ./KernelSU/
+            cp ../../kernel_patches/mksu/fix.patch ../KernelSU/
             patch -p1 < fix.patch
             
           else
