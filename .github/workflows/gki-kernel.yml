@@ -279,8 +279,8 @@ jobs:
           #  patch -p1 -F 3 < ksu_hooks.patch
           if [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
             echo "Applying hooks for KernelSU-Next..."
-            cp ../../kernel_patches/next/next_hooks.patch ./
-            patch -p1 -F 3 < next_hooks.patch
+            cp ../../kernel_patches/next/syscall_hooks.patch ./
+            patch -p1 -F 3 < syscall_hooks.patch
           #elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
           #  echo "Applying hooks for MKSU..."
           #  cp ../../kernel_patches/hooks/ksu_hooks.patch ./
