@@ -7,36 +7,6 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      build_a12_510:
-        description: 'Build a12 5.10?'
-        required: true
-        type: boolean
-        default: true
-      build_a13_510:
-        description: 'Build a13 5.10?'
-        required: true
-        type: boolean
-        default: true
-      build_a13_515:
-        description: 'Build a13 5.15?'
-        required: true
-        type: boolean
-        default: true
-      build_a14_515:
-        description: 'Build a14 5.15?'
-        required: true
-        type: boolean
-        default: true
-      build_a14_61:
-        description: 'Build a14 6.1?'
-        required: true
-        type: boolean
-        default: true
-      build_a15_66:
-        description: 'Build a15  6.6?'
-        required: true
-        type: boolean
-        default: true
       make_release:
         description: 'Do you want to create a release?'
         required: true
@@ -68,7 +38,6 @@ on:
 
 jobs:
   build-kernel-a12-5-10:
-    if: ${{ inputs.build_a12_510 }}
     uses: ./.github/workflows/kernel-a12-5.10.yml
     secrets: inherit
     with:
@@ -78,7 +47,6 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a13-5-10:
-    if: ${{ inputs.build_a13_510 }}
     uses: ./.github/workflows/kernel-a13-5.10.yml
     secrets: inherit
     with:
@@ -88,7 +56,6 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a13-5-15:
-    if: ${{ inputs.build_a13_515 }}
     uses: ./.github/workflows/kernel-a13-5.15.yml
     secrets: inherit
     with:
@@ -98,7 +65,6 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a14-5-15:
-    if: ${{ inputs.build_a14_515 }}
     uses: ./.github/workflows/kernel-a14-5.15.yml
     secrets: inherit
     with:
@@ -108,7 +74,6 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a14-6-1:
-    if: ${{ inputs.build_a14_61 }}
     uses: ./.github/workflows/kernel-a14-6.1.yml
     secrets: inherit
     with:
@@ -118,7 +83,6 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernel-a15-6-6:
-    if: ${{ inputs.build_a15_66 }}
     uses: ./.github/workflows/kernel-a15-6.6.yml
     secrets: inherit
     with:
