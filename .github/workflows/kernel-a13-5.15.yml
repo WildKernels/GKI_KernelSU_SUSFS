@@ -4,6 +4,10 @@ permissions:
   actions: write   # Allows triggering actions
 
 on:
+  push:
+    paths:
+      - .github/workflows/kernel-a13-5.15.yml  # Runs when this workflow file is updated\
+  workflow_dispatch:
   workflow_call:  # This allows this workflow to be called from another workflow
     inputs:
       make_release:
@@ -13,12 +17,15 @@ on:
       kernelsu_variant:
         required: true
         type: string
+        default: Next
       kernelsu_branch:
         required: true
         type: string
+        default: Stable
       kernelsu_branch_other:
         required: false
         type: string
+        default: ""
   
 jobs:
   build-kernel-a13-5-15-kernelsu-susfs:
@@ -51,11 +58,11 @@ jobs:
     uses: ./.github/workflows/gki-kernel.yml
     secrets: inherit
     with:
-      make_release: ${{ inputs.make_release }}
+      make_release: ${{ inputs.make_release || false }}
       android_version: "android13"
       kernel_version: "5.15"
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant || 'Next' }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch || 'Dev' }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
