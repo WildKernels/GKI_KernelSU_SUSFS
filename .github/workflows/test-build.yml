@@ -1,4 +1,4 @@
-name: Android 12 5.10
+name: Test GKI Build
 permissions:
   contents: write  # Allow writing to repository contents (for pushing tags)
   actions: write   # Allows triggering actions
@@ -6,7 +6,8 @@ permissions:
 on:
   push:
     paths:
-      - .github/workflows/kernel-a12-5.10.yml  # Runs when this workflow file is updated\
+      - .github/workflows/test-build.yml  # Runs when this workflow file is updated\
+      - .github/workflows/gki-kernel.yml  # Runs when this workflow file is updated\
   workflow_dispatch:
   workflow_call:  # This allows this workflow to be called from another workflow
     inputs:
@@ -28,44 +29,42 @@ on:
         default: ""
   
 jobs:
-  build-kernel-a12-5-10-kernelsu-susfs:
+  build-test-kernel-kernelsu-susfs:
     strategy:
       fail-fast: false
       matrix:
         include:
-        - sub_level: "66"
-          os_patch_level: "2022-01"
-          revision: "r11"
-        - sub_level: "168"
-          os_patch_level: "2023-04"
-          revision: "r9"
-        - sub_level: "198"
-          os_patch_level: "2024-01"
-          revision: "r17"
-        - sub_level: "205"
-          os_patch_level: "2024-03"
-          revision: "r9"
-        - sub_level: "209"
-          os_patch_level: "2024-05"
-          revision: "r13"
-        - sub_level: "218"
-          os_patch_level: "2024-08"
-          revision: "r14"
-        - sub_level: "226"
-          os_patch_level: "2024-11"
-          revision: "r8"
-        - sub_level: "233"
-          os_patch_level: "2025-02"
-          revision: "r1"
-        - sub_level: "X"
+        - android_version: "android12"
+          kernel_version: "5.10"
+          sub_level: "X"
           os_patch_level: "lts"
           revision: "r1"
+        - android_version: "android13"
+          kernel_version: "5.10"
+          sub_level: "X"
+          os_patch_level: "lts"
+        - android_version: "android13"
+          kernel_version: "5.15"
+          sub_level: "X"
+          os_patch_level: "lts"
+        - android_version: "android14"
+          kernel_version: "5.15"
+          sub_level: "X"
+          os_patch_level: "lts"
+        - android_version: "android14"
+          kernel_version: "6.1"
+          sub_level: "X"
+          os_patch_level: "lts"
+        - android_version: "android15"
+          kernel_version: "6.6"
+          sub_level: "X"
+          os_patch_level: "lts"
     uses: ./.github/workflows/gki-kernel.yml
     secrets: inherit
     with:
       make_release: ${{ inputs.make_release || false }}
-      android_version: "android12"
-      kernel_version: "5.10"
+      android_version: ${{ matrix.android_version }}
+      kernel_version: ${{ matrix.kernel_version }}
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
       revision: ${{ matrix.revision }}

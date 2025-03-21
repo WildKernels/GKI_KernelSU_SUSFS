@@ -179,6 +179,7 @@ jobs:
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
 
       - name: Copy file
+        if: ${{ inputs.make_release == false }}
         run: |
           cp -r $CONFIG source-clean-$CONFIG
 
@@ -190,6 +191,7 @@ jobs:
           path: source-clean-${{ env.CONFIG }}
 
       - name: Remove file
+        if: ${{ inputs.make_release == false }}
         run: |
           rm -rf source-clean-$CONFIG
 
@@ -344,7 +346,7 @@ jobs:
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
       
-      - name: Config Kernel Name
+      - name: Config BBR
         #if: ${{ inputs.kernel_version != '6.6' }}
         run: |
           cd "$CONFIG/common"
@@ -359,7 +361,6 @@ jobs:
           echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig 
 
-
       - name: Config Kernel Name
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -368,19 +369,18 @@ jobs:
           sed -i '$s|echo "\$res"|echo "-android14-11-gadc189cb6359-mioki"|' ./common/scripts/setlocalversion
           # Run perl command to modify UTS_VERSION
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sat Apr 20 04:20:00 UTC 2024"}' ./common/scripts/mkcompile_h
-
+          
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
             sed -i 's/-dirty//' ./common/scripts/setlocalversion
-            #LTO=${{ inputs.lto_type }} BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang"
           else
             rm -rf ./common/android/abi_gki_protected_exports_*
             sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
             sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-Wild+"/' ./common/arch/arm64/configs/gki_defconfig
-            #tools/bazel build --config=fast --lto=${{ inputs.lto_type }} //common:kernel_aarch64_dist
           fi
 
       - name: Copy file
+        if: ${{ inputs.make_release == false }}
         run: |
           cp -r $CONFIG source-patched-$CONFIG
 
@@ -392,6 +392,7 @@ jobs:
           path: source-patched-${{ env.CONFIG }}
 
       - name: Remove file
+        if: ${{ inputs.make_release == false }}
         run: |
           rm -rf source-patched-$CONFIG
 
