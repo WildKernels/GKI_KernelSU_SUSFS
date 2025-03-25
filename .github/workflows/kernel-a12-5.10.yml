@@ -33,8 +33,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - sub_level: "66"
-          os_patch_level: "2022-01"
+        - sub_level: "136"
+          os_patch_level: "2022-11"
           revision: "r11"
         - sub_level: "168"
           os_patch_level: "2023-04"
