@@ -36,6 +36,15 @@ on:
         type: string  # This input is required if 'Other' is chosen
 
 jobs:
+  build-kernel-a13-5-10:
+    uses: ./.github/workflows/kernel-a13-5.10.yml
+    secrets: inherit
+    with:
+      make_release: ${{ inputs.make_release }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
   build-kernel-a14-6-1:
     uses: ./.github/workflows/kernel-a14-6.1.yml
     secrets: inherit
@@ -48,6 +57,7 @@ jobs:
   trigger-release:
     runs-on: ubuntu-latest
     needs:
+        - build-kernel-a13-5-10
         - build-kernel-a14-6-1
     if: ${{ inputs.make_release }}
     env:
