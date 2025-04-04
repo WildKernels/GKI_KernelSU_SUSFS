@@ -366,7 +366,7 @@ jobs:
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
 
-          sed -i '$s|echo "\$res"|echo "-android14-11-gadc189cb6359-mioki"|' ./common/scripts/setlocalversion
+          sed -i "s|echo \"\$res\"|echo \"${{ matrix.version_string }}\"|" ./common/scripts/setlocalversion
           # Run perl command to modify UTS_VERSION
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sat Apr 20 04:20:00 UTC 2024"}' ./common/scripts/mkcompile_h
           
