@@ -111,31 +111,31 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
       include_susfs: ${{ inputs.include_susfs }}
 
-  build-kernels-a14-5-15:
-    needs: set-matrix
-    uses: ./.github/workflows/kernel-a14-5.15.yml
-    secrets: inherit
-    strategy:
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      make_release: ${{ inputs.make_release }}
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
-      include_susfs: ${{ inputs.include_susfs }}
+#  build-kernels-a14-5-15:
+#    needs: set-matrix
+#    uses: ./.github/workflows/kernel-a14-5.15.yml
+#    secrets: inherit
+#    strategy:
+#      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+#    with:
+#      make_release: ${{ inputs.make_release }}
+#      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+#      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+#      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+#      include_susfs: ${{ inputs.include_susfs }}
 
-  build-kernels-a14-6-1:
-    needs: set-matrix
-    uses: ./.github/workflows/kernel-a14-6.1.yml
-    secrets: inherit
-    strategy:
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      make_release: ${{ inputs.make_release }}
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
-      include_susfs: ${{ inputs.include_susfs }}
+#  build-kernels-a14-6-1:
+#    needs: set-matrix
+#    uses: ./.github/workflows/kernel-a14-6.1.yml
+#    secrets: inherit
+#    strategy:
+#      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+#    with:
+#      make_release: ${{ inputs.make_release }}
+#      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+#      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+#      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+#      include_susfs: ${{ inputs.include_susfs }}
 
   build-kernels-a15:
     needs: set-matrix
@@ -157,8 +157,8 @@ jobs:
       - build-kernels-a12
       - build-kernels-a13-5-10
       - build-kernels-a13-5-15
-      - build-kernels-a14-5-15
-      - build-kernels-a14-6-1
+      #- build-kernels-a14-5-15
+      #- build-kernels-a14-6-1
       - build-kernels-a15
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
