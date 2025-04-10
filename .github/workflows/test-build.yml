@@ -4,10 +4,10 @@ permissions:
   actions: write   # Allows triggering actions
 
 on:
-  push:
-    paths:
-      - .github/workflows/test-build.yml  # Runs when this workflow file is updated\
-      - .github/workflows/gki-kernel.yml  # Runs when this workflow file is updated\
+#  push:
+#    paths:
+#      - .github/workflows/test-build.yml  # Runs when this workflow file is updated\
+#      - .github/workflows/gki-kernel.yml  # Runs when this workflow file is updated\
   workflow_dispatch:
   workflow_call:  # This allows this workflow to be called from another workflow
     inputs:

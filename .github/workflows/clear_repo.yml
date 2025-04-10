@@ -1,0 +1,41 @@
+name: Delete All Releases and Tags
+
+on:
+  workflow_dispatch:
+
+jobs:
+  delete-releases-and-tags:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt update
+          sudo apt install gh -y
+
+      - name: Delete all releases via GitHub API
+        run: |
+          echo "Fetching all releases..."
+          releases=$(gh release list --json tagName --jq '.[].tagName')
+
+          for release in $releases; do
+            echo "Deleting release: $release"
+            gh release delete $release --yes
+          done
+
+      - name: Delete all local and remote tags
+        run: |
+          echo "Fetching all tags..."
+          git fetch --tags
+
+          echo "Deleting all local tags..."
+          git tag -d $(git tag -l)
+
+          echo "Deleting all remote tags..."
+          for tag in $(git ls-remote --tags origin | awk '{print $2}' | sed 's#refs/tags/##'); do
+            git push --delete origin $tag
+          done

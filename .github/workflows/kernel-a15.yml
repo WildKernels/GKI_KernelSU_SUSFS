@@ -1,34 +1,31 @@
-name: Android 15 6.6
+name: Build Kernel - A15
+
 permissions:
-  contents: write  # Allow writing to repository contents (for pushing tags)
+  contents: write  # Allow writing to repository contents
   actions: write   # Allows triggering actions
 
 on:
-  push:
-    paths:
-      - .github/workflows/kernel-a15-6.6.yml  # Runs when this workflow file is updated\
-  workflow_dispatch:
-  workflow_call:  # This allows this workflow to be called from another workflow
+  workflow_call:
     inputs:
       make_release:
         required: true
         type: boolean
-        default: true
+      include_susfs:
+        required: true
+        type: boolean
       kernelsu_variant:
         required: true
         type: string
-        default: Next
       kernelsu_branch:
         required: true
         type: string
-        default: Stable
       kernelsu_branch_other:
         required: false
         type: string
         default: ""
 
 jobs:
-  build-kernel-a15-6-6-kernelsu-susfs:
+  build-kernels-a15:
     strategy:
       fail-fast: false
       matrix:
@@ -51,14 +48,15 @@ jobs:
             os_patch_level: "2025-03"
           - sub_level: "X"
             os_patch_level: "lts"
-    uses: ./.github/workflows/gki-kernel.yml
+    uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
-      make_release: ${{ inputs.make_release || false }}
+      make_release: ${{ inputs.make_release }}
       android_version: "android15"
       kernel_version: "6.6"
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
-      kernelsu_variant: ${{ inputs.kernelsu_variant || 'Next' }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch || 'Dev' }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+      include_susfs: ${{ inputs.include_susfs }}
