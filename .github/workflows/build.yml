@@ -168,23 +168,6 @@ jobs:
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
 
-#      - name: Copy file
-#        if: ${{ inputs.make_release == false }}
-#        run: |
-#          cp -r $CONFIG source-clean-$CONFIG
-
-#      - name: Upload artifact
-#        if: ${{ inputs.make_release == false }}
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: source-clean-${{ env.CONFIG }}
-#          path: source-clean-${{ env.CONFIG }}
-
-#      - name: Remove file
-#        if: ${{ inputs.make_release == false }}
-#        run: |
-#          rm -rf source-clean-$CONFIG
-
       - name: Determine the branch for KernelSU
         run: |
           if [[ "${{ inputs.kernelsu_branch }}" == "Stable" ]]; then
@@ -375,23 +358,6 @@ jobs:
             sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
             sed -E -i '/^CONFIG_LOCALVERSION=/ s/(.*)"$/\1-Wild+"/' ./common/arch/arm64/configs/gki_defconfig
           fi
-
-#      - name: Copy file
-#        if: ${{ inputs.make_release == false }}
-#        run: |
-#          cp -r $CONFIG source-patched-$CONFIG
-
-#      - name: Upload artifact
-#        if: ${{ inputs.make_release == false }}
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: source-patched-${{ env.CONFIG }}
-#          path: source-patched-${{ env.CONFIG }}
-
-#      - name: Remove file
-#        if: ${{ inputs.make_release == false }}
-#        run: |
-#          rm -rf source-patched-$CONFIG
 
       - name: Build with retry
         uses: nick-fields/retry@v3
