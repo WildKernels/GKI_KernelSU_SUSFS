@@ -7,10 +7,6 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      test_build:
-        required: true
-        type: boolean
-        default: false
       include_susfs:
         description: 'Include SUSFS?'
         required: true
@@ -88,7 +84,6 @@ jobs:
           echo "matrix={\"include\": [$(IFS=,; echo "${MATRIX_ENTRIES[*]}")]}" >> $GITHUB_OUTPUT
 
   test-build:
-    if: ${{ inputs.test_build }}
     needs: set-matrix
     uses: ./.github/workflows/build.yml
     secrets: inherit
