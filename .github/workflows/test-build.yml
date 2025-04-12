@@ -1,58 +1,108 @@
-name: Test Build Kernel
+name: Test Build Kernels
 
 permissions:
-  contents: write  # Allow writing to repository contents
-  actions: write   # Allows triggering actions
+  contents: write
+  actions: write
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
-      make_release:
+      test_build:
         required: true
         type: boolean
+        default: false
       include_susfs:
+        description: 'Include SUSFS?'
         required: true
         type: boolean
-      kernelsu_variant:
+        default: true
+      include_ksu:
+        description: 'Include KSU?'
         required: true
-        type: string
+        type: boolean
+        default: true
+      include_mksu:
+        description: 'Include MKSU?'
+        required: true
+        type: boolean
+        default: true
+      include_ksu_next:
+        description: 'Include KSU_NEXT?'
+        required: true
+        type: boolean
+        default: true
+      include_all:
+        description: 'Include ALL?'
+        required: true
+        type: boolean
+        default: true
       kernelsu_branch:
+        description: "Choose ksu branch"
         required: true
-        type: string
+        type: choice
+        options:
+          - Stable
+          - Dev
+          - Other
+        default: Stable
       kernelsu_branch_other:
+        description: "If 'Other' is selected, specify your custom branch"
         required: false
         type: string
         default: ""
 
 jobs:
-  build-kernels-a15:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - android_version: "android12"
-            kernel_version: "5.10"
-            revision: "r1"
-          - android_version: "android13"
-            kernel_version: "5.10"
-          - android_version: "android13"
-            kernel_version: "5.15"
-          - android_version: "android14"
-            kernel_version: "5.15"
-          - android_version: "android14"
-            kernel_version: "6.1"
-          - android_version: "android15"
-            kernel_version: "6.6"
+  set-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          VARIANTS=()
+          [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("KSU")
+          [[ "${{ inputs.include_ksu_next }}" == "true" ]] && VARIANTS+=("KSU_NEXT")
+          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("MKSU")
+          [[ "${{ inputs.include_all }}" == "true" ]] && VARIANTS+=("ALL")
+
+          ANDROID_KERNEL_MATRIX=(
+            "android12|5.10|r1"
+            "android13|5.10|"
+            "android13|5.15|"
+            "android14|5.15|"
+            "android14|6.1|"
+            "android15|6.6|"
+          )
+
+          MATRIX_ENTRIES=()
+          for variant in "${VARIANTS[@]}"; do
+            for entry in "${ANDROID_KERNEL_MATRIX[@]}"; do
+              IFS="|" read -r android_version kernel_version revision <<< "$entry"
+              MATRIX_ENTRY="{\"kernelsu_variant\": \"${variant}\", \"android_version\": \"${android_version}\", \"kernel_version\": \"${kernel_version}\""
+              [[ -n "$revision" ]] && MATRIX_ENTRY+=", \"revision\": \"${revision}\""
+              MATRIX_ENTRY+="}"
+              MATRIX_ENTRIES+=("$MATRIX_ENTRY")
+            done
+          done
+
+          echo "matrix={\"include\": [$(IFS=,; echo "${MATRIX_ENTRIES[*]}")]}" >> $GITHUB_OUTPUT
+
+  test-build:
+    if: ${{ inputs.test_build }}
+    needs: set-matrix
     uses: ./.github/workflows/build.yml
     secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      make_release: ${{ inputs.make_release }}
+      make_release: false
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      include_susfs: ${{ inputs.include_susfs }}
       android_version: ${{ matrix.android_version }}
       kernel_version: ${{ matrix.kernel_version }}
+      revision: ${{ matrix.revision || '' }}
       sub_level: "X"
       os_patch_level: "lts"
-      revision: ${{ matrix.revision }}
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
-      include_susfs: ${{ inputs.include_susfs }}

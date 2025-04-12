@@ -76,20 +76,6 @@ jobs:
           [[ "${{ inputs.include_all }}" == "true" ]] && VARIANTS+=("\"ALL\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
-  test-build:
-    if: ${{ inputs.test_build}}
-    needs: set-matrix
-    uses: ./.github/workflows/test-build.yml
-    secrets: inherit
-    strategy:
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      make_release: ${{ inputs.make_release }}
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
-      include_susfs: ${{ inputs.include_susfs }}
-
   build-kernels-a12:
     if: ${{ inputs.test_build == false }}
     needs: set-matrix
