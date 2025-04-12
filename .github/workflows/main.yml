@@ -17,6 +17,11 @@ on:
         required: true
         type: boolean
         default: true
+      tg_release:
+        description: 'Release on telegram?'
+        required: true
+        type: boolean
+        default: false
       include_susfs:
         description: 'Include SUSFS?'
         required: true
@@ -163,6 +168,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_NAME: "GKI Prebuilt Release"
+      RELEASE_BODY:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -238,6 +244,52 @@ jobs:
         with:
           path: ./downloaded-artifacts
 
+      - name: Set release body
+        run: |
+          cat << 'EOF' > release_body.md
+          These kernels are prebuilt with Offical KernelSU/MKSU/KernelSU-Next and with SUSFS.
+      
+          **SUSFS Present: ${{ inputs.include_susfs }}**
+          Branch type for KSU: ${{ inputs.kernelsu_branch }}
+          Wild+ Current Kernel Tag (Not Important): ${{ env.NEW_TAG }}
+      
+          Features:
+          -> KernelSU/MKSU/KernelSU-Next
+          -> SUSFS ඞ v1.5.5 
+          -> Manual Syscall Hooks for Better Hiding
+          -> Magic Mount Support
+          -> Simple Maphide for LineageOS Detections
+          -> Futile Maphide for jit-zygote-cache Detections
+          -> Wireguard Support
+          -> BBR Support
+      
+          Notes:
+          -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
+          -> Kernel Flasher is broken with latest susfs, try https://github.com/libxzr/HorizonKernelFlasher!
+      
+          Module: 
+          -> https://github.com/sidex15/ksu_module_susfs
+      
+          Managers:
+          -> KernelSU (`KSU`, `ALL`): https://github.com/tiann/KernelSU / https://t.me/KernelSU_group/3234
+          -> 5ec1cff's KernelSU (`MKSU`, `ALL`): https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci
+          -> KernelSU-Next (`KSU_NEXT`, `ALL`): https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group/24847
+          -> rsuntk's KernelSU (`ALL`): https://github.com/rsuntk/KernelSU / https://t.me/rsukrnlsu
+          -> backslashxx's KernelSU (`ALL`): https://github.com/backslashxx/KernelSU
+      
+          Commit Hashes (at the time of release):
+          -> KernelSU Official (`KSU`, `ALL`): [${{ env.KSU_REF }}](${{ env.KSU_URL }})
+          -> 5ec1cff's KernelSU (`MKSU`): [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
+          -> KernelSU Next (`KSU_NEXT`): [${{ env.KSU_NEXT_REF }}](${{ env.KSU_NEXT_URL }})
+          -> SUSFS4KSU: 
+            -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
+            -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
+            -> gki-android13-5.15: [${{ env.COMMIT_HASH_gki_android13_5_15 }}](${{ env.COMMIT_URL_gki_android13_5_15 }})
+            -> gki-android14-5.15: [${{ env.COMMIT_HASH_gki_android14_5_15 }}](${{ env.COMMIT_URL_gki_android14_5_15 }})
+            -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
+            -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -245,48 +297,7 @@ jobs:
           prerelease: ${{ inputs.release_type }}
           files: ""
           name: ${{ env.RELEASE_NAME }}
-          body: |
-            These kernels are prebuilt with Offical KernelSU/MKSU/KernelSU-Next and with SUSFS.
-            
-            **SUSFS Present: ${{ inputs.include_susfs }}**
-            Branch type for KSU: ${{ inputs.kernelsu_branch }}
-            Wild+ Current Kernel Tag (Not Important): ${{ env.NEW_TAG }}
-            
-            Features:
-            -> KernelSU/MKSU/KernelSU-Next
-            -> SUSFS ඞ v1.5.5 
-            -> Manual Syscall Hooks for Better Hiding
-            -> Magic Mount Support
-            -> Simple Maphide for LineageOS Detections
-            -> Futile Maphide for jit-zygote-cache Detections
-            -> Wireguard Support
-            -> BBR Support
-
-            Notes:
-            -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
-            -> Kernel Flasher is broken with latest susfs, try https://github.com/libxzr/HorizonKernelFlasher!
-
-            Module: 
-            -> https://github.com/sidex15/ksu_module_susfs
-            
-            Managers:
-            -> KernelSU (`KSU`, `ALL`): https://github.com/tiann/KernelSU / https://t.me/KernelSU_group/3234
-            -> 5ec1cff's KernelSU (`MKSU`, `ALL`): https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci
-            -> KernelSU-Next (`KSU_NEXT`, `ALL`): https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group/24847
-            -> rsuntk's KernelSU (`ALL`): https://github.com/rsuntk/KernelSU / https://t.me/rsukrnlsu
-            -> backslashxx's KernelSU (`ALL`): https://github.com/backslashxx/KernelSU
-            
-            Commit Hashes (at the time of release):
-            -> KernelSU Official (`KSU`, `ALL`): [${{ env.KSU_REF }}](${{ env.KSU_URL }})
-            -> 5ec1cff's KernelSU (`MKSU`): [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
-            -> KernelSU Next (`KSU_NEXT`): [${{ env.KSU_NEXT_REF }}](${{ env.KSU_NEXT_URL }})
-            -> SUSFS4KSU: 
-              -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
-              -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
-              -> gki-android13-5.15: [${{ env.COMMIT_HASH_gki_android13_5_15 }}](${{ env.COMMIT_URL_gki_android13_5_15 }})
-              -> gki-android14-5.15: [${{ env.COMMIT_HASH_gki_android14_5_15 }}](${{ env.COMMIT_URL_gki_android14_5_15 }})
-              -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
-              -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
+          body_path: release_body.md
 
       - name: Upload Release Assets
         run: |
@@ -303,16 +314,17 @@ jobs:
           echo "GitHub release created with the following files:"
           ls ./downloaded-artifacts/**/*
 
-#      - name: Send telegram message on push
-#        env:
-#          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-#          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-#          TELEGRAM_MESSAGE_THREAD_ID: ${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}
-#        run: |
-#          curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-#            -d "chat_id=$TELEGRAM_CHAT_ID" \
-#            -d "message_thread_id=$TELEGRAM_MESSAGE_THREAD_ID" \
-#            -d "text=Latest release: 
-#            https://github.com/WildPlusKernel/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }}
-#            
-#            ${{ env.RELEASE_NOTES }}"
+      - name: Send telegram message on push
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_MESSAGE_THREAD_ID: ${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}
+        if: ${{ inputs.tg_release }}
+        run: |
+          curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d "chat_id=$TELEGRAM_CHAT_ID" \
+            -d "message_thread_id=$TELEGRAM_MESSAGE_THREAD_ID" \
+            -d "text=Latest release: 
+            https://github.com/WildPlusKernel/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }}
+            
+            cat release_body.md"
