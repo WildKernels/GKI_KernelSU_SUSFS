@@ -1,4 +1,4 @@
-name: Build Kernel - A13 5.15
+name: Build Kernel - A13
 
 permissions:
   contents: write  # Allow writing to repository contents
@@ -25,6 +25,44 @@ on:
         default: ""
 
 jobs:
+  build-kernels-a13-5-10:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sub_level: "189"
+            os_patch_level: "2023-11"
+          - sub_level: "198"
+            os_patch_level: "2024-01"
+          - sub_level: "205"
+            os_patch_level: "2024-03"
+          - sub_level: "209"
+            os_patch_level: "2024-05"
+          - sub_level: "210"
+            os_patch_level: "2024-06"
+          - sub_level: "214"
+            os_patch_level: "2024-07"
+          - sub_level: "218"
+            os_patch_level: "2024-08"
+          - sub_level: "223"
+            os_patch_level: "2024-11"
+          - sub_level: "228"
+            os_patch_level: "2025-01"
+          - sub_level: "X"
+            os_patch_level: "lts"
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      make_release: ${{ inputs.make_release }}
+      android_version: "android13"
+      kernel_version: "5.10"
+      sub_level: ${{ matrix.sub_level }}
+      os_patch_level: ${{ matrix.os_patch_level }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+      include_susfs: ${{ inputs.include_susfs }}
+
   build-kernels-a13-5-15:
     strategy:
       fail-fast: false
