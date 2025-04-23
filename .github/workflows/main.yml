@@ -200,7 +200,7 @@ jobs:
         run: |
             LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
             if [ -z "$LATEST_TAG" ]; then
-              LATEST_TAG="v1.5.5-r0"
+              LATEST_TAG="v1.5.6-r0"
             fi
             
             NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
@@ -227,7 +227,7 @@ jobs:
       
           Features:
           -> KernelSU/MKSU/KernelSU-Next
-          -> SUSFS ඞ v1.5.5 
+          -> SUSFS ඞ v1.5.6
           -> Manual Syscall Hooks for Better Hiding
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
