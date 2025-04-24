@@ -25,15 +25,53 @@ on:
         default: ""
 
 jobs:
+  build-kernels-a14-5-15:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sub_level: "137"
+            os_patch_level: "2024-01"
+          - sub_level: "144"
+            os_patch_level: "2024-03"
+          - sub_level: "148"
+            os_patch_level: "2024-05"
+          - sub_level: "149"
+            os_patch_level: "2024-06"
+          - sub_level: "153"
+            os_patch_level: "2024-07"
+          - sub_level: "158"
+            os_patch_level: "2024-08"
+          - sub_level: "167"
+            os_patch_level: "2024-11"
+          - sub_level: "170"
+            os_patch_level: "2025-01"
+          - sub_level: "178"
+            os_patch_level: "2025-03"
+          - sub_level: "X"
+            os_patch_level: "lts"
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      make_release: ${{ inputs.make_release }}
+      android_version: "android14"
+      kernel_version: "5.15"
+      sub_level: ${{ matrix.sub_level }}
+      os_patch_level: ${{ matrix.os_patch_level }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+      include_susfs: ${{ inputs.include_susfs }}
+
   build-kernels-a14-6-1:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - sub_level: "25"
-            os_patch_level: "2023-10"
-          - sub_level: "43"
-            os_patch_level: "2023-11"
+          #- sub_level: "25"
+          #  os_patch_level: "2023-10"
+          #- sub_level: "43"
+          #  os_patch_level: "2023-11"
           - sub_level: "57"
             os_patch_level: "2024-01"
           - sub_level: "68"
@@ -60,6 +98,8 @@ jobs:
             os_patch_level: "2025-02"
           - sub_level: "128"
             os_patch_level: "2025-03"
+          - sub_level: "129"
+            os_patch_level: "2025-04"
           - sub_level: "X"
             os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
@@ -68,44 +108,6 @@ jobs:
       make_release: ${{ inputs.make_release }}
       android_version: "android14"
       kernel_version: "6.1"
-      sub_level: ${{ matrix.sub_level }}
-      os_patch_level: ${{ matrix.os_patch_level }}
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
-      include_susfs: ${{ inputs.include_susfs }}
-
-  build-kernels-a14-5-15:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - sub_level: "131"
-            os_patch_level: "2023-11"
-          - sub_level: "137"
-            os_patch_level: "2024-01"
-          - sub_level: "144"
-            os_patch_level: "2024-03"
-          - sub_level: "148"
-            os_patch_level: "2024-05"
-          - sub_level: "149"
-            os_patch_level: "2024-06"
-          - sub_level: "153"
-            os_patch_level: "2024-07"
-          - sub_level: "158"
-            os_patch_level: "2024-08"
-          - sub_level: "167"
-            os_patch_level: "2024-11"
-          - sub_level: "170"
-            os_patch_level: "2025-01"
-          - sub_level: "X"
-            os_patch_level: "lts"
-    uses: ./.github/workflows/build.yml
-    secrets: inherit
-    with:
-      make_release: ${{ inputs.make_release }}
-      android_version: "android14"
-      kernel_version: "5.15"
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
