@@ -46,6 +46,8 @@ jobs:
             os_patch_level: "2025-02"
           - sub_level: "77"
             os_patch_level: "2025-03"
+          - sub_level: "82"
+            os_patch_level: "2025-04"
           - sub_level: "X"
             os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
