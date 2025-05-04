@@ -11,9 +11,14 @@ on:
         description: 'Include KSU?'
         required: true
         type: boolean
-        default: true
+        default: false
       include_mksu:
         description: 'Include MKSU?'
+        required: true
+        type: boolean
+        default: false
+      include_multi:
+        deacription: 'Include MULTI?'
         required: true
         type: boolean
         default: true
@@ -50,6 +55,7 @@ jobs:
           [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
           [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
+          [[ "${{ inputs.include_multi }}" == "true" ]] && VARIANTS+=("\"MULTI\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-kernels-a12:
@@ -212,11 +218,11 @@ jobs:
           -> https://github.com/sidex15/ksu_module_susfs
       
           Managers:
-          -> KernelSU-Next (`KSU_NEXT`, `KSU`): https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
-          -> KernelSU (`KSU`): https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
-          -> 5ec1cff's KernelSU (`MKSU`, `KSU`): https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci
-          -> rsuntk (`KSU`): https://github.com/rsuntk/KernelSU / https://t.me/rsukrnlsu
-          -> backslashxx (`KSU`): https://github.com/backslashxx/KernelSU
+          -> KernelSU-Next (`KSU_NEXT`, `MULTI`): https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
+          -> KernelSU (`KSU`, `MULTI`): https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
+          -> 5ec1cff's KernelSU (`MKSU`, `MULTI`): https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci
+          -> rsuntk (`MULTI`): https://github.com/rsuntk/KernelSU / https://t.me/rsukrnlsu
+          -> backslashxx (`MULTI`): https://github.com/backslashxx/KernelSU
       
           Commit Hashes (at the time of release):
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})

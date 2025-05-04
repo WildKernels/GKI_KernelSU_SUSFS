@@ -186,7 +186,7 @@ jobs:
           cd "$CONFIG"
       
           case "${{ inputs.kernelsu_variant }}" in
-            "KSU")
+            "KSU" | "MULTI" )
               echo "Adding KernelSU Official..."
               curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
@@ -213,7 +213,7 @@ jobs:
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           
           case "${{ inputs.kernelsu_variant }}" in
-            "KSU")
+            "KSU" "MULTI" )
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
               cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
@@ -259,11 +259,11 @@ jobs:
           patch -p1 -F 3 < 69_hide_stuff.patch
 
       - name: Add All Managers
-        if: ${{ inputs.kernelsu_variant == 'KSU' }}
+        if: ${{ inputs.kernelsu_variant == 'MULTI' }}
         run: |
           cd "$CONFIG"
           cse "${{ inputs.kernelsu_variant }}" in
-            "KSU")
+            "KSU" | "MULTI" )
               echo "Applying Manager patch for Official KernelSU..."
               #cp ../kernel_patches/ksu/manager.patch ./
               ;;
