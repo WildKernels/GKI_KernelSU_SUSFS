@@ -259,10 +259,10 @@ jobs:
           patch -p1 -F 3 < 69_hide_stuff.patch
 
       - name: Add All Managers
-        if: ${{ inputs.kernelsu_variant == 'ALL' }}
+        if: ${{ inputs.kernelsu_variant == 'KSU' }}
         run: |
           cd "$CONFIG"
-          case "${{ inputs.kernelsu_variant }}" in
+          cse "${{ inputs.kernelsu_variant }}" in
             "KSU")
               echo "Applying Manager patch for Official KernelSU..."
               #cp ../kernel_patches/ksu/manager.patch ./
