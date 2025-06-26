@@ -79,6 +79,7 @@ jobs:
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
           [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
+          echo "${{ inputs.pong_only_mode }} , ${{ inputs.use_pong_ramdisk }}"
 
   build-kernels-a12:
     needs: set-matrix
