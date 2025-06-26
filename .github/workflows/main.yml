@@ -15,7 +15,7 @@ on:
           - Actions
           - Pre-Release
           - Release
-        default: Pre-Release
+        default: Actions
       include_wild:
         description: 'Include WILD?'
         required: true
