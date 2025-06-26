@@ -21,6 +21,10 @@ on:
         required: false
         type: boolean
         default: false
+      use_pong_ramdisk:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-kernels-a12:
@@ -83,4 +87,5 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+      pong_only_mode: ${{ inputs.pong_only_mode }}
 

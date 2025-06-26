@@ -12,6 +12,11 @@ on:
         required: true
         type: boolean
         default: true
+      use_pong_ramdisk:
+        description: "Use ramdisk from the pong.img in the repo (ONLY USE WITH THE IMG YOU WANT TO FLASH ALREADY COMMITED TO THE REPO)"
+        required: true
+        type: boolean
+        default: false
       release_type:
         description: "Choose Release Type"
         required: true
@@ -63,6 +68,9 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - id: set-matrix
         run: |
           VARIANTS=()
@@ -84,6 +92,7 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
       pong_only_mode: ${{ inputs.pong_only_mode }}
+      use_pong_ramdisk: ${{ inputs.use_pong_ramdisk }}
 
   build-kernels-a13:
     if: ${{ inputs.pong_only_mode == false }}

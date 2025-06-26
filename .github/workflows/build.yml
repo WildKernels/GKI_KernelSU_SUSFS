@@ -30,6 +30,14 @@ on:
       revision:
         required: false
         type: string
+      pong_only_mode:
+        required: false
+        type: boolean
+        default: false
+      use_pong_ramdisk:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-gki:
@@ -426,13 +434,18 @@ jobs:
           mkdir bootimgs
 
           echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
+          if [ "${{ inputs.pong_only_mode == true }}" ]; then   # Pong uses an uncompressed Image
+            cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
+            cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
+          else
+            cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
+            cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
+            cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
+            cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
 
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
+            # Create gzip of the Image file
+            gzip -n -k -f -9 ./Image > ./Image.gz
+          fi
 
       - name: Create Bootimgs Folder and Copy Images for Android 14/15
         if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
@@ -449,6 +462,7 @@ jobs:
           gzip -n -k -f -9 ./Image > ./Image.gz
 
       - name: Create ZIP Files for Different Formats
+        if: ${{ inputs.pong_only_mode == false }}
         run: |
           echo "Creating zip files for all formats..."
           cd ./AnyKernel3
@@ -473,34 +487,40 @@ jobs:
           rm ./Image.gz
 
       - name: Android 12 boot image build script
-        if: ${{ inputs.android_version == 'android12' }}
+        if: ${{ ( inputs.android_version == 'android12' && inputs.pong_only_mode == true && inputs.use_pong_ramdisk == true ) || ( inputs.android_version == 'android12' && inputs.pong_only_mode == false && inputs.use_pong_ramdisk == false ) }}
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd bootimgs
           
-          GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-"${{ inputs.os_patch_level }}"_"${{ inputs.revision }}".zip
-          FALLBACK_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip
-          
-          # Check if the GKI URL is available
-          echo "Checking if GKI kernel URL is reachable: $GKI_URL"
-          status=$(curl -sL -w "%{http_code}" "$GKI_URL" -o /dev/null)
-          
-          if [ "$status" = "200" ]; then
-              echo "[+] Downloading from GKI_URL"
-              curl -Lo gki-kernel.zip "$GKI_URL"
+          if [ "${{ inputs.pong_only_mode == true && inputs.use_pong_ramdisk == true }}" ]; then
+            echo "Unpacking pong.img..."
+            FULL_PATH=$(GITHUB_WORKSPACE)/pong.img
+            echo "Unpacking using: $FULL_PATH"
           else
-              echo "[+] $GKI_URL not found, using $FALLBACK_URL"
-              curl -Lo gki-kernel.zip "$FALLBACK_URL"
+            GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-"${{ inputs.os_patch_level }}"_"${{ inputs.revision }}".zip
+            FALLBACK_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip
+
+            # Check if the GKI URL is available
+            echo "Checking if GKI kernel URL is reachable: $GKI_URL"
+            status=$(curl -sL -w "%{http_code}" "$GKI_URL" -o /dev/null)
+          
+            if [ "$status" = "200" ]; then
+                echo "[+] Downloading from GKI_URL"
+                curl -Lo gki-kernel.zip "$GKI_URL"
+            else
+                echo "[+] $GKI_URL not found, using $FALLBACK_URL"
+                curl -Lo gki-kernel.zip "$FALLBACK_URL"
+            fi
+          
+            # Unzip the downloaded kernel and remove the zip
+            echo "Unzipping the downloaded kernel..."
+            unzip gki-kernel.zip && rm gki-kernel.zip
+          
+            echo "Unpacking boot.img..."
+            FULL_PATH=$(pwd)/boot-5.10.img
+            echo "Unpacking using: $FULL_PATH"
           fi
-          
-          # Unzip the downloaded kernel and remove the zip
-          echo "Unzipping the downloaded kernel..."
-          unzip gki-kernel.zip && rm gki-kernel.zip
-          
-          echo "Unpacking boot.img..."
-          FULL_PATH=$(pwd)/boot-5.10.img
-          echo "Unpacking using: $FULL_PATH"
-          
+
           echo "Running unpack_bootimg.py..."
           $UNPACK_BOOTIMG --boot_img="$FULL_PATH"
           
@@ -510,17 +530,23 @@ jobs:
           echo "Building boot.img"
           $MKBOOTIMG --header_version 4 --kernel Image --output boot.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
+          if [ "${{ inputs.pong_only_mode == true && inputs.use_pong_ramdisk == true }}" ]; then
+            cp ./boot.img ../pong-${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
+          else
+            cp ./boot.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
+          fi
+
+          if [ "${{ inputs.pong_only_mode == false }}" ]; then
+            echo "Building boot-gz.img"
+            $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+            $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+            cp ./boot-gz.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-gz.img
           
-          echo "Building boot-gz.img"
-          $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
-          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot-gz.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-gz.img
-          
-          echo "Building boot-lz4.img"
-          $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
-          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
+            echo "Building boot-lz4.img"
+            $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+            $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+            cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
+          fi
 
       - name: Android 13/14/15 boot image build script
         if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
@@ -552,6 +578,7 @@ jobs:
           done
   
       - name: Upload Build Artifacts
+        if: ${{ inputs.pong_only_mode == false && inputs.use_pong_ramdisk == false }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.kernelsu_variant }}-kernel-${{ env.CONFIG }}
@@ -559,3 +586,19 @@ jobs:
             *.zip
             *.img.gz
             *Image*
+
+      - name: Upload Pong Artifacts
+        if: ${{ inputs.pong_only_mode == true && inputs.use_pong_ramdisk == false }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.kernelsu_variant }}-kernel-${{ env.CONFIG }}
+          path: |
+            *Image*
+
+      - name: Upload pong.img Artifacts
+        if: ${{ inputs.pong_only_mode == true && inputs.use_pong_ramdisk == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.kernelsu_variant }}-kernel-${{ env.CONFIG }}
+          path: |
+            *.img.gz
