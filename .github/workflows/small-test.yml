@@ -16,6 +16,9 @@ jobs:
         
       - id: testing
         run: |
-          ls -l 
+          env
+          echo '\n'
+          ls -al 
+          echo '\n'
           echo ${PWD}
           
