@@ -487,8 +487,12 @@ jobs:
           rm ./Image.gz
 
       - name: Android 12 boot image build script
-        if: ${{ ( inputs.android_version == 'android12' && inputs.pong_only_mode == true && inputs.use_pong_ramdisk == true ) || ( inputs.android_version == 'android12' && inputs.pong_only_mode == false && inputs.use_pong_ramdisk == false ) }}
+        if: ${{ inputs.android_version == 'android12' }}
         run: |
+          if [ "${{ inputs.pong_only_mode == true && inputs.use_pong_ramdisk == false }}" ]; then
+            exit 0
+          fi
+          
           echo "Changing to configuration directory: $CONFIG..."
           cd bootimgs
           
