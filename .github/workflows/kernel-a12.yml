@@ -17,9 +17,14 @@ on:
         required: false
         type: string
         default: ""
+      pong_only_mode:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-kernels-a12:
+    if: ${{ inputs.pong_only_mode == false }}
     strategy:
       fail-fast: true
       matrix:
@@ -62,3 +67,20 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+
+  build-pong_only-kernel-a12:
+    if: ${{ inputs.pong_only_mode == true }}
+    strategy:
+      fail-fast: true
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      android_version: "android12"
+      kernel_version: "5.10"
+      sub_level: "226"
+      os_patch_level: "2024-11"
+      revision: "r8"
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+

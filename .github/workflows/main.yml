@@ -7,6 +7,11 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      pong_only_mode:
+        description: "Only build the gki that the Nothing Phone 2 uses (currently android12-5.10.226)"
+        required: true
+        type: boolean
+        default: true
       release_type:
         description: "Choose Release Type"
         required: true
@@ -78,8 +83,10 @@ jobs:
       kernelsu_variant: ${{ matrix.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      pong_only_mode: ${{ inputs.pong_only_mode }}
 
   build-kernels-a13:
+    if: ${{ inputs.pong_only_mode == false }}
     needs: set-matrix
     uses: ./.github/workflows/kernel-a13.yml
     secrets: inherit
@@ -92,6 +99,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernels-a14:
+    if: ${{ inputs.pong_only_mode == false }}
     needs: set-matrix
     uses: ./.github/workflows/kernel-a14.yml
     secrets: inherit
@@ -104,6 +112,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernels-a15:
+    if: ${{ inputs.pong_only_mode == false }}
     needs: set-matrix
     uses: ./.github/workflows/kernel-a15.yml
     secrets: inherit
