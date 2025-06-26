@@ -54,7 +54,7 @@ on:
           - Stable
           - Dev
           - Other
-        default: Dev
+        default: Stable
       kernelsu_branch_other:
         description: "If 'Other' is selected, specify your custom branch"
         required: false
