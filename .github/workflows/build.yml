@@ -71,7 +71,6 @@ jobs:
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
           echo "CONFIG set to: $CONFIG"
-          echo "${{ inputs.pong_only_mode }} , ${{ inputs.use_pong_ramdisk }}"
 
       - name: Install ccache
         run: sudo apt update && sudo apt install -y ccache
