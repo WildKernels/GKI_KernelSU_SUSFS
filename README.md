@@ -1,3 +1,7 @@
+## My own personal builds of Wild Kernels, with my own patches in the future, possibly.
+Original README.md:
+
+
 # Wild Kernels for Android
 
 ## Your warranty is no longer valid!
