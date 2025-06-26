@@ -51,23 +51,6 @@ on:
         type: string
         default: ""
 
-jobs:
-  notify:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send Telegram Notification
-        run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F message_thread_id="${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}" \
-            -F text="
-            🚀 Build started for Kernel! 
-            📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})
-            🗂️ *Branch:* ${{ github.ref_name }}
-            ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-            [🔗 View GitHub Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
-            -F parse_mode="Markdown"
-            
   set-matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 120
