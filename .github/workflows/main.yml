@@ -51,6 +51,7 @@ on:
         type: string
         default: ""
 
+jobs:
   set-matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 120
