@@ -576,7 +576,7 @@ jobs:
           cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
           
       - name: Compress all img files with gzip
-        if: ${{ inputs.pong_only_mode == false || inputs.use_pong_ramdisk == true }}
+        if: ${{ inputs.pong_only_mode == false }}
         run: |
           for image in *.img; do
             gzip -vnf9 "$image"
@@ -607,3 +607,4 @@ jobs:
           name: ${{ inputs.kernelsu_variant }}-kernel-${{ env.CONFIG }}
           path: |
             *.img.gz
+            *.img
