@@ -8,9 +8,12 @@ on:
     workflow_dispatch:
 
 jobs:
-  test: 
+  test:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - id: testing
         run: |
           ls -l 
