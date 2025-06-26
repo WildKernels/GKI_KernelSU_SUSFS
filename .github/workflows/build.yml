@@ -404,7 +404,7 @@ jobs:
           # modify UTS_VERSION
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Apr 20 04:20:00 UTC 2025"}' ./common/scripts/mkcompile_h
           
-          sed -i '$s|echo "\$res"|echo "\$res-${{ inputs.kernelsu_variant }}-v$KSUVER-SUSFS-v1.5.7-Vagelis1608"|' ./common/scripts/setlocalversion
+          sed -i '$s|echo "\$res"|echo "\$res-${{ inputs.kernelsu_variant }}-SUSFS-Vagelis1608"|' ./common/scripts/setlocalversion
           if [ -f "build/build.sh" ]; then
             sed -i 's/-dirty//' ./common/scripts/setlocalversion
           else
@@ -412,7 +412,7 @@ jobs:
             sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
             rm -rf ./common/android/abi_gki_protected_exports_*
             sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-            sed -E -i "/^CONFIG_LOCALVERSION=/ s/(.*)\"/\\1-${{ inputs.kernelsu_variant }}-v$KSUVER-SUSFS-v1.5.7-Vagelis1608\"/" ./common/arch/arm64/configs/gki_defconfig
+            sed -E -i "/^CONFIG_LOCALVERSION=/ s/(.*)\"/\\1-${{ inputs.kernelsu_variant }}-SUSFS-Vagelis1608\"/" ./common/arch/arm64/configs/gki_defconfig
           fi
 
       - name: Build
