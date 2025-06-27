@@ -68,9 +68,6 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
       - id: set-matrix
         run: |
           VARIANTS=()

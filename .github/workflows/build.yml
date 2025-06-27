@@ -49,6 +49,9 @@ jobs:
       CCACHE_HARDLINK: "true"
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
         with:
