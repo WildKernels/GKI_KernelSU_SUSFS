@@ -499,7 +499,7 @@ jobs:
           
           if [ "${{ inputs.pong_only_mode }}" == "true" ]; then
             echo "Unpacking pong.img..."
-            FULL_PATH=$(GITHUB_WORKSPACE)/pong.img
+            FULL_PATH=$GITHUB_WORKSPACE/pong.img
             echo "Unpacking using: $FULL_PATH"
           else
             GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-"${{ inputs.os_patch_level }}"_"${{ inputs.revision }}".zip
