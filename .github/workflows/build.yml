@@ -489,7 +489,8 @@ jobs:
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
         run: |
-          if [ ${{ inputs.pong_only_mode == true && inputs.use_pong_ramdisk == false }} ]; then
+          if [ "${{ inputs.pong_only_mode == true && inputs.use_pong_ramdisk == false }}" ]; then
+            echo "Skipping boot img build script"
             exit 0
           fi
           
