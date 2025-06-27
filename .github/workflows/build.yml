@@ -50,6 +50,7 @@ jobs:
 
     steps:
       - name: Checkout repo
+        if: ${{ inputs.pong_only_mode == true }}
         uses: actions/checkout@v4
 
       - name: Maximize Build Space
