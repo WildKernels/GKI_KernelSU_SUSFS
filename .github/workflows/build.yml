@@ -244,17 +244,19 @@ jobs:
               cd ./KernelSU-Next
               cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
-              cp ../../kernel_patches/next/fix_apk_sign.c.patch ./
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_apk_sign.c.patch ./
               patch -p1 --forward --fuzz=3 < fix_apk_sign.c.patch
-              cp ../../kernel_patches/next/fix_core_hook.c.patch ./
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_core_hook.c.patch ./
               patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
-              cp ../../kernel_patches/next/fix_selinux.c.patch ./
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_selinux.c.patch ./
               patch -p1 --forward --fuzz=3 < fix_selinux.c.patch
-              cp ../../kernel_patches/next/fix_ksud.c.patch ./
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_ksud.c.patch ./
               patch -p1 --forward --fuzz=3 < fix_ksud.c.patch
-              #cp ../../kernel_patches/next/fix_sucompat.c.patch ./
-              #patch -p1 --forward --fuzz=3 < fix_sucompat.c.patch
-              #sed -i '/bool ksu_devpts_hook = false;/d' ./kernel/sucompat.c
+              
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
@@ -313,32 +315,6 @@ jobs:
           cd "$CONFIG/common"
           cp ../../kernel_patches/69_hide_stuff.patch ./
           patch -p1 -F 3 < 69_hide_stuff.patch
-
-      - name: Add All Managers
-        run: |
-          cd "$CONFIG"
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Applying Manager patch for Wild KSU..."
-              cd Wild_KSU
-              cp ../../kernel_patches/wild/manager.patch ./
-              ;;
-            "KSU")
-              echo "Applying Manager patch for Official KernelSU..."
-              cd KernelSU
-              cp ../../kernel_patches/wild/manager.patch ./
-              ;;
-            "NEXT")
-              echo "Applying Manager patch for KernelSU Next..."
-              cd KernelSU-Next
-              cp ../../kernel_patches/next/manager.patch ./
-              ;;
-            "MKSU")
-              echo "Applying Manager patch for MKSU..."
-              #cp ../kernel_patches/mksu/manager.patch .//
-              ;;
-          esac
-          patch -p1 --fuzz=3 < manager.patch || echo "No Manager Patch"
 
       - name: Add Configuration Settings
         run: |

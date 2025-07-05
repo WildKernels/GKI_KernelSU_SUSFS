@@ -228,7 +228,7 @@ jobs:
           Features:
           -> Wild KSU Kernels & Others
           -> Multi Manager Support for Wild Kernels & Next Kernels (Not Recommended)
-          -> SUSFS ඞ v1.5.7
+          -> SUSFS ඞ v1.5.8
           -> Scope-Minimized Manual hooks v1.4
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
