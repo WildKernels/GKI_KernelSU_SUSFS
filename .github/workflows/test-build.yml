@@ -62,12 +62,7 @@ jobs:
           [[ "${{ inputs.include_all }}" == "true" ]] && VARIANTS+=("ALL")
 
           ANDROID_KERNEL_MATRIX=(
-            "android12|5.10|r1"
-            "android13|5.10|"
-            "android13|5.15|"
-            "android14|5.15|"
             "android14|6.1|"
-            "android15|6.6|"
           )
 
           MATRIX_ENTRIES=()
