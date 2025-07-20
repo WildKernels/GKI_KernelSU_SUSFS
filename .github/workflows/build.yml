@@ -372,7 +372,7 @@ jobs:
               perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
               rm -rf ./common/android/abi_gki_protected_exports_*
               perl -pi -e 's/^-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-              perl -pi -e 's/^CONFIG_LOCALVERSION=(.*)"/CONFIG_LOCALVERSION=\1-NEXT-v$KSUVER-SUSFS-v1.5.9-Dandy"/' ./common/arch/arm64/configs/gki_defconfig
+              perl -pi -e 's/^CONFIG_LOCALVERSION=(.*)"/CONFIG_LOCALVERSION=\1-NEXT-v$KSUVER-SUSFS-v1.5.9-Wild"/' ./common/arch/arm64/configs/gki_defconfig
           fi
 
       - name: Build
