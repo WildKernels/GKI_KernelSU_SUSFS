@@ -327,25 +327,25 @@ jobs:
           cp ../../kernel_patches/69_hide_stuff.patch ./
           patch -p1 --forward -F 3 < 69_hide_stuff.patch
 
-          - name: Copy source files & Apply LZ4KD & ZSTDN patches
-          if: ${{ inputs.use_zram }}
-          run: |
-            echo "Changing to configuration directory: $CONFIG..."
-            cd "$CONFIG/common"
-            cp -r ../../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
-            cp -r ../../SukiSU_patch/other/zram/lz4k/lib/* ./lib/
-            cp -r ../../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
-            cp -r ../../SukiSU_patch/other/zram/lz4k_oplus ./lib/
-  
-            cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
-            echo "Applying lz4kd patch"
-            patch -p1 -F 3 < lz4kd.patch || true
-            echo 'Completed lz4kd patch'
-  
-            cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
-            echo "Applying lz4k_oplus patch"
-            patch -p1 -F 3 < lz4k_oplus.patch || true
-            echo 'Completed lz4k_oplus patch'
+      - name: Copy source files & Apply LZ4KD & ZSTDN patches
+        if: ${{ inputs.use_zram }}
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          cp -r ../../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
+          cp -r ../../SukiSU_patch/other/zram/lz4k/lib/* ./lib/
+          cp -r ../../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
+          cp -r ../../SukiSU_patch/other/zram/lz4k_oplus ./lib/
+
+          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
+          echo "Applying lz4kd patch"
+          patch -p1 -F 3 < lz4kd.patch || true
+          echo 'Completed lz4kd patch'
+
+          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
+          echo "Applying lz4k_oplus patch"
+          patch -p1 -F 3 < lz4k_oplus.patch || true
+          echo 'Completed lz4k_oplus patch'
   
       - name: LZ4KD & Lz4k_oplus Configuration
         if: ${{ inputs.use_zram }}
