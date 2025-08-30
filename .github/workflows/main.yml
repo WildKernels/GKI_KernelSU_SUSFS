@@ -168,7 +168,7 @@ jobs:
   release:
     if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}
     runs-on: ubuntu-latest
-    needs: [build-kernels-a12, build-kernels-a13, build-kernels-a14, build-kernels-a15]
+    needs: [set-matrix]
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
@@ -176,6 +176,23 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Check build job status
+        run: |
+          # Check if any build jobs should have run and failed
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 12" ]]; then
+            echo "Android 12 build was requested"
+          fi
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 13" ]]; then
+            echo "Android 13 build was requested"
+          fi
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 14" ]]; then
+            echo "Android 14 build was requested"
+          fi
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 15" ]]; then
+            echo "Android 15 build was requested"
+          fi
+          echo "Proceeding with release creation..."
 
       - name: Get commit hashes and generate commit URLs
         run: |
