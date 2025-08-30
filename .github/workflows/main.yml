@@ -12,6 +12,11 @@ on:
         required: true
         type: boolean
         default: true
+      use_zram:
+        description: "Add ZRAM Algorithms?"
+        required: true
+        type: boolean
+        default: true
       release_type:
         description: "Choose Release Type"
         required: true
@@ -20,29 +25,19 @@ on:
           - Actions
           - Pre-Release
           - Release
-        default: Pre-Release
-      include_wild:
-        description: 'Include WILD?'
+        default: Release
+      kernelsu_variant:
+        description: "Choose KSU Variant"
         required: true
-        type: boolean
-        default: true
-      include_ksu:
-        description: 'Include KSU?'
-        required: true
-        type: boolean
-        default: false
-      include_next:
-        description: 'Include NEXT?'
-        required: true
-        type: boolean
-        default: false
-      include_mksu:
-        description: 'Include MKSU?'
-        required: true
-        type: boolean
-        default: false
+        type: choice
+        options:
+          - WILD
+          - KSU
+          - NEXT
+          - MKSU
+        default: NEXT
       kernelsu_branch:
-        description: "Choose ksu branch"
+        description: "Choose KSU Branch"
         required: true
         type: choice
         options:
@@ -55,6 +50,36 @@ on:
         required: false
         type: string
         default: ""
+      build_type:
+        description: "Choose Build Type"
+        required: true
+        type: choice
+        options:
+          - All
+          - Only AnyKernel3
+          - Only Boot.img
+        default: Only AnyKernel3
+      compress_type:
+        description: "Choose Image Compression Type"
+        required: true
+        type: choice
+        options:
+          - All
+          - None
+          - gzip
+          - lz4
+        default: gzip
+      android_version:
+        description: "Choose Android Version"
+        required: true
+        type: choice
+        options:
+          - All
+          - Android 12
+          - Android 13
+          - Android 14
+          - Android 15
+        default: Android 12
 
 jobs:          
   set-matrix:
@@ -66,13 +91,14 @@ jobs:
       - id: set-matrix
         run: |
           VARIANTS=()
-          [[ "${{ inputs.include_wild }}" == "true" ]] && VARIANTS+=("\"WILD\"")
-          [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
-          [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
-          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
+          [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]] && VARIANTS+=("\"WILD\"")
+          [[ "${{ inputs.kernelsu_variant }}" == "KSU" ]] && VARIANTS+=("\"KSU\"")
+          [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]] && VARIANTS+=("\"NEXT\"")
+          [[ "${{ inputs.kernelsu_variant }}" == "MKSU" ]] && VARIANTS+=("\"MKSU\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-kernels-a12:
+    if: ${{ inputs.android_version == 'All' || inputs.android_version == 'Android 12' }}
     needs: set-matrix
     uses: ./.github/workflows/kernel-a12.yml
     secrets: inherit
@@ -84,8 +110,12 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
       use_make: ${{ inputs.use_make }}
-
+      use_zram: ${{ inputs.use_zram }}
+      build_type: ${{ inputs.build_type }}
+      compress_type: ${{ inputs.compress_type }}
+  
   build-kernels-a13:
+    if: ${{ inputs.android_version == 'All' || inputs.android_version == 'Android 13' }}
     needs: set-matrix
     uses: ./.github/workflows/kernel-a13.yml
     secrets: inherit
@@ -97,8 +127,12 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
       use_make: ${{ inputs.use_make }}
+      use_zram: ${{ inputs.use_zram }}
+      build_type: ${{ inputs.build_type }}
+      compress_type: ${{ inputs.compress_type }}
 
   build-kernels-a14:
+    if: ${{ inputs.android_version == 'All' || inputs.android_version == 'Android 14' }}
     needs: set-matrix
     uses: ./.github/workflows/kernel-a14.yml
     secrets: inherit
@@ -110,8 +144,12 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
       use_make: ${{ inputs.use_make }}
+      use_zram: ${{ inputs.use_zram }}
+      build_type: ${{ inputs.build_type }}
+      compress_type: ${{ inputs.compress_type }}
 
   build-kernels-a15:
+    if: ${{ inputs.android_version == 'All' || inputs.android_version == 'Android 15' }}
     needs: set-matrix
     uses: ./.github/workflows/kernel-a15.yml
     secrets: inherit
@@ -123,36 +161,48 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
       use_make: ${{ inputs.use_make }}
+      use_zram: ${{ inputs.use_zram }}
+      build_type: ${{ inputs.build_type }}
+      compress_type: ${{ inputs.compress_type }}
 
   release:
     if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}
     runs-on: ubuntu-latest
-    needs:
-      - build-kernels-a12
-      - build-kernels-a13
-      - build-kernels-a14
-      - build-kernels-a15
+    needs: [build-kernels-a12, build-kernels-a13, build-kernels-a14, build-kernels-a15]
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
       RELEASE_BODY:
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Get commit hashes and generate commit URLs
         run: |
           GITLAB_OWNER="simonpunk"
           GITLAB_REPO="susfs4ksu"
           
-          declare -A BRANCH_MAP=(
-            ["gki_android12_5_10"]="gki-android12-5.10"
-            ["gki_android13_5_10"]="gki-android13-5.10"
-            ["gki_android13_5_15"]="gki-android13-5.15"
-            ["gki_android14_5_15"]="gki-android14-5.15"
-            ["gki_android14_6_1"]="gki-android14-6.1"
-            ["gki_android15_6_6"]="gki-android15-6.6"
-          )
+          # Define branch mappings for each Android version
+          declare -A BRANCH_MAP=()
+          
+          # Add branches based on android_version input
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 12" ]]; then
+            BRANCH_MAP["gki_android12_5_10"]="gki-android12-5.10"
+          fi
+          
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 13" ]]; then
+            BRANCH_MAP["gki_android13_5_10"]="gki-android13-5.10"
+            BRANCH_MAP["gki_android13_5_15"]="gki-android13-5.15"
+          fi
+          
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 14" ]]; then
+            BRANCH_MAP["gki_android14_5_15"]="gki-android14-5.15"
+            BRANCH_MAP["gki_android14_6_1"]="gki-android14-6.1"
+          fi
+          
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 15" ]]; then
+            BRANCH_MAP["gki_android15_6_6"]="gki-android15-6.6"
+          fi
           
           for var_name in "${!BRANCH_MAP[@]}"; do
             branch_name="${BRANCH_MAP[$var_name]}"
@@ -216,8 +266,14 @@ jobs:
         run: |
           cat << 'EOF' > release_body.md
           
-          Branch type for KSU: ${{ inputs.kernelsu_branch }}
-          Wild Current Kernel Tag: ${{ env.NEW_TAG }}
+          Build Configurations:
+          -> Android Version: ${{ inputs.android_version }}
+          -> Build Type: ${{ inputs.build_type }}
+          -> Image Compression Type: ${{ inputs.compress_type }}
+          -> KSU Variant: ${{ inputs.kernelsu_variant }}
+          -> Branch type for KSU: ${{ inputs.kernelsu_branch }}
+          -> Wild Current Kernel Tag: ${{ env.NEW_TAG }}
+          -> Added ZRAM Algorithms: ${{ inputs.use_zram }}
       
           Features:
           -> Wild KSU Kernels & Others
@@ -229,6 +285,7 @@ jobs:
           -> Futile Maphide for jit-zygote-cache Detections
           -> Wireguard Support
           -> BBR Support
+          -> More ZRAM Algorithms
       
           Notes:
           -> Wild KSU & KernelSU Next, SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
@@ -246,14 +303,27 @@ jobs:
           -> Wild KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
-          -> SUSFS4KSU: 
-            -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
-            -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
-            -> gki-android13-5.15: [${{ env.COMMIT_HASH_gki_android13_5_15 }}](${{ env.COMMIT_URL_gki_android13_5_15 }})
-            -> gki-android14-5.15: [${{ env.COMMIT_HASH_gki_android14_5_15 }}](${{ env.COMMIT_URL_gki_android14_5_15 }})
-            -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
-            -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
+          -> SUSFS4KSU:
           EOF
+          
+          # Add commit hashes based on android_version
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 12" ]]; then
+            echo "  -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})" >> release_body.md
+          fi
+          
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 13" ]]; then
+            echo "  -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})" >> release_body.md
+            echo "  -> gki-android13-5.15: [${{ env.COMMIT_HASH_gki_android13_5_15 }}](${{ env.COMMIT_URL_gki_android13_5_15 }})" >> release_body.md
+          fi
+          
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 14" ]]; then
+            echo "  -> gki-android14-5.15: [${{ env.COMMIT_HASH_gki_android14_5_15 }}](${{ env.COMMIT_URL_gki_android14_5_15 }})" >> release_body.md
+            echo "  -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})" >> release_body.md
+          fi
+          
+          if [[ "${{ inputs.android_version }}" == "All" ]] || [[ "${{ inputs.android_version }}" == "Android 15" ]]; then
+            echo "  -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})" >> release_body.md
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -278,16 +348,3 @@ jobs:
         run: |
           echo "GitHub release created with the following files:"
           ls ./downloaded-artifacts/**/*
-            
-      - name: Send Telegram Notification
-        run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F message_thread_id="${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}" \
-            -F text="
-            🌽 *New Kernel Release Uploaded*  
-            📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
-            🗂️ *Branch:* ${{ github.ref_name }}  
-            ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
-            -F parse_mode="Markdown"

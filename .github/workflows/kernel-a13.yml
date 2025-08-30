@@ -19,6 +19,18 @@ on:
       use_make:
         required: true
         type: boolean
+      use_zram:
+        required: true
+        type: boolean
+        default: true
+      build_type:
+        required: true
+        type: string
+        default: All
+      compress_type:
+        required: true
+        type: string
+        default: All
 
 jobs:
   build-kernels-a13-5-10:
@@ -59,6 +71,9 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
       use_make: ${{ inputs.use_make }}
+      use_zram: ${{ inputs.use_zram }}
+      build_type: ${{ inputs.build_type }}
+      compress_type: ${{ inputs.compress_type }}
 
   build-kernels-a13-5-15:
     strategy:
@@ -100,3 +115,6 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
       use_make: ${{ inputs.use_make }}
+      use_zram: ${{ inputs.use_zram }}
+      build_type: ${{ inputs.build_type }}
+      compress_type: ${{ inputs.compress_type }}
