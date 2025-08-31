@@ -478,32 +478,6 @@ jobs:
             echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
           fi
 
-      - name: Configure Kernel Name
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
-
-          # If you need to change the build time, please modify the following variable CURRENT_TIME to a string like: CURRENT_TIME="Sat Jun 07 06:29:29 UTC 2025"
-          # This string represents UTC time: June 7, 2025 06:29:29, "Sat" is the abbreviation for Saturday, and "Jun" is the abbreviation for June
-          # If you want to use Beijing time, it should be: CURRENT_TIME="Sat Jun 07 14:29:29 CST 2025"
-          CURRENT_TIME="Sun Apr 20 04:20:00 UTC 2025"
-
-          echo "CURRENT_TIME=$CURRENT_TIME"
-          perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \\| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_TIME\"}" ./common/scripts/mkcompile_h
-
-          # Apply specific Makefile modification for kernel versions 6.1 and 6.6 only
-          if [ "${{ inputs.kernel_version }}" = "6.1" ] || [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            sed -i -e "s|\$(preempt-flag-y) \"\$(build-timestamp)\"|\$(preempt-flag-y) \"$CURRENT_TIME\"|" ./common/init/Makefile
-          fi
-          
-          if [ -f "build/build.sh" ]; then
-            sed -i 's/-dirty//' ./common/scripts/setlocalversion
-          else
-            sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
-            rm -rf ./common/android/abi_gki_protected_exports_*
-            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-          fi
-
       - name: Build
         if: ${{ inputs.use_make == 'false' }}
         run : |
