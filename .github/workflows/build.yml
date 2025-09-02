@@ -227,7 +227,7 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-               echo "Applying SUSFS patches for Wild KSU..."
+              echo "Applying SUSFS patches for Wild KSU..."
               cd ./Wild_KSU
               cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
@@ -476,6 +476,29 @@ jobs:
             echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
           else
             echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
+
+      - name: Change Kernel Name
+        if: ${{ inputs.use_make == 'false' }}
+        run: |
+          cd "$CONFIG"
+          if [ -f "build/build.sh" ]; then
+              perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
+              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-WKSU-v\$KSUVER-SUSFS-v1.5.9-Wild"/s' ./common/scripts/setlocalversion
+              perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Apr 20 04:20:00 UTC 2025"}' ./common/scripts/mkcompile_h
+          else
+              #Remove -maybe-dirty
+              perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
+              
+              #Set Kernel Name
+              echo "CONFIG_LOCALVERSION=\"-WKSU-v$KSUVER-SUSFS-v1.5.9-Wild\"" >> ./common/arch/arm64/configs/gki_defconfig
+
+              #Set Kernel Timestamp
+              perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Sun Apr 20 04:20:00 UTC 2025"/' ./common/init/Makefile
+
+              #Remove Abi Exports and Error
+              rm -rf ./common/android/abi_gki_protected_exports_*
+              perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
 
       - name: Build

@@ -237,7 +237,7 @@ jobs:
           get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
-
+          
       - name: Generate and Create New Tag
         run: |
             LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
