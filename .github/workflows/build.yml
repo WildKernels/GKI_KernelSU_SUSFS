@@ -484,14 +484,13 @@ jobs:
           cd "$CONFIG"
           if [ -f "build/build.sh" ]; then
               perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-WKSU-v\$KSUVER-SUSFS-v1.5.9-Wild"/s' ./common/scripts/setlocalversion
+              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res"/s' ./common/scripts/setlocalversion
               perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Apr 20 04:20:00 UTC 2025"}' ./common/scripts/mkcompile_h
           else
               #Remove -maybe-dirty
               perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
               
-              #Set Kernel Name
-              echo "CONFIG_LOCALVERSION=\"-WKSU-v$KSUVER-SUSFS-v1.5.9-Wild\"" >> ./common/arch/arm64/configs/gki_defconfig
+              #Do not set custom localversion
 
               #Set Kernel Timestamp
               perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Sun Apr 20 04:20:00 UTC 2025"/' ./common/init/Makefile
