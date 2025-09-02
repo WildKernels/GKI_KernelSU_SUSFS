@@ -317,7 +317,7 @@ jobs:
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
             cp ../../kernel_patches/wild/hooks/scope_min_manual_hooks_v1.4.patch ./
-            patch -p1 --forward -F 3 < syscall_hooks.patch
+            patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
           fi
 
       - name: Apply Hide Stuff Patches
@@ -659,6 +659,24 @@ jobs:
           for image in *.img; do
             gzip -vnf9 "$image"
           done
+
+      - name: Change Kernel Name
+        if: ${{ inputs.use_make == 'true' }}
+        run: |
+          cd "$CONFIG"
+          perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
+          if [ -f "build/build.sh" ]; then
+              #Set Kernel Name
+              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res"/s' ./common/scripts/setlocalversion
+              #Set Kernel Timestamp
+              perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Apr 20 04:20:00 UTC 2025"}' ./common/scripts/mkcompile_h
+          else
+              #Set Kernel Name
+              perl -pi -e 's{echo "\${KERNELVERSION}\${file_localversion}\${config_localversion}\${LOCALVERSION}\${scm_version}"}{echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"}' /scripts/setlocalversion
+              
+              #Set Kernel Timestamp
+              perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Sun Apr 20 04:20:00 UTC 2025"/' ./common/init/Makefile
+          fi
 
       - name: Add Build based configs
         if: ${{ github.event.inputs.use_make == 'true' }}

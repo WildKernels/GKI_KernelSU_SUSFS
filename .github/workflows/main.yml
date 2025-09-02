@@ -34,7 +34,6 @@ on:
           - WILD
           - KSU
           - NEXT
-          - MKSU
         default: NEXT
       kernelsu_branch:
         description: "Choose KSU Branch"
@@ -94,7 +93,6 @@ jobs:
           [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]] && VARIANTS+=("\"WILD\"")
           [[ "${{ inputs.kernelsu_variant }}" == "KSU" ]] && VARIANTS+=("\"KSU\"")
           [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]] && VARIANTS+=("\"NEXT\"")
-          [[ "${{ inputs.kernelsu_variant }}" == "MKSU" ]] && VARIANTS+=("\"MKSU\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-kernels-a12:
@@ -239,7 +237,6 @@ jobs:
           get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
-          get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
 
       - name: Generate and Create New Tag
         run: |
@@ -296,7 +293,7 @@ jobs:
           Managers:
           -> Wild KSU: https://github.com/WildKernels/Wild_KSU
           -> KernelSU: https://github.com/tiann/KernelSU
-          -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next
+          -> KernelSU-Next: https://github.com/KernelSU-Next/KernelSU-Next
       
           Commit Hashes (at the time of release):
           -> Wild KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
