@@ -94,7 +94,31 @@ jobs:
           fi
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+          echo "Replace common with custom kernel..."
+          rm -rf common
+          git clone --depth=1 -b android12-5.10 https://github.com/ramabondanp/android_kernel_common-5.10.git common
 
+      - name: Replace Clang with clang-r574158 (clang 21)
+        run: |
+          cd $GITHUB_WORKSPACE/$CONFIG/prebuilts-master/clang/host/linux-x86
+
+          echo "Remove old clang..."
+          rm -rf clang-*
+
+          echo "Download clang 21 (clang-r574158)..."
+          mkdir -p clang-r574158
+          cd clang-r574158
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/d0e0a3882edb1acc193263ae98fce706e82aca38/clang-r574158.tar.gz
+
+          echo "Extract clang 21..."
+          tar -xvzf clang-r574158.tar.gz
+          rm clang-r574158.tar.gz
+          
+      - name: Update build.config.common for clang 21
+        run: |
+          cd $GITHUB_WORKSPACE/$CONFIG/common
+          sed -i 's|CLANG_PREBUILT_BIN=.*|CLANG_PREBUILT_BIN=prebuilts-master/clang/host/linux-x86/clang-r574158/bin|' build.config.common 
+    
       - name: Apply glibc 2.38 Compatibility Fix
         if: inputs.android_version == 'android14' && inputs.kernel_version == '6.1'
         run: |
@@ -329,8 +353,8 @@ jobs:
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Apr 20 04:20:00 UTC 2025"}' ./common/scripts/mkcompile_h
           
           #Set Kernel Name
-          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            #sed -i 's|^\(CONFIG_LOCALVERSION=".*\)"$|\1-🌱-Wild"|' ./common/arch/arm64/configs/gki_defconfig
+          if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
+            #sed -i 's|^\(CONFIG_LOCALVERSION=".*\)"$|\1-🌱-GhostSP"|' ./common/arch/arm64/configs/gki_defconfig
             perl -pi -e 's/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"/echo "KERNELVERSION: \$\{KERNELVERSION\}" >\&2; echo "file_localversion: \$\{file_localversion\}" >\&2; echo "config_localversion: \$\{config_localversion\}" >\&2; echo "LOCALVERSION: \$\{LOCALVERSION\}" >\&2; echo "scm_version: \$\{scm_version\}" >\&2; val="\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"; echo "Final version: \$val" >\&2; echo "\$val"; exit 0/' ./common/scripts/setlocalversion
           else
             perl -pi -e 's/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"/echo "KERNELVERSION: \$\{KERNELVERSION\}" >\&2; echo "file_localversion: \$\{file_localversion\}" >\&2; echo "config_localversion: \$\{config_localversion\}" >\&2; echo "LOCALVERSION: \$\{LOCALVERSION\}" >\&2; echo "scm_version: \$\{scm_version\}" >\&2; val="\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"; echo "Final version: \$val" >\&2; echo "\$val"; exit 0/' ./common/scripts/setlocalversion
