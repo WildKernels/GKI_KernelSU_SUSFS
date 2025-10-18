@@ -47,46 +47,51 @@ on:
           - v1.5.12
           - v1.5.9
         default: v1.5.12
+      skip_build:
+        description: "Skip building and use existing artifacts from last run"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
 
   build-a12-5-10:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10'
+    if: inputs.skip_build == false && (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10')
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a13-5-10:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10'
+    if: inputs.skip_build == false && (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10')
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a13-5-15:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15'
+    if: inputs.skip_build == false && (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15')
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a14-5-15:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15'
+    if: inputs.skip_build == false && (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15')
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a14-6-1:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1'
+    if: inputs.skip_build == false && (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1')
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a15-6-6:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6'
+    if: inputs.skip_build == false && (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6')
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
@@ -94,7 +99,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.build_selection == 'All' && inputs.release_type != 'Actions'
+    if: inputs.release_type != 'Actions'
     needs:
       - build-a12-5-10
       - build-a13-5-10
@@ -184,11 +189,53 @@ jobs:
         run: |
             echo "NEW_TAG=actions-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
 
-      - name: Download Artifacts
+      - name: Download Artifacts (Current Run)
+        if: inputs.skip_build == false
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
           pattern: 'WKSU-*-AnyKernel3'
+
+      - name: Download Artifacts (Previous Run)
+        if: inputs.skip_build == true
+        run: |
+          echo "Skipping build - downloading artifacts from most recent workflow run"
+          
+          # Create directory for artifacts
+          mkdir -p ./downloaded-artifacts
+          
+          # Get the most recent successful workflow run
+          latest_run_id=$(gh api repos/${{ github.repository }}/actions/workflows/main.yml/runs \
+            --jq '.workflow_runs[] | select(.conclusion == "success") | .id' | head -1)
+          
+          echo "Using artifacts from run ID: $latest_run_id"
+          
+          # Get all artifacts from the latest successful run
+          gh api repos/${{ github.repository }}/actions/runs/$latest_run_id/artifacts \
+            --jq '.artifacts[] | select(.name | contains("WKSU") and contains("AnyKernel3")) | .archive_download_url' \
+            > artifact_urls.txt
+          
+          # Download each artifact
+          while IFS= read -r url; do
+            if [ ! -z "$url" ]; then
+              echo "Downloading artifact from: $url"
+              # Get artifact name from the API
+              artifact_name=$(gh api repos/${{ github.repository }}/actions/runs/$latest_run_id/artifacts \
+                --jq ".artifacts[] | select(.archive_download_url == \"$url\") | .name")
+              
+              # Download and extract
+              curl -L -H "Authorization: token ${{ github.token }}" "$url" -o "${artifact_name}.zip"
+              unzip -q "${artifact_name}.zip" -d "./downloaded-artifacts/${artifact_name}/"
+              rm "${artifact_name}.zip"
+              echo "Downloaded and extracted: ${artifact_name}"
+            fi
+          done < artifact_urls.txt
+          
+          # Clean up
+          rm -f artifact_urls.txt
+          
+          echo "All artifacts downloaded successfully!"
+          ls -la ./downloaded-artifacts/
 
       - name: Set release body
         run: |
@@ -255,17 +302,23 @@ jobs:
         run: |
           for dir in ./downloaded-artifacts/*/; do
             if [ -d "$dir" ]; then
-              # Upload only AnyKernel3 ZIP files (created in build.yml)
-              for zipfile in "$dir"/*-AnyKernel3.zip; do
-                if [ -f "$zipfile" ]; then
-                  echo "Re-compressing $(basename "$zipfile") with maximum compression..."
-                  unzip -q "$zipfile" -d temp_extract
-                  zip -r -9 "$(basename "$zipfile")" temp_extract/*
-                  echo "Uploading $(basename "$zipfile")..."
-                  gh release upload ${{ env.NEW_TAG }} "$(basename "$zipfile")"
-                  rm -rf temp_extract "$(basename "$zipfile")"
-                fi
-              done
+              # Check if AnyKernel3 folder exists in this artifact
+              if [ -d "$dir/AnyKernel3" ]; then
+                # Get artifact name from directory name
+                artifact_name=$(basename "$dir")
+                zipfile_name="${artifact_name}.zip"
+                
+                echo "Creating ${zipfile_name} from AnyKernel3 folder..."
+                cd "$dir"
+                zip -r -9 "../../${zipfile_name}" AnyKernel3/
+                cd - > /dev/null
+                
+                echo "Uploading ${zipfile_name}..."
+                gh release upload ${{ env.NEW_TAG }} "${zipfile_name}"
+                rm "${zipfile_name}"
+              else
+                echo "Warning: No AnyKernel3 folder found in $dir"
+              fi
             fi
           done
 
