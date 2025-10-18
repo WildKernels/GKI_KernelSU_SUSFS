@@ -206,34 +206,42 @@ jobs:
           
           # Get all artifacts from the specified workflow run
           echo "Fetching artifact list..."
-          gh api repos/${{ github.repository }}/actions/runs/${{ inputs.use_existing_run_id }}/artifacts \
-            --jq '.artifacts[] | select(.name | contains("WKSU") and contains("AnyKernel3")) | {name: .name, url: .archive_download_url}' \
-            > artifacts.json
+          gh api repos/${{ github.repository }}/actions/runs/${{ inputs.use_existing_run_id }}/artifacts > all_artifacts.json
           
-          echo "Found artifacts:"
-          cat artifacts.json
+          echo "All artifacts from run:"
+          cat all_artifacts.json | jq '.artifacts[] | {name: .name, expired: .expired}'
           
-          # Download each artifact
-          jq -r '.url' artifacts.json | while IFS= read -r url; do
-            if [ ! -z "$url" ]; then
-              echo "Downloading artifact from: $url"
-              # Get artifact name from the API
-              artifact_name=$(jq -r --arg url "$url" 'select(.url == $url) | .name' artifacts.json)
+          # Filter for WKSU AnyKernel3 artifacts
+          cat all_artifacts.json | jq -r '.artifacts[] | select(.name | contains("WKSU") and contains("AnyKernel3")) | select(.expired == false) | @base64' > artifacts_b64.txt
+          
+          echo "Found matching artifacts:"
+          while IFS= read -r artifact_b64; do
+            if [ ! -z "$artifact_b64" ]; then
+              artifact_json=$(echo "$artifact_b64" | base64 -d)
+              artifact_name=$(echo "$artifact_json" | jq -r '.name')
+              download_url=$(echo "$artifact_json" | jq -r '.archive_download_url')
               
-              echo "Artifact name: $artifact_name"
+              echo "- $artifact_name"
+              echo "  URL: $download_url"
               
               # Download and extract
-              curl -L -H "Authorization: token ${{ github.token }}" "$url" -o "${artifact_name}.zip"
-              unzip -q "${artifact_name}.zip" -d "./downloaded-artifacts/${artifact_name}/"
-              rm "${artifact_name}.zip"
-              echo "Downloaded and extracted: ${artifact_name}"
+              echo "Downloading $artifact_name..."
+              curl -L -H "Authorization: token ${{ github.token }}" "$download_url" -o "${artifact_name}.zip"
+              
+              if [ -f "${artifact_name}.zip" ]; then
+                unzip -q "${artifact_name}.zip" -d "./downloaded-artifacts/${artifact_name}/"
+                rm "${artifact_name}.zip"
+                echo "Successfully downloaded and extracted: ${artifact_name}"
+              else
+                echo "ERROR: Failed to download ${artifact_name}"
+              fi
             fi
-          done
+          done < artifacts_b64.txt
           
           # Clean up
-          rm -f artifacts.json
+          rm -f all_artifacts.json artifacts_b64.txt
           
-          echo "All artifacts downloaded successfully!"
+          echo "Download complete. Contents:"
           ls -la ./downloaded-artifacts/
 
       - name: Set release body
