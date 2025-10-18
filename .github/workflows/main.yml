@@ -205,17 +205,22 @@ jobs:
           mkdir -p ./downloaded-artifacts
           
           # Get all artifacts from the specified workflow run
+          echo "Fetching artifact list..."
           gh api repos/${{ github.repository }}/actions/runs/${{ inputs.use_existing_run_id }}/artifacts \
-            --jq '.artifacts[] | select(.name | contains("WKSU") and contains("AnyKernel3")) | .archive_download_url' \
-            > artifact_urls.txt
+            --jq '.artifacts[] | select(.name | contains("WKSU") and contains("AnyKernel3")) | {name: .name, url: .archive_download_url}' \
+            > artifacts.json
+          
+          echo "Found artifacts:"
+          cat artifacts.json
           
           # Download each artifact
-          while IFS= read -r url; do
+          jq -r '.url' artifacts.json | while IFS= read -r url; do
             if [ ! -z "$url" ]; then
               echo "Downloading artifact from: $url"
               # Get artifact name from the API
-              artifact_name=$(gh api repos/${{ github.repository }}/actions/runs/${{ inputs.use_existing_run_id }}/artifacts \
-                --jq ".artifacts[] | select(.archive_download_url == \"$url\") | .name")
+              artifact_name=$(jq -r --arg url "$url" 'select(.url == $url) | .name' artifacts.json)
+              
+              echo "Artifact name: $artifact_name"
               
               # Download and extract
               curl -L -H "Authorization: token ${{ github.token }}" "$url" -o "${artifact_name}.zip"
@@ -223,10 +228,10 @@ jobs:
               rm "${artifact_name}.zip"
               echo "Downloaded and extracted: ${artifact_name}"
             fi
-          done < artifact_urls.txt
+          done
           
           # Clean up
-          rm -f artifact_urls.txt
+          rm -f artifacts.json
           
           echo "All artifacts downloaded successfully!"
           ls -la ./downloaded-artifacts/
@@ -294,8 +299,13 @@ jobs:
       - name: Upload Release Assets
         if: inputs.release_type != 'Actions'
         run: |
+          echo "Checking downloaded artifacts directory..."
+          ls -la ./downloaded-artifacts/
+          
+          uploaded_count=0
           for dir in ./downloaded-artifacts/*/; do
             if [ -d "$dir" ]; then
+              echo "Processing directory: $dir"
               # Check if AnyKernel3 folder exists in this artifact
               if [ -d "$dir/AnyKernel3" ]; then
                 # Get artifact name from directory name
@@ -308,13 +318,23 @@ jobs:
                 cd - > /dev/null
                 
                 echo "Uploading ${zipfile_name}..."
-                gh release upload ${{ env.NEW_TAG }} "${zipfile_name}"
+                gh release upload ${{ env.NEW_TAG }} "${zipfile_name}" --clobber
                 rm "${zipfile_name}"
+                uploaded_count=$((uploaded_count + 1))
+                echo "Successfully uploaded: ${zipfile_name}"
               else
                 echo "Warning: No AnyKernel3 folder found in $dir"
+                echo "Contents of $dir:"
+                ls -la "$dir"
               fi
             fi
           done
+          
+          echo "Total files uploaded: $uploaded_count"
+          if [ $uploaded_count -eq 0 ]; then
+            echo "ERROR: No files were uploaded!"
+            exit 1
+          fi
 
       - name: Display Files Uploaded
         if: inputs.release_type != 'Actions'
