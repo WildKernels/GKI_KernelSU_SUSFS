@@ -99,7 +99,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.release_type != 'Actions'
+    if: inputs.release_type != 'Actions' && (always() || inputs.use_existing_run_id != '')
     needs:
       - build-a12-5-10
       - build-a13-5-10
