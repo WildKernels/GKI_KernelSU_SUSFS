@@ -23,7 +23,7 @@ on:
         type: choice
         options:
           - Actions
-          - No-Release
+          - Empty-Release
           - Pre-Release
           - Release
         default: Actions
@@ -52,42 +52,42 @@ on:
 jobs:
 
   build-a12-5-10:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10') && inputs.release_type != 'Empty-Release'
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a13-5-10:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10') && inputs.release_type != 'Empty-Release'
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a13-5-15:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15') && inputs.release_type != 'Empty-Release'
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a14-5-15:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15') && inputs.release_type != 'Empty-Release'
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a14-6-1:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1') && inputs.release_type != 'Empty-Release'
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
       susfs_version: ${{ inputs.susfs_version }}
 
   build-a15-6-6:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6') && inputs.release_type != 'Empty-Release'
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
@@ -95,7 +95,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.build_selection == 'All' && inputs.release_type != 'Actions'
+    if: inputs.build_selection == 'All' && inputs.release_type != 'Actions' && inputs.release_type != 'Empty-Release'
     needs:
       - build-a12-5-10
       - build-a13-5-10
@@ -191,37 +191,6 @@ jobs:
           path: ./downloaded-artifacts
           pattern: 'WKSU-*-AnyKernel3'
 
-      - name: Zip AnyKernel3 (No-Release)
-        if: inputs.release_type == 'No-Release'
-        run: |
-          for dir in ./downloaded-artifacts/*/; do
-            if [ -d "$dir/AnyKernel3" ]; then
-              artifact_name=$(basename "$dir")
-              zip_name="${artifact_name}.zip"
-              echo "Creating ZIP for $artifact_name as $zip_name..."
-              (cd "$dir" && zip -r -9 "$zip_name" AnyKernel3/)
-            fi
-          done
-
-      - name: Upload artifacts (No-Release, Normal)
-        if: inputs.release_type == 'No-Release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: AnyKernel3-Normal
-          path: ./downloaded-artifacts/*-Normal-AnyKernel3/*.zip
-          compression-level: 0
-          retention-days: 90
-          if-no-files-found: warn
-
-      - name: Upload artifacts (No-Release, Module_Check_Bypass)
-        if: inputs.release_type == 'No-Release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: AnyKernel3-Module_Check_Bypass
-          path: ./downloaded-artifacts/*-Module_Check_Bypass-AnyKernel3/*.zip
-          compression-level: 0
-          retention-days: 90
-          if-no-files-found: warn
 
       - name: Set release body
         run: |
@@ -325,3 +294,32 @@ jobs:
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
+
+
+  release-empty:
+    runs-on: ubuntu-latest
+    if: inputs.release_type == 'Empty-Release'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v1.5.12"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate New Tag
+        run: |
+          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v1.5.12-r0"
+          fi
+          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+          echo "New tag: $NEW_TAG"
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+
+      - name: Create empty GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.NEW_TAG }}
+          prerelease: true
+          name: ${{ env.RELEASE_NAME }}
+          body: "Empty release scaffold. Assets will be uploaded manually."
