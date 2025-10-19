@@ -23,6 +23,7 @@ on:
         type: choice
         options:
           - Actions
+          - No-Release
           - Pre-Release
           - Release
         default: Actions
@@ -167,7 +168,7 @@ jobs:
           echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
 
       - name: Generate New Tag
-        if: inputs.release_type != 'Actions'
+        if: inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release'
         run: |
             LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "")
             if [ -z "$LATEST_TAG" ]; then
@@ -189,6 +190,38 @@ jobs:
         with:
           path: ./downloaded-artifacts
           pattern: 'WKSU-*-AnyKernel3'
+
+      - name: Zip AnyKernel3 (No-Release)
+        if: inputs.release_type == 'No-Release'
+        run: |
+          for dir in ./downloaded-artifacts/*/; do
+            if [ -d "$dir/AnyKernel3" ]; then
+              artifact_name=$(basename "$dir")
+              zip_name="${artifact_name}.zip"
+              echo "Creating ZIP for $artifact_name as $zip_name..."
+              (cd "$dir" && zip -r -9 "$zip_name" AnyKernel3/)
+            fi
+          done
+
+      - name: Upload artifacts (No-Release, Normal)
+        if: inputs.release_type == 'No-Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnyKernel3-Normal
+          path: ./downloaded-artifacts/*-Normal-AnyKernel3/*.zip
+          compression-level: 0
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Upload artifacts (No-Release, Module_Check_Bypass)
+        if: inputs.release_type == 'No-Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnyKernel3-Module_Check_Bypass
+          path: ./downloaded-artifacts/*-Module_Check_Bypass-AnyKernel3/*.zip
+          compression-level: 0
+          retention-days: 90
+          if-no-files-found: warn
 
       - name: Set release body
         run: |
@@ -241,7 +274,7 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        if: inputs.release_type != 'Actions'
+        if: inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.NEW_TAG }}
@@ -251,29 +284,30 @@ jobs:
           body_path: release_body.md
 
       - name: Upload Release Assets
-        if: inputs.release_type != 'Actions'
+        if: inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release'
         run: |
           for dir in ./downloaded-artifacts/*/; do
             # Create ZIP files from AnyKernel3 directories
             if [ -d "$dir/AnyKernel3" ]; then
               artifact_name=$(basename "$dir")
-              echo "Creating ZIP for $artifact_name..."
+              zip_name="${artifact_name}.zip"
+              echo "Creating ZIP for $artifact_name as $zip_name..."
               cd "$dir"
-              zip -r -9 "${artifact_name}-AnyKernel3.zip" AnyKernel3/
-              echo "Uploading ${artifact_name}.zip..."
-              gh release upload ${{ env.NEW_TAG }} "${artifact_name}-AnyKernel3.zip"
+              zip -r -9 "$zip_name" AnyKernel3/
+              echo "Uploading $zip_name..."
+              gh release upload ${{ env.NEW_TAG }} "$zip_name"
               cd - > /dev/null
             fi
           done
 
       - name: Display Files Uploaded
-        if: inputs.release_type != 'Actions'
+        if: inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release'
         run: |
           echo "GitHub release created with the following files:"
           ls ./downloaded-artifacts/**/*
             
       - name: Send Telegram Notification
-        if: inputs.release_type != 'Actions'
+        if: inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release'
         run: |
           RELEASE_TYPE_TEXT=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
