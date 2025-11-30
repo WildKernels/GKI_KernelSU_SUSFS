@@ -110,6 +110,7 @@ jobs:
           rustup update nightly
           rustup default nightly
           rustup target add aarch64-unknown-none
+          echo "RUST_TOOLCHAIN=$(rustc --print sysroot)" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Other Dependencies
         run: |
