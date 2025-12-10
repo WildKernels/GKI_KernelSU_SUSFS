@@ -5,59 +5,60 @@ permissions:
   actions: write
 
 on:
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - '.github/workflows/**'
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       release_type:
-        description: "Choose Release Type"
-        required: true
+        description: "Release Type"
         type: choice
-        options:
-          - Actions
-          - Pre-Release
-          - Release
+        options: [Actions, Pre-Release, Release]
         default: Actions
-      build_selection:
-        description: "Choose which kernels to build"
-        required: true
-        type: choice
-        options:
-          - All
-          - Android12-5.10
-          - Android13-5.10
-          - Android13-5.15
-          - Android14-5.15
-          - Android14-6.1
-          - Android15-6.6
-          - Android16-6.12
-          - Custom
-        default: Android16-6.12
       ksu_variant:
-        description: "Choose KernelSU variant"
-        required: true
+        description: "KernelSU Variant"
         type: choice
-        options:
-          - KSU
-          - WKSU
+        options: [KSU, WKSU]
         default: KSU
       ksu_commit:
-        description: "Optional KernelSU commit SHA"
-        required: false
+        description: "KSU Commit (optional)"
         type: string
+        required: false
+
+      # Build Selection
+      build_a12_5_10:
+        description: "Android 12 - 5.10"
+        type: boolean
+        default: true
+      build_a13_5_10:
+        description: "Android 13 - 5.10"
+        type: boolean
+        default: true
+      build_a13_5_15:
+        description: "Android 13 - 5.15"
+        type: boolean
+        default: true
+      build_a14_5_15:
+        description: "Android 14 - 5.15"
+        type: boolean
+        default: true
+      build_a14_6_1:
+        description: "Android 14 - 6.1"
+        type: boolean
+        default: true
+      build_a15_6_6:
+        description: "Android 15 - 6.6"
+        type: boolean
+        default: true
+      build_a16_6_12:
+        description: "Android 16 - 6.12"
+        type: boolean
+        default: true
+      build_custom:
+        description: "Custom Builds"
+        type: boolean
+        default: true
 
 jobs:
-
   build-a12-5-10:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10')
+    if: inputs.build_a12_5_10
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
@@ -65,34 +66,31 @@ jobs:
       ksu_commit: ${{ inputs.ksu_commit }}
 
   build-a13-5-10:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10')
+    if: inputs.build_a13_5_10
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
 
-
   build-a13-5-15:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15')
+    if: inputs.build_a13_5_15
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
 
-
   build-a14-5-15:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15')
+    if: inputs.build_a14_5_15
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
 
-
   build-a14-6-1:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1')
+    if: inputs.build_a14_6_1
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
@@ -100,7 +98,7 @@ jobs:
       ksu_commit: ${{ inputs.ksu_commit }}
 
   build-a15-6-6:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6')
+    if: inputs.build_a15_6_6
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
@@ -108,16 +106,15 @@ jobs:
       ksu_commit: ${{ inputs.ksu_commit }}
 
   build-a16-6-12:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android16-6.12')
+    if: inputs.build_a16_6_12
     uses: ./.github/workflows/kernel-a16-612.yml
     secrets: inherit
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
 
-
   build-custom:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Custom')
+    if: inputs.build_custom
     uses: ./.github/workflows/kernel-custom.yml
     secrets: inherit
     with:
@@ -134,6 +131,7 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
+      - build-a16-6-12
       - build-custom
 
     env:
@@ -231,22 +229,29 @@ jobs:
       - name: Upload Release Assets
         run: |
           shopt -s nullglob
-          anykernel_dirs=(./downloaded-artifacts/*/)
+          anykernel_dirs=(./downloaded-artifacts/*-AnyKernel3/)
+          
           if [ ${#anykernel_dirs[@]} -eq 0 ]; then
-            echo "No artifact directories found under ./downloaded-artifacts; skipping upload."
-          else
-            for dir in "${anykernel_dirs[@]}"; do
-              # Check if this is an AnyKernel3 artifact directory
-              if [[ "$(basename "$dir")" == *"-AnyKernel3" ]]; then
-                artifact_name=$(basename "$dir")
-                echo "Creating ZIP for $artifact_name..."
-                # Navigate into the directory and zip its contents directly
-                (cd "$dir" && zip -r -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*)
-                echo "Uploading ${artifact_name}.zip..."
-                gh release upload ${{ env.NEW_TAG }} "${artifact_name}.zip"
-              fi
-            done
+            echo "No AnyKernel3 artifact directories found; skipping upload."
+            exit 0
           fi
+          
+          echo "Found ${#anykernel_dirs[@]} artifacts to process"
+          
+          # Create all ZIPs in parallel
+          for dir in "${anykernel_dirs[@]}"; do
+            artifact_name=$(basename "$dir")
+            echo "Creating ZIP for $artifact_name..."
+            (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
+          done
+          wait
+          
+          # Upload all ZIPs
+          for dir in "${anykernel_dirs[@]}"; do
+            artifact_name=$(basename "$dir")
+            echo "Uploading ${artifact_name}.zip..."
+            gh release upload "${{ env.NEW_TAG }}" "${artifact_name}.zip" --clobber
+          done
             
       - name: Send Telegram Notification
         if: inputs.release_type != 'Actions'
