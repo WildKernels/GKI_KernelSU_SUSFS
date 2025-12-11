@@ -294,6 +294,7 @@ jobs:
                 cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
                 patch -p1 < fix_open.c.patch || true
                 sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
+                sed -i '/#include <linux\/syscalls.h>/a #include <linux/susfs.h>' fs/open.c
               fi
 
               # Use ACTUAL_SUBLEVEL for LTS or actual kernel sublevel if available
