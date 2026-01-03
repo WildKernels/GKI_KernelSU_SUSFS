@@ -671,7 +671,7 @@ jobs:
     - name: Change Kernel Name
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
-        #KONTOLLLL to Kernel Version (replace last instance only)
+        #KONTOL to Kernel Version (replace last instance only)
         if [[ "${{ inputs.kernel_version }}" == "5."* ]] || [[ "${{ inputs.kernel_version }}" == "6.1" ]]; then
           case ${{ matrix.build_type }} in
             TheWildJames)
