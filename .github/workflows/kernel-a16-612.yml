@@ -13,28 +13,30 @@ on:
       ksu_commit:
         required: false
         type: string
+      build_bypass:
+        required: true
+        type: boolean
 
 jobs:
   build-kernels-a16-612:
     name: "6.12.${{ matrix.sub_level }}-${{ matrix.os_patch_level }}"
-    if: ${{ inputs.ksu_variant == 'ksu' }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - sub_level: "23"
-            os_patch_level: "2025-05-exp"
-          - sub_level: "30"
-            os_patch_level: "2025-07"
-          - sub_level: "38"
-            os_patch_level: "2025-08"
-          - sub_level: "38"
-            os_patch_level: "2025-09"
-          - sub_level: "58"
-            os_patch_level: "2025-12"
-          - sub_level: "X"
-            os_patch_level: "lts"
-          # Add more sublevels/patch levels as needed
+        - sub_level: "23"
+          os_patch_level: "2025-05-exp"
+        - sub_level: "30"
+          os_patch_level: "2025-07"
+        - sub_level: "38"
+          os_patch_level: "2025-08"
+        - sub_level: "38"
+          os_patch_level: "2025-09"
+        - sub_level: "58"
+          os_patch_level: "2025-12"
+        - sub_level: "X"
+          os_patch_level: "lts"
+        # Add more sublevels/patch levels as needed
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
@@ -45,3 +47,4 @@ jobs:
       variant: "A16-612"
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}

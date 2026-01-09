@@ -1,8 +1,8 @@
 name: Kernel Config - A13 5.10
 
 permissions:
-  contents: write  # Allow writing to repository contents
-  actions: write   # Allows triggering actions
+  contents: write # Allow writing to repository contents
+  actions: write # Allows triggering actions
 
 on:
   workflow_call:
@@ -13,6 +13,9 @@ on:
       ksu_commit:
         required: false
         type: string
+      build_bypass:
+        required: true
+        type: boolean
 
 jobs:
   build-kernels-a13-5-10:
@@ -21,83 +24,83 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Deprecated series (Android 13 - 5.10)
-          - sub_level: "107"
-            os_patch_level: "2022-04"
-          - sub_level: "107"
-            os_patch_level: "2022-05"
-          - sub_level: "107"
-            os_patch_level: "2022-06"
-          - sub_level: "107"
-            os_patch_level: "2022-07"
-          - sub_level: "107"
-            os_patch_level: "2022-08"
-          - sub_level: "107"
-            os_patch_level: "2022-09"
-          - sub_level: "107"
-            os_patch_level: "2022-10"
-          - sub_level: "107"
-            os_patch_level: "2022-11"
-          - sub_level: "149"
-            os_patch_level: "2022-12"
-          - sub_level: "149"
-            os_patch_level: "2023-01"
-          - sub_level: "157"
-            os_patch_level: "2023-02"
-          - sub_level: "157"
-            os_patch_level: "2023-03"
-          - sub_level: "168"
-            os_patch_level: "2023-04"
-          - sub_level: "168"
-            os_patch_level: "2023-05"
-          - sub_level: "177"
-            os_patch_level: "2023-06"
-          - sub_level: "177"
-            os_patch_level: "2023-07"
-          - sub_level: "186"
-            os_patch_level: "2023-08"
-          - sub_level: "186"
-            os_patch_level: "2023-09"
-          - sub_level: "189"
-            os_patch_level: "2023-10"
-          - sub_level: "189"
-            os_patch_level: "2023-11"
-          - sub_level: "198"
-            os_patch_level: "2023-12"
-          - sub_level: "198"
-            os_patch_level: "2024-01"
-          - sub_level: "205"
-            os_patch_level: "2024-02"
-          - sub_level: "205"
-            os_patch_level: "2024-03"
-          - sub_level: "209"
-            os_patch_level: "2024-04"
-          - sub_level: "209"
-            os_patch_level: "2024-05"
-          - sub_level: "210"
-            os_patch_level: "2024-06"
-          - sub_level: "214"
-            os_patch_level: "2024-07"
-          - sub_level: "218"
-            os_patch_level: "2024-08"
-          # Active series
-          - sub_level: "223"
-            os_patch_level: "2024-09"
-          - sub_level: "223"
-            os_patch_level: "2024-11"
-          - sub_level: "228"
-            os_patch_level: "2025-01"
-          - sub_level: "234"
-            os_patch_level: "2025-03"
-          - sub_level: "236"
-            os_patch_level: "2025-05"
-          - sub_level: "238"
-            os_patch_level: "2025-07"
-          - sub_level: "243"
-            os_patch_level: "2025-10"
-          # LTS meta
-          - sub_level: "X"
-            os_patch_level: "lts"
+        # Deprecated series (Android 13 - 5.10)
+        - sub_level: "107"
+          os_patch_level: "2022-04"
+        - sub_level: "107"
+          os_patch_level: "2022-05"
+        - sub_level: "107"
+          os_patch_level: "2022-06"
+        - sub_level: "107"
+          os_patch_level: "2022-07"
+        - sub_level: "107"
+          os_patch_level: "2022-08"
+        - sub_level: "107"
+          os_patch_level: "2022-09"
+        - sub_level: "107"
+          os_patch_level: "2022-10"
+        - sub_level: "107"
+          os_patch_level: "2022-11"
+        - sub_level: "149"
+          os_patch_level: "2022-12"
+        - sub_level: "149"
+          os_patch_level: "2023-01"
+        - sub_level: "157"
+          os_patch_level: "2023-02"
+        - sub_level: "157"
+          os_patch_level: "2023-03"
+        - sub_level: "168"
+          os_patch_level: "2023-04"
+        - sub_level: "168"
+          os_patch_level: "2023-05"
+        - sub_level: "177"
+          os_patch_level: "2023-06"
+        - sub_level: "177"
+          os_patch_level: "2023-07"
+        - sub_level: "186"
+          os_patch_level: "2023-08"
+        - sub_level: "186"
+          os_patch_level: "2023-09"
+        - sub_level: "189"
+          os_patch_level: "2023-10"
+        - sub_level: "189"
+          os_patch_level: "2023-11"
+        - sub_level: "198"
+          os_patch_level: "2023-12"
+        - sub_level: "198"
+          os_patch_level: "2024-01"
+        - sub_level: "205"
+          os_patch_level: "2024-02"
+        - sub_level: "205"
+          os_patch_level: "2024-03"
+        - sub_level: "209"
+          os_patch_level: "2024-04"
+        - sub_level: "209"
+          os_patch_level: "2024-05"
+        - sub_level: "210"
+          os_patch_level: "2024-06"
+        - sub_level: "214"
+          os_patch_level: "2024-07"
+        - sub_level: "218"
+          os_patch_level: "2024-08"
+        # Active series
+        - sub_level: "223"
+          os_patch_level: "2024-09"
+        - sub_level: "223"
+          os_patch_level: "2024-11"
+        - sub_level: "228"
+          os_patch_level: "2025-01"
+        - sub_level: "234"
+          os_patch_level: "2025-03"
+        - sub_level: "236"
+          os_patch_level: "2025-05"
+        - sub_level: "238"
+          os_patch_level: "2025-07"
+        - sub_level: "243"
+          os_patch_level: "2025-10"
+        # LTS meta
+        - sub_level: "X"
+          os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
@@ -107,3 +110,4 @@ jobs:
       os_patch_level: ${{ matrix.os_patch_level }}
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}

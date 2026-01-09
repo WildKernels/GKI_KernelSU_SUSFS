@@ -10,51 +10,59 @@ on:
       release_type:
         description: "Release Type"
         type: choice
-        options: [Actions, Pre-Release, Release]
+        options: [ Actions, Pre-Release, Release ]
         default: Actions
       ksu_variant:
         description: "KernelSU Variant"
         type: choice
-        options: [KSU, WKSU]
-        default: KSU
+        options: [ KSU, WKSU, Next, RKSU]
+        default: WKSU
       ksu_commit:
         description: "KSU Commit (optional)"
         type: string
+        default: ""
         required: false
-
+      build_bypass:
+        description: "Build Bypass"
+        type: boolean
+        default: false
       # Build Selection
       build_a12_5_10:
         description: "Android 12 - 5.10"
         type: boolean
-        default: true
+        default: false
       build_a13_5_10:
         description: "Android 13 - 5.10"
         type: boolean
-        default: true
+        default: false
       build_a13_5_15:
         description: "Android 13 - 5.15"
         type: boolean
-        default: true
+        default: false
       build_a14_5_15:
         description: "Android 14 - 5.15"
         type: boolean
-        default: true
+        default: false
       build_a14_6_1:
         description: "Android 14 - 6.1"
         type: boolean
-        default: true
+        default: false
       build_a15_6_6:
         description: "Android 15 - 6.6"
         type: boolean
-        default: true
+        default: false
       build_a16_6_12:
         description: "Android 16 - 6.12"
         type: boolean
-        default: true
+        default: false
       build_custom:
         description: "Custom Builds"
         type: boolean
         default: true
+      build_lts:
+        description: "Build All LTS Kernels"
+        type: boolean
+        default: false
 
 jobs:
   build-a12-5-10:
@@ -64,6 +72,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a13-5-10:
     if: inputs.build_a13_5_10
@@ -72,6 +81,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a13-5-15:
     if: inputs.build_a13_5_15
@@ -80,6 +90,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a14-5-15:
     if: inputs.build_a14_5_15
@@ -88,6 +99,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a14-6-1:
     if: inputs.build_a14_6_1
@@ -96,6 +108,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a15-6-6:
     if: inputs.build_a15_6_6
@@ -104,6 +117,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a16-6-12:
     if: inputs.build_a16_6_12
@@ -112,6 +126,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-custom:
     if: inputs.build_custom
@@ -120,155 +135,365 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
+
+  build-lts:
+    if: inputs.build_lts
+    uses: ./.github/workflows/kernel-lts.yml
+    secrets: inherit
+    with:
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
+
+  rej:
+    if: always()
+    runs-on: ubuntu-latest
+    needs:
+    - build-a12-5-10
+    - build-a13-5-10
+    - build-a13-5-15
+    - build-a14-5-15
+    - build-a14-6-1
+    - build-a15-6-6
+    - build-a16-6-12
+    - build-custom
+    - build-lts
+    steps:
+    - name: Download Misc Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts
+        pattern: '*-Rejects'
+
+    - name: Process Reject Artifacts
+      run: |
+        mkdir -p aio-rejects
+        
+        # Iterate over Rejects artifacts in downloaded-artifacts
+        for dir in ./downloaded-artifacts/*-Rejects; do
+            # Ensure it is a directory
+            [ -d "$dir" ] || continue
+            
+            dirname=$(basename "$dir")
+            echo "Processing $dirname..."
+            
+            # Get original name (remove -Rejects suffix)
+            original_name=${dirname%-Rejects}
+            
+            mkdir -p "aio-rejects/$original_name"
+            
+            # Check for patch-rejects folder (legacy structure) or direct contents
+            if [ -d "$dir/patch-rejects" ]; then
+                echo "Found patch-rejects subdir in $dirname"
+                cp -r "$dir/patch-rejects/." "aio-rejects/$original_name/"
+            else
+                echo "Copying contents from $dirname"
+                cp -r "$dir/." "aio-rejects/$original_name/"
+            fi
+        done
+        
+        # Zip and upload if we found anything
+        if [ "$(ls -A aio-rejects)" ]; then
+            echo "Creating AIO-REJ.zip..."
+            cd aio-rejects
+            zip -r -q -9 ../AIO-REJ.zip .
+            cd ..
+        else
+            echo "No rejects found to upload."
+        fi
+
+    - name: Upload AIO-REJ Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AIO-REJ
+        path: AIO-REJ.zip
+        if-no-files-found: ignore
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.release_type != 'Actions'
+    if: ${{ always() && inputs.release_type != 'Actions' }}
+    permissions:
+      contents: write
     needs:
-      - build-a12-5-10
-      - build-a13-5-10
-      - build-a13-5-15
-      - build-a14-5-15
-      - build-a14-6-1
-      - build-a15-6-6
-      - build-a16-6-12
-      - build-custom
+    - build-a12-5-10
+    - build-a13-5-10
+    - build-a13-5-15
+    - build-a14-5-15
+    - build-a14-6-1
+    - build-a15-6-6
+    - build-a16-6-12
+    - build-custom
+    - build-lts
 
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v1.5.12"
+      RELEASE_NAME: "!!TESTING!! GKI Kernels With KernelSU-Next & SUSFS v2.0.0 !!TESTING!!"
       RELEASE_BODY: ""
+    outputs:
+      new_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
-      - name: Download Apache Arrow's util_free_space.sh
-        if: false
-        run: |
-          curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
-          chmod +x util_free_space.sh
-          ./util_free_space.sh
-      
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Validate Selected Builds
+      run: |
+        set -euo pipefail
 
-      - name: Generate New Tag
-        if: inputs.release_type != 'Actions'
-        run: |
-            LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "")
-            NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-    
-            echo "New tag: $NEW_TAG"
-            echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+        failed=0
 
-      - name: Set release body
-        run: |
-          cat << 'EOF' > release_body.md
-      
-          **IMPORTANT DISCLAIMER**
-          This software is provided for testing and educational purposes only. Use at your own risk.
-          The developers are not responsible for any damage, data loss, or issues that may occur.
-          Please ensure you have proper backups before installation.
+        check_selected() {
+          local selected="$1"
+          local job_name="$2"
+          local result="$3"
+          if [[ "$selected" == "true" ]]; then
+            if [[ "$result" != "success" ]]; then
+              echo "Selected job $job_name did not succeed (result: $result)"
+              failed=1
+            fi
+          fi
+        }
 
-          🔹 Normal 
-          - Default kernel configuration 
-          - Standard kernel module loading behavior 
-          - Recommended for most users 
+        check_selected "${{ inputs.build_a12_5_10 }}" "build-a12-5-10" "${{ needs.build-a12-5-10.result }}"
+        check_selected "${{ inputs.build_a13_5_10 }}" "build-a13-5-10" "${{ needs.build-a13-5-10.result }}"
+        check_selected "${{ inputs.build_a13_5_15 }}" "build-a13-5-15" "${{ needs.build-a13-5-15.result }}"
+        check_selected "${{ inputs.build_a14_5_15 }}" "build-a14-5-15" "${{ needs.build-a14-5-15.result }}"
+        check_selected "${{ inputs.build_a14_6_1 }}" "build-a14-6-1" "${{ needs.build-a14-6-1.result }}"
+        check_selected "${{ inputs.build_a15_6_6 }}" "build-a15-6-6" "${{ needs.build-a15-6-6.result }}"
+        check_selected "${{ inputs.build_a16_6_12 }}" "build-a16-6-12" "${{ needs.build-a16-6-12.result }}"
+        check_selected "${{ inputs.build_custom }}" "build-custom" "${{ needs.build-custom.result }}"
+        check_selected "${{ inputs.build_lts }}" "build-lts" "${{ needs.build-lts.result }}"
 
-          🔹 Bypass 
-          - Includes module check bypass modifications 
-          - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
-          - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
-          - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
+        if [[ "$failed" -ne 0 ]]; then
+          exit 1
+        fi
 
-          Features:
-          -> Wild KSU
-          -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
-          -> SUSFS ඞ v1.5.12
-          -> Scope-Minimized Manual hooks v1.4
-          -> Ptrace Patch Support for Older Kernels (<5.16)
-          -> IPSet Support for Advanced Network Filtering
-          -> Wireguard Support
-          -> BBR v1 Support
-          -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
+    - name: Free Disk Space
+      if: true
+      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
+      with:
+        remove_android: true
+        remove_dotnet: true
+        remove_haskell: true
+        remove_tool_cache: true
+        remove_swap: true
+        remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+        remove_packages_one_command: true
+        remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
+        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
+        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
+        testing: false
 
-          🔹 BBG (Baseband-guard)
-          - A lightweight LSM (Linux Security Module) for Android kernel
-          - Blocks unauthorized writes to critical partitions/device nodes
-          - Prevents malicious tampering with baseband and boot chain
-          - Kernel-level protection via LSM hooks
-          - Reduces risk of soft-brick/hard-brick issues
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-          Notes:
-          -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
-          -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
-          -> **boot.img files**: Available as CI artifacts only - download from the Actions tab in the "Misc" Artifact
-          -> **Warning**: boot.img files may not boot on some devices
-          -> **Note:** For detailed commit information and component versions, please check the build summary in the "Misc" Artifact
+    - name: Generate New Tag
+      id: tag
+      if: inputs.release_type != 'Actions'
+      run: |
+        LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "")
+        if [[ "$LATEST_TAG" =~ ^(.*)-r([0-9]+)$ ]]; then
+          VERSION="${BASH_REMATCH[1]}"
+          REV="${BASH_REMATCH[2]}"
+          NEW_REV=$((REV + 1))
+          NEW_TAG="${VERSION}-r${NEW_REV}"
+        else
+          NEW_TAG="${LATEST_TAG}-r1"
+        fi
+        
+        echo "New tag: $NEW_TAG"
+        echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+        echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
-          Module: 
-          -> https://github.com/sidex15/ksu_module_susfs
-      
-          Managers:
-          -> WKSU: https://github.com/WildKernels/Wild_KSU
-          -> Next: https://github.com/KernelSU-Next/KernelSU-Next
-          EOF
+    - name: Set release body
+      run: |
+        cat << 'EOF' > release_body.md
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.NEW_TAG }}
-          prerelease: ${{ inputs.release_type == 'Pre-Release' }}
-          files: ""
-          name: ${{ env.RELEASE_NAME }}
-          body_path: release_body.md
+        !!THIS RELEASE IS A TESTING RELEASE!!
 
-      - name: Download Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: ./downloaded-artifacts
-          pattern: '*-AnyKernel3'
+        **IMPORTANT DISCLAIMER**
+        This software is provided for testing and educational purposes only. Use at your own risk.
+        The developers are not responsible for any damage, data loss, or issues that may occur.
+        Please ensure you have proper backups before installation.
 
-      - name: Upload Release Assets
-        run: |
-          shopt -s nullglob
-          anykernel_dirs=(./downloaded-artifacts/*-AnyKernel3/)
-          
-          if [ ${#anykernel_dirs[@]} -eq 0 ]; then
-            echo "No AnyKernel3 artifact directories found; skipping upload."
+        🔹 Normal 
+        - Default kernel configuration 
+        - Standard kernel module loading behavior 
+        - Recommended for most users 
+
+        🔹 Bypass 
+        - Includes module check bypass modifications 
+        - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
+        - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
+        - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
+
+        Features:
+        -> Wild KSU Manager Support, Also Compatible with KernelSU-Next Manager
+        -> SUSFS ඞ v2.0.0
+        -> SUSFS Inline Hooks
+        -> Ptrace Patch Support for Older Kernels (<5.16)
+        -> IPSet Support for Advanced Network Filtering
+        -> Wireguard Support
+        -> BBR v1 Support
+        -> BBG: https://github.com/vc-teahouse/Baseband-guard
+
+        🔹 BBG (Baseband-guard)
+        - A lightweight LSM (Linux Security Module) for Android kernel
+        - Blocks unauthorized writes to critical partitions/device nodes
+        - Prevents malicious tampering with baseband and boot chain
+        - Kernel-level protection via LSM hooks
+        - Reduces risk of soft-brick/hard-brick issues
+
+        Kernel Flasher:
+        -> https://github.com/fatalcoder524/KernelFlasher/
+
+        Manager:
+        -> Wild KSU Manager: https://github.com/WildKernels/Wild_KSU
+        -> Next: https://github.com/KernelSU-Next/KernelSU-Next
+
+        Module: 
+        -> https://github.com/sidex15/ksu_module_susfs
+
+        !!THIS RELEASE IS A TESTING RELEASE!!
+        EOF
+
+    - name: Create GitHub Release
+      run: |
+        PRERELEASE_FLAG=""
+        if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
+          PRERELEASE_FLAG="--prerelease"
+        fi
+
+        echo "Creating release ${{ env.NEW_TAG }}..."
+        gh release create "${{ env.NEW_TAG }}" \
+          --title "${{ env.RELEASE_NAME }}" \
+          --notes-file release_body.md \
+          --target "${{ github.sha }}" \
+          $PRERELEASE_FLAG
+
+    - name: Download Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts
+        pattern: '*-AnyKernel3'
+
+    - name: Upload Release Assets
+      run: |+
+        shopt -s nullglob
+        mapfile -t anykernel_dirs < <(find ./downloaded-artifacts -maxdepth 2 -type d -name '*-AnyKernel3' -print)
+
+        for dir in "${anykernel_dirs[@]}"; do
+          artifact_name=$(basename "$dir")
+          echo "Creating ZIP for $artifact_name..."
+          (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
+        done
+        wait
+
+        for dir in "${anykernel_dirs[@]}"; do
+          artifact_name=$(basename "$dir")
+          echo "Uploading 2 ${artifact_name}.zip..."
+          gh release upload "${{ env.NEW_TAG }}" "$GITHUB_WORKSPACE/${artifact_name}.zip" --clobber
+        done
+
+  notify-actions:
+    runs-on: ubuntu-latest
+    needs: [release]
+    if: ${{ always() && (inputs.release_type == 'Actions' || needs.release.result == 'success') }}
+    env:
+      NEW_TAG: ${{ needs.release.outputs.new_tag }}
+    steps:
+    - name: Free Disk Space
+      if: true
+      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
+      with:
+        remove_android: true
+        remove_dotnet: true
+        remove_haskell: true
+        remove_tool_cache: true
+        remove_swap: true
+        remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+        remove_packages_one_command: true
+        remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
+        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
+        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
+        testing: false
+        
+    - name: Download Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts/6.1.145-android14-2025-09-TheWildJames-AnyKernel3
+        pattern: 6.1.145-android14-2025-09-TheWildJames-AnyKernel3
+      continue-on-error: true
+
+    - name: Download Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts/6.1.145-android14-2025-09-Normal-AnyKernel3
+        pattern: 6.1.145-android14-2025-09-Normal-AnyKernel3
+      continue-on-error: true
+
+    - name: Upload Release Assets
+      run: |+
+        shopt -s nullglob
+        mapfile -t anykernel_dirs < <(find ./downloaded-artifacts -maxdepth 2 -type d -name '*-AnyKernel3' -print)
+
+        for dir in "${anykernel_dirs[@]}"; do
+          artifact_name=$(basename "$dir")
+          echo "Creating ZIP for $artifact_name..."
+          (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
+        done
+        wait
+
+    - name: Send Telegram Notification
+      if: inputs.release_type == 'Actions'
+      run: |
+        curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
+          -F text="
+          🌽 *New Kernel Actions Build Finished*
+          📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})
+          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+          [🔗 View Action Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+          -F parse_mode="Markdown"
+
+    - name: Send Telegram Notification
+      if: inputs.release_type != 'Actions' && needs.release.result == 'success'
+      run: |
+        RELEASE_TYPE_TEXT=""
+        if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
+          RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
+        else
+          RELEASE_TYPE_TEXT="🚀 *Release*"
+        fi
+
+        curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
+          -F text="
+          🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
+          📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
+          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+          [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
+          -F parse_mode="Markdown"
+
+    - name: DM Artifacts
+      if: always()
+      run: |
+        shopt -s nullglob
+        files=("$GITHUB_WORKSPACE"/*.zip)
+
+        if [ ${#files[@]} -eq 0 ]; then
+            echo "No ZIP files found for DM."
             exit 0
-          fi
-          
-          echo "Found ${#anykernel_dirs[@]} artifacts to process"
-          
-          # Create all ZIPs in parallel
-          for dir in "${anykernel_dirs[@]}"; do
-            artifact_name=$(basename "$dir")
-            echo "Creating ZIP for $artifact_name..."
-            (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
-          done
-          wait
-          
-          # Upload all ZIPs
-          for dir in "${anykernel_dirs[@]}"; do
-            artifact_name=$(basename "$dir")
-            echo "Uploading ${artifact_name}.zip..."
-            gh release upload "${{ env.NEW_TAG }}" "${artifact_name}.zip" --clobber
-          done
-            
-      - name: Send Telegram Notification
-        if: inputs.release_type != 'Actions'
-        run: |
-          RELEASE_TYPE_TEXT=""
-          if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
-            RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
-          else
-            RELEASE_TYPE_TEXT="🚀 *Release*"
-          fi
-          
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
-            -F text="
-            🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
-            📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
-            ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
-            -F parse_mode="Markdown"
+        fi
+
+        if [ -z "${{ secrets.TELEGRAM_USER_ID }}" ]; then
+            echo "Error: TELEGRAM_USER_ID secret is not set."
+            exit 1
+        fi
+
+        for file in "${files[@]}"; do
+            echo "Sending $(basename "$file") to Telegram DM..."
+            curl -v -F chat_id="${{ secrets.TELEGRAM_USER_ID }}" \
+                -F document=@"$file" \
+                -F caption="📦 Build: $(basename "$file")" \
+                https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
+        done

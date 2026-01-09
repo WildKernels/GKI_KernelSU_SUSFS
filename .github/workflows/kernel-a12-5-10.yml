@@ -1,8 +1,8 @@
 name: Kernel Config - A12 5.10
 
 permissions:
-  contents: write  # Allow writing to repository contents
-  actions: write   # Allows triggering actions
+  contents: write # Allow writing to repository contents
+  actions: write # Allows triggering actions
 
 on:
   workflow_call:
@@ -13,6 +13,9 @@ on:
       ksu_commit:
         required: false
         type: string
+      build_bypass:
+        required: true
+        type: boolean
 
 jobs:
   build-kernels-a12:
@@ -107,4 +110,4 @@ jobs:
       os_patch_level: ${{ matrix.os_patch_level }}
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
-
+      build_bypass: ${{ inputs.build_bypass }}

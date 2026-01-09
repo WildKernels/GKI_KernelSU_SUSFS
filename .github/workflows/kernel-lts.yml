@@ -1,0 +1,67 @@
+name: Kernel Config - LTS AIO
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_call:
+    inputs:
+      ksu_variant:
+        required: true
+        type: string
+      ksu_commit:
+        required: false
+        type: string
+      build_bypass:
+        required: true
+        type: boolean
+
+jobs:
+  build-kernels-lts:
+    name: "LTS-${{ matrix.android_version }}-${{ matrix.kernel_version }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - android_version: "android12"
+            kernel_version: "5.10"
+            sub_level: "X"
+            os_patch_level: "lts"
+          - android_version: "android13"
+            kernel_version: "5.10"
+            sub_level: "X"
+            os_patch_level: "lts"
+          - android_version: "android13"
+            kernel_version: "5.15"
+            sub_level: "X"
+            os_patch_level: "lts"
+          - android_version: "android14"
+            kernel_version: "5.15"
+            sub_level: "X"
+            os_patch_level: "lts"
+          - android_version: "android14"
+            kernel_version: "6.1"
+            sub_level: "X"
+            os_patch_level: "lts"
+          - android_version: "android15"
+            kernel_version: "6.6"
+            sub_level: "X"
+            os_patch_level: "lts"
+          - android_version: "android16"
+            kernel_version: "6.12"
+            sub_level: "X"
+            os_patch_level: "lts"
+            variant: "A16-612"
+
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      android_version: ${{ matrix.android_version }}
+      kernel_version: ${{ matrix.kernel_version }}
+      sub_level: ${{ matrix.sub_level }}
+      os_patch_level: ${{ matrix.os_patch_level }}
+      variant: ${{ matrix.variant }}
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}

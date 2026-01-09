@@ -13,6 +13,9 @@ on:
       ksu_commit:
         required: false
         type: string
+      build_bypass:
+        required: true
+        type: boolean
 
 jobs:
   build-kernel-custom:
@@ -20,21 +23,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - android_version: "android12"
-            kernel_version: "5.10"
-            sub_level: "226"
-            os_patch_level: "2024-11"
-            variant: "vTomsonek"
-          - android_version: "android14"
-            kernel_version: "6.1"
-            sub_level: "134"
-            os_patch_level: "2025-05"
-            variant: "TheWildJames"
-          #- android_version: "android14"
-          #  kernel_version: "6.1"
-          #  sub_level: "147"
-          #  os_patch_level: "2025-12"
-          #  variant: "MarionKernel"
+        - android_version: "android12"
+          kernel_version: "5.10"
+          sub_level: "226"
+          os_patch_level: "2024-11"
+          variant: "vTomsonek"
+        - android_version: "android14"
+          kernel_version: "6.1"
+          sub_level: "145"
+          os_patch_level: "2025-09"
+          variant: "TheWildJames"
+        - android_version: "android14"
+          kernel_version: "6.1"
+          sub_level: "157"
+          os_patch_level: "2025-12"
+          variant: "MarionKernel"
+        - android_version: "android14"
+          kernel_version: "6.1"
+          sub_level: "128"
+          os_patch_level: "2025-03"
+          variant: "Hakan"
 
     uses: ./.github/workflows/build.yml
     secrets: inherit
@@ -46,3 +54,4 @@ jobs:
       variant: ${{ matrix.variant }}
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
