@@ -171,7 +171,7 @@ jobs:
         fi
 
     - name: Apply ptrace patch for older kernels
-      if: fromJSON(inputs.kernel_version) < 5.16
+      if: false && fromJSON(inputs.kernel_version) < 5.16
       working-directory: ${{ env.KERNEL_ROOT }}/common
       run: |
         patch -p1 -F 3 < "$KERNEL_PATCHES/gki_ptrace.patch"
@@ -431,7 +431,7 @@ jobs:
         esac
 
     - name: Apply Performance Patches
-      if: true
+      if: false
       working-directory: ${{ env.KERNEL_ROOT }}/common
       run: |
         MIN_VERSION="5.16"
