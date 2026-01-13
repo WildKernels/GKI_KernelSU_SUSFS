@@ -1,0 +1,35 @@
+name: Run Kernel Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_version:
+        required: true
+        default: android12
+      kernel_version:
+        required: true
+        default: "5.10"
+      sub_level:
+        required: true
+        default: "226"
+      os_patch_level:
+        required: true
+        default: "2024-11"
+      ksu_variant:
+        required: true
+        default: WKSU
+      build_bypass:
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  call-build:
+    uses: ./.github/workflows/build.yml
+    with:
+      android_version: ${{ inputs.android_version }}
+      kernel_version: ${{ inputs.kernel_version }}
+      sub_level: ${{ inputs.sub_level }}
+      os_patch_level: ${{ inputs.os_patch_level }}
+      ksu_variant: ${{ inputs.ksu_variant }}
+      build_bypass: ${{ inputs.build_bypass }}
