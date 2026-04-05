@@ -1,21 +1,5 @@
 {
   "include": [
-    {"kernel_version": "6.6.30-android15-2024-07"},
-    {"kernel_version": "6.6.30-android15-2024-08"},
-    {"kernel_version": "6.6.46-android15-2024-09"},
-    {"kernel_version": "6.6.50-android15-2024-10"},
-    {"kernel_version": "6.6.56-android15-2024-11"},
-    {"kernel_version": "6.6.57-android15-2024-12"},
-    {"kernel_version": "6.6.58-android15-2025-01"},
-    {"kernel_version": "6.6.66-android15-2025-02"},
-    {"kernel_version": "6.6.77-android15-2025-03"},
-    {"kernel_version": "6.6.82-android15-2025-04"},
-    {"kernel_version": "6.6.87-android15-2025-05"},
-    {"kernel_version": "6.6.89-android15-2025-06"},
-    {"kernel_version": "6.6.92-android15-2025-07"},
-    {"kernel_version": "6.6.98-android15-2025-08"},
-    {"kernel_version": "6.6.98-android15-2025-09"},
-    {"kernel_version": "6.6.102-android15-2025-10"},
-    {"kernel_version": "6.6.118-android15-2026-01"}
+    {"kernel_version": "6.6.102-android15-8-g6eb5b2a8c46b-ab14739656-4k"}
   ]
 }

@@ -41,39 +41,54 @@ jobs:
     - name: Parse kernel version
       id: parse
       run: |
-        # Parse version string. 
-        # Format: [KERNEL_VERSION].[SUBLEVEL]-[ANDROID_VERSION]-[PATCH_LEVEL]
-        # Example 1: 5.10.198-android12-2024-01 -> K=5.10, S=198, A=android12, P=2024-01
-        # Example 2: 5.10.X-android12-lts       -> K=5.10, S=X,   A=android12, P=lts
-        
         INPUT_VERSION="${{ inputs.kernel_version }}"
-        
-        # Split by hyphens
-        IFS='-' read -r KERNEL_PART ANDROID_PART REST <<< "$INPUT_VERSION"
-        
-        # Extract Kernel Version and Sublevel
-        KERNEL_VERSION="${KERNEL_PART%.*}"
-        SUB_LEVEL="${KERNEL_PART##*.}"
-        
-        # Extract Android Version
-        ANDROID_VERSION="$ANDROID_PART"
-        
-        # Everything after the android version is the patch level
-        OS_PATCH_LEVEL="$REST"
-  
-        echo "Parsed: KERNEL=$KERNEL_VERSION, SUB=$SUB_LEVEL, ANDROID=$ANDROID_VERSION, PATCH=$OS_PATCH_LEVEL"
-        
-        # Set environment variables for subsequent steps and shell scripts
+
+        # Legacy format: 6.6.102-android15-2025-10
+        # Detailed GKI format: 6.6.102-android15-8-g<commit>-ab<build_id>-4k
+        if [[ "$INPUT_VERSION" =~ ^([0-9]+\.[0-9]+)\.([0-9]+)-([a-z0-9]+)-([0-9]+)-g([0-9a-f]+)-ab([0-9]+)-(4k|16k)$ ]]; then
+          KERNEL_VERSION="${BASH_REMATCH[1]}"
+          SUB_LEVEL="${BASH_REMATCH[2]}"
+          ANDROID_VERSION="${BASH_REMATCH[3]}"
+          KERNEL_BUILD_ITERATION="${BASH_REMATCH[4]}"
+          KERNEL_COMMIT="${BASH_REMATCH[5]}"
+          KERNEL_BUILD_ID="${BASH_REMATCH[6]}"
+          PAGE_SIZE_VARIANT="${BASH_REMATCH[7]}"
+          OS_PATCH_LEVEL="ab${KERNEL_BUILD_ID}"
+          KERNEL_MANIFEST_REF="common-${ANDROID_VERSION}-${KERNEL_VERSION}"
+        else
+          IFS='-' read -r KERNEL_PART ANDROID_PART REST <<< "$INPUT_VERSION"
+          KERNEL_VERSION="${KERNEL_PART%.*}"
+          SUB_LEVEL="${KERNEL_PART##*.}"
+          ANDROID_VERSION="$ANDROID_PART"
+          OS_PATCH_LEVEL="$REST"
+          KERNEL_BUILD_ITERATION=""
+          KERNEL_COMMIT=""
+          KERNEL_BUILD_ID=""
+          PAGE_SIZE_VARIANT="4k"
+          KERNEL_MANIFEST_REF=""
+        fi
+
+        echo "Parsed: KERNEL=$KERNEL_VERSION, SUB=$SUB_LEVEL, ANDROID=$ANDROID_VERSION, PATCH=$OS_PATCH_LEVEL, PAGE=$PAGE_SIZE_VARIANT, COMMIT=$KERNEL_COMMIT"
+
         echo "ANDROID_VERSION=$ANDROID_VERSION" >> "$GITHUB_ENV"
         echo "KERNEL_VERSION=$KERNEL_VERSION" >> "$GITHUB_ENV"
         echo "SUB_LEVEL=$SUB_LEVEL" >> "$GITHUB_ENV"
         echo "OS_PATCH_LEVEL=$OS_PATCH_LEVEL" >> "$GITHUB_ENV"
+        echo "KERNEL_BUILD_ITERATION=$KERNEL_BUILD_ITERATION" >> "$GITHUB_ENV"
+        echo "KERNEL_COMMIT=$KERNEL_COMMIT" >> "$GITHUB_ENV"
+        echo "KERNEL_BUILD_ID=$KERNEL_BUILD_ID" >> "$GITHUB_ENV"
+        echo "PAGE_SIZE_VARIANT=$PAGE_SIZE_VARIANT" >> "$GITHUB_ENV"
+        echo "KERNEL_MANIFEST_REF=$KERNEL_MANIFEST_REF" >> "$GITHUB_ENV"
 
-        # Set step outputs for immediate YAML context access (avoids validation warnings)
         echo "android_version=$ANDROID_VERSION" >> $GITHUB_OUTPUT
         echo "kernel_version=$KERNEL_VERSION" >> $GITHUB_OUTPUT
         echo "sub_level=$SUB_LEVEL" >> $GITHUB_OUTPUT
         echo "os_patch_level=$OS_PATCH_LEVEL" >> $GITHUB_OUTPUT
+        echo "kernel_build_iteration=$KERNEL_BUILD_ITERATION" >> $GITHUB_OUTPUT
+        echo "kernel_commit=$KERNEL_COMMIT" >> $GITHUB_OUTPUT
+        echo "kernel_build_id=$KERNEL_BUILD_ID" >> $GITHUB_OUTPUT
+        echo "page_size_variant=$PAGE_SIZE_VARIANT" >> $GITHUB_OUTPUT
+        echo "kernel_manifest_ref=$KERNEL_MANIFEST_REF" >> $GITHUB_OUTPUT
 
     - name: Free Disk Space
       if: true
@@ -130,6 +145,8 @@ jobs:
         android_version: ${{ steps.parse.outputs.android_version }}
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
         os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
+        manifest_ref: ${{ steps.parse.outputs.kernel_manifest_ref }}
+        kernel_commit: ${{ steps.parse.outputs.kernel_commit }}
 
     - name: Extract Sublevel and Set File Name
       id: extract
@@ -315,13 +332,36 @@ jobs:
     - name: Clean Kernel Flags
       uses: ./.github/actions/clean-kernel-flags
 
+    - name: Verify Clang/LLVM Toolchain (Android 15+)
+      if: ${{ steps.parse.outputs.android_version == 'android15' || steps.parse.outputs.android_version == 'android16' }}
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -e
+        CLANG_PATH=$(find . -type f -path '*prebuilts/clang/host/linux-x86/*/bin/clang' | head -n 1)
+        if [ -z "$CLANG_PATH" ]; then
+          echo "Unable to locate prebuilt clang in synced kernel tree"
+          exit 1
+        fi
+        CLANG_MAJOR=$($CLANG_PATH --version | head -n1 | sed -E 's/.*clang version ([0-9]+).*/\1/')
+        echo "Detected clang: $($CLANG_PATH --version | head -n1)"
+        if [ -z "$CLANG_MAJOR" ] || [ "$CLANG_MAJOR" -lt 18 ]; then
+          echo "Clang 18+ is required for Android 15+/6.6 builds"
+          exit 1
+        fi
+
     - name: Build Kernel
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -ex
         #make -C common mrproper
+        if [ "$PAGE_SIZE_VARIANT" = "16k" ]; then
+          BUILD_CONFIG_FILE="common/build.config.gki.aarch64.16k"
+        else
+          BUILD_CONFIG_FILE="common/build.config.gki.aarch64"
+        fi
+
         if [ -f "build/build.sh" ]; then
-          SKIP_MRPROPER=1 GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
+          SKIP_MRPROPER=1 GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" LTO=thin BUILD_CONFIG="$BUILD_CONFIG_FILE" build/build.sh || exit 1
         else
           # Copy fragment to kernel tree for bazel
           cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
@@ -418,6 +458,9 @@ jobs:
         echo "Android Version     : $ANDROID_VERSION"
         echo "Kernel Version      : $KERNEL_VERSION"
         echo "Sub Level           : $SUB_LEVEL"
+        echo "Kernel Commit       : ${KERNEL_COMMIT:-auto}"
+        echo "Kernel Build ID     : ${KERNEL_BUILD_ID:-n/a}"
+        echo "Page Size Variant   : $PAGE_SIZE_VARIANT"
         echo "Sub level (Makefile): $SUBLEVEL"
         echo "Patch Level         : $OS_PATCH_LEVEL"
         # Branch info

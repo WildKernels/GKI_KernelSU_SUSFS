@@ -25,18 +25,15 @@ runs:
       run: |
         SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
-        
+
         echo "Preparing SUSFS for branch: $SUSFS_BRANCH"
-        
-        # Parse commit map to find the commit for this branch
+
         COMMIT_MAP="${{ inputs.susfs_commit }}"
         TARGET_COMMIT=""
-        
+
         if [ -n "$COMMIT_MAP" ]; then
-          # Split by comma
           IFS=',' read -ra ENTRIES <<< "$COMMIT_MAP"
           for entry in "${ENTRIES[@]}"; do
-            # Split by colon
             IFS=':' read -r branch commit <<< "$entry"
             if [ "$branch" == "$SUSFS_BRANCH" ]; then
               TARGET_COMMIT="$commit"
@@ -44,26 +41,25 @@ runs:
             fi
           done
         fi
-        
+
         if [ -n "$TARGET_COMMIT" ]; then
-          echo "Found specific commit for $SUSFS_BRANCH: $TARGET_COMMIT"
+          echo "Using pinned SUSFS commit for $SUSFS_BRANCH: $TARGET_COMMIT"
           git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" susfs4ksu
-          cd susfs4ksu
-          git checkout "$TARGET_COMMIT"
-          cd ..
+          git -C susfs4ksu checkout "$TARGET_COMMIT"
         else
-          echo "No specific commit found for $SUSFS_BRANCH, cloning latest..."
+          echo "No pinned commit for $SUSFS_BRANCH, using latest branch head"
           git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" --depth=1 susfs4ksu
         fi
-        
-        SUSFS_VERSION="2.0.0"
-        echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
+
+        SUSFS_VERSION=$(git -C susfs4ksu describe --tags --always 2>/dev/null || git -C susfs4ksu rev-parse --short HEAD)
+        echo "SUSFS_VERSION=$SUSFS_VERSION" >> "$GITHUB_ENV"
+        echo "SUSFS_FIX_VERSION=2.0.0" >> "$GITHUB_ENV"
 
     - name: Enable KernelSU SUSFS Config
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF_CFG'
         # KernelSU SUSFS Configuration
         CONFIG_KSU_SUSFS=y
         CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -75,14 +71,20 @@ runs:
         CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
         CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
         CONFIG_KSU_SUSFS_SUS_MAP=y
-        EOF
-    
+        EOF_CFG
+
     - name: Apply Base SUSFS Patches
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        # Apply base SUSFS patches
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
-        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
-        patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+
+        PATCH_FILE="${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch"
+        if [ ! -f "$PATCH_FILE" ]; then
+          echo "Missing SUSFS base patch: $PATCH_FILE"
+          exit 1
+        fi
+
+        # Use forward+fuzz to tolerate small upstream drift while still failing on real breakage.
+        patch --forward --fuzz=3 -p1 < "$PATCH_FILE"
