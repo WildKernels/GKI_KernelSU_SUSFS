@@ -11,6 +11,14 @@ inputs:
   os_patch_level:
     description: 'OS patch level (e.g., 2024-01)'
     required: true
+  manifest_ref:
+    description: 'Optional manifest branch override (e.g., common-android15-6.6)'
+    required: false
+    default: ''
+  kernel_commit:
+    description: 'Optional commit hash to checkout in kernel/common after sync'
+    required: false
+    default: ''
 
 outputs:
   deprecated_branch:
@@ -26,22 +34,34 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       run: |
         FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
+        MANIFEST_REF="${{ inputs.manifest_ref }}"
 
-        # Initialize repo with the target branch
-        repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --depth=1
+        if [ -z "$MANIFEST_REF" ]; then
+          MANIFEST_REF="common-${FORMATTED_BRANCH}"
+        fi
 
-        # Check if branch is deprecated
-        REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
+        # Initialize repo with the target branch/ref
+        repo init -u https://android.googlesource.com/kernel/manifest -b "$MANIFEST_REF" --depth=1
+
+        # Check if branch is deprecated (legacy branch mode only)
         DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
         DEPRECATED=false
-        
-        if grep -q deprecated <<< $REMOTE_BRANCH; then
-          sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
-          echo "⚠ Note: Branch ${FORMATTED_BRANCH} is considered deprecated."
-          DEPRECATED=true
+        if [ -z "${{ inputs.manifest_ref }}" ]; then
+          REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common "${FORMATTED_BRANCH}" || true)
+          if grep -q deprecated <<< "$REMOTE_BRANCH"; then
+            sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" "$DEFAULT_MANIFEST_PATH"
+            echo "⚠ Note: Branch ${FORMATTED_BRANCH} is considered deprecated."
+            DEPRECATED=true
+          fi
         fi
-        
+
         echo "deprecated=$DEPRECATED" >> $GITHUB_OUTPUT
-        
+
         # Sync kernel source
         repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle
+
+        # Optional hard pin of kernel/common commit for exact GKI releases
+        if [ -n "${{ inputs.kernel_commit }}" ]; then
+          git -C common fetch --depth=1 origin "${{ inputs.kernel_commit }}"
+          git -C common checkout "${{ inputs.kernel_commit }}"
+        fi

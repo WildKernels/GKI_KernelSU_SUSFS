@@ -1,13 +1,13 @@
 name: Fetch Latest Commits
-description: "Fetches the latest commit hashes for Wild KSU, AnyKernel3, Kernel Patches, and SUSFS"
+description: "Fetches the latest commit hashes for KernelSU-Next, AnyKernel3, Kernel Patches, and SUSFS"
 inputs:
   ksu_commit:
-    description: "Optional: Specific Wild KSU commit to use"
+    description: "Optional: Specific KernelSU-Next commit to use"
     required: false
     default: ""
 outputs:
   ksu_commit:
-    description: "Wild KSU Commit"
+    description: "KernelSU-Next Commit"
     value: ${{ steps.commits.outputs.ksu_commit }}
   anykernel_commit:
     description: "AnyKernel3 Commit"
@@ -33,10 +33,10 @@ runs:
 
         echo "Fetching latest commits..."
         
-        # Wild KSU
+        # KernelSU-Next
         if [ -n "${{ inputs.ksu_commit }}" ]; then
           # Try to resolve input as a ref (branch/tag)
-          resolved_commit=$(get_commit "https://github.com/WildKernels/Wild_KSU.git" "${{ inputs.ksu_commit }}")
+          resolved_commit=$(get_commit "https://github.com/rifsxd/KernelSU-Next.git" "${{ inputs.ksu_commit }}")
           
           if [ -n "$resolved_commit" ]; then
             ksu_commit="$resolved_commit"
@@ -44,10 +44,10 @@ runs:
             # If resolution failed, assume input is a commit SHA
             ksu_commit="${{ inputs.ksu_commit }}"
           fi
-          echo "Using provided Wild KSU commit: $ksu_commit"
+          echo "Using provided KernelSU-Next commit: $ksu_commit"
         else
-          ksu_commit=$(get_commit "https://github.com/WildKernels/Wild_KSU.git" "refs/heads/canary")
-          echo "Wild KSU: $ksu_commit"
+          ksu_commit=$(get_commit "https://github.com/rifsxd/KernelSU-Next.git" "refs/heads/main")
+          echo "KernelSU-Next: $ksu_commit"
         fi
         echo "ksu_commit=$ksu_commit" >> $GITHUB_OUTPUT
         

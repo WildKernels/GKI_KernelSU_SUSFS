@@ -23,7 +23,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
+        SUSFS_VERSION=${{ env.SUSFS_FIX_VERSION || '2.0.0' }}
 
         if [[ "$SUBLEVEL" -le 209 ]]; then
           sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
@@ -45,7 +45,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
+        SUSFS_VERSION=${{ env.SUSFS_FIX_VERSION || '2.0.0' }}
 
         if [[ "$SUBLEVEL" -le 107 ]]; then
           cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/fdinfo.c.patch ./
@@ -62,7 +62,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
+        SUSFS_VERSION=${{ env.SUSFS_FIX_VERSION || '2.0.0' }}
         
         if [[ "$SUBLEVEL" -le 41 ]]; then
           cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/namespace.c.patch ./
@@ -99,7 +99,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
+        SUSFS_VERSION=${{ env.SUSFS_FIX_VERSION || '2.0.0' }}
 
         cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a14-6.1/base.c.patch ./
         patch -p1 < base.c.patch
@@ -114,7 +114,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
+        SUSFS_VERSION=${{ env.SUSFS_FIX_VERSION || '2.0.0' }}
 
         if [[ "$SUBLEVEL" -le 92 ]]; then
           cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/base.c.patch ./
