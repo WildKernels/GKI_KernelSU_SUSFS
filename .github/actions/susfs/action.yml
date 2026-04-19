@@ -56,7 +56,7 @@ runs:
           git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" --depth=1 susfs4ksu
         fi
         
-        SUSFS_VERSION="2.0.0"
+        SUSFS_VERSION="v2.1.0"
         echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
 
     - name: Enable KernelSU SUSFS Config
@@ -77,7 +77,7 @@ runs:
         CONFIG_KSU_SUSFS_SUS_MAP=y
         EOF
     
-    - name: Apply Base SUSFS Patches
+    - name: Apply Kernel SUSFS Patches
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
@@ -86,3 +86,10 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+
+    - name: Apply KSU SUSFS Patches
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
+      run: |
+        cp ${{ github.workspace }}/kernel_patches/wild/ksun-0daf55582-susfs-v2.1.0-e259e7d6.patch ./
+        patch -p1 < ksun-0daf55582-susfs-v2.1.0-e259e7d6.patch

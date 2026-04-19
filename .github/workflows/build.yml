@@ -40,7 +40,7 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Parse kernel version
       id: parse
@@ -204,9 +204,9 @@ jobs:
             sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
         fi
 
-    - name: Setup Wild KSU
-      if: contains(inputs.feature_set, 'WKSU')
-      uses: ./.github/actions/wksu
+    - name: Setup KernelSU-Next
+      if: contains(inputs.feature_set, 'KSUN')
+      uses: ./.github/actions/kernelsu
       with:
         ksu_commit: ${{ inputs.ksu_commit }}
 
@@ -323,7 +323,6 @@ jobs:
           # Copy fragment to kernel tree for bazel
           cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
           tools/bazel build --config=release --stamp --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment //common:kernel_aarch64_dist || exit 1
-          fi
         fi
 
     - name: Create Bootimgs Folder and Build Boot Images
@@ -463,6 +462,7 @@ jobs:
         compression-level: 9
 
     - name: Upload Rejects
+      if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.extract.outputs.file_name }}-Rejects
@@ -486,9 +486,9 @@ jobs:
         echo "Build Type          : ${{ matrix.variant }}"
         # Features info
         echo "Features            : ${{ inputs.feature_set || 'None' }}"
-        echo "WKSU Commit         : ${{ inputs.ksu_commit || 'canary' }}"
-        echo "WKSU Tag            : $KSU_GIT_TAG"
-        echo "WKSU Version        : $KSU_VERSION"
+        echo "KSUN Commit         : ${{ inputs.ksu_commit || 'canary' }}"
+        echo "KSUN Tag            : $KSU_GIT_TAG"
+        echo "KSUN Version        : $KSU_VERSION"
         echo "BBG Commit          : $BBG_COMMIT"
         echo "BBG Version         : $BBG_VERSION"
         # Variant info

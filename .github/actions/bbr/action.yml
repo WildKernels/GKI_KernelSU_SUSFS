@@ -4,6 +4,9 @@ inputs:
   kernel_version:
     description: 'Kernel version (e.g., 6.6)'
     required: true
+  android_version:
+    description: 'Android version (e.g., 12)'
+    required: true
 
 runs:
   using: composite
@@ -12,10 +15,8 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        if [ "$inputs.kernel_version" == "6.1" ]; then
-          cp $GITHUB_WORKSPACE/kernel_patches/bbrv3-a14-6.1.patch $GITHUB_WORKSPACE/kernel/common
-          patch -p1 < bbrv3-a14-6.1.patch
-        fi
+        cp "$GITHUB_WORKSPACE/kernel_patches/bbrv3-${inputs.android_version}-${inputs.kernel_version}.patch" $GITHUB_WORKSPACE/kernel/common
+        patch -p1 < "bbrv3-${inputs.android_version}-${inputs.kernel_version}.patch"
 
     - name: Fix modules.bzl
       shell: bash
@@ -32,24 +33,18 @@ runs:
 
     - name: Add BBRv3 Config
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
+      working-directory: ${{ github.workspace }}/kernel
       run: |
-        set -euo pipefail
-        if [ "${{ inputs.kernel_version }}" = "6.1" ]; then
-          frag="${{ github.workspace }}/kernel/common/arch/arm64/configs/wild_gki.fragment"
-
-          {
-            echo 'CONFIG_TCP_CONG_ADVANCED=y'
-            echo 'CONFIG_TCP_CONG_BBR=y'
-            echo 'CONFIG_DEFAULT_BBR=y'
-            echo 'CONFIG_DEFAULT_TCP_CONG="bbr"'
-            echo 'CONFIG_NET_SCH_FQ=y'
-            echo
-            echo '# CONFIG_TCP_CONG_BIC is not set'
-            echo '# CONFIG_TCP_CONG_WESTWOOD is not set'
-            echo '# CONFIG_TCP_CONG_HTCP is not set'
-          } >> "$frag"
-        fi
+        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        CONFIG_TCP_CONG_ADVANCED=y
+        CONFIG_TCP_CONG_BBR=y
+        CONFIG_DEFAULT_BBR=y
+        CONFIG_DEFAULT_TCP_CONG="bbr"
+        CONFIG_NET_SCH_FQ=y
+        # CONFIG_TCP_CONG_BIC is not set
+        # CONFIG_TCP_CONG_WESTWOOD is not set
+        # CONFIG_TCP_CONG_HTCP is not set
+        EOF
         
 
     

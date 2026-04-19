@@ -29,12 +29,12 @@ on:
         description: "Feature Set"
         type: choice
         options:
-          - WKSU+SUSFS+BBG
-          - WKSU+BBG
-          - WKSU
+          - KSUN+SUSFS+BBG
+          - KSUN+BBG
+          - KSUN
           - BBG
           - None
-        default: WKSU+SUSFS+BBG
+        default: KSUN+SUSFS+BBG
       ksu_commit:
         description: "KSU Commit (optional)"
         type: string
@@ -51,7 +51,7 @@ jobs:
       susfs_commit: ${{ steps.fetch.outputs.susfs_commit }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Fetch Commits
         id: fetch
         uses: ./.github/actions/fetch-commits
@@ -68,7 +68,7 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
+      feature_set: ${{ inputs.feature_set || 'KSUN+SUSFS+BBG' }}
     secrets: inherit
 
   build-a13-5-10:
@@ -81,7 +81,7 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
+      feature_set: ${{ inputs.feature_set || 'KSUN+SUSFS+BBG' }}
     secrets: inherit
 
   build-a13-5-15:
@@ -94,7 +94,7 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
+      feature_set: ${{ inputs.feature_set || 'KSUN+SUSFS+BBG' }}
     secrets: inherit
 
   build-a14-5-15:
@@ -107,7 +107,7 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
+      feature_set: ${{ inputs.feature_set || 'KSUN+SUSFS+BBG' }}
     secrets: inherit
 
   build-a14-6-1:
@@ -120,7 +120,7 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
+      feature_set: ${{ inputs.feature_set || 'KSUN+SUSFS+BBG' }}
     secrets: inherit
 
   build-a15-6-6:
@@ -133,7 +133,7 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
+      feature_set: ${{ inputs.feature_set || 'KSUN+SUSFS+BBG' }}
     secrets: inherit
 
   build-a16-6-12:
@@ -146,7 +146,7 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
+      feature_set: ${{ inputs.feature_set || 'KSUN+SUSFS+BBG' }}
     secrets: inherit
 
   rej:
@@ -232,7 +232,7 @@ jobs:
 
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v2.0.0"
+      RELEASE_NAME: "GKI Kernels With KernelSU-Next & SUSFS v2.1.0"
       RELEASE_BODY: ""
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
@@ -286,7 +286,7 @@ jobs:
         testing: false
 
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Generate New Tag
       id: tag

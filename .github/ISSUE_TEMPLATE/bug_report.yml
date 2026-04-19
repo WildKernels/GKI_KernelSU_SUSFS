@@ -37,8 +37,8 @@ body:
 
   - type: input
     attributes:
-        label: WKSU Kernel Version
-        description: Your WKSU kernel version number
+        label: KSUN Kernel Version
+        description: Your KSUN kernel version number
         placeholder: "e.g., 13971"
     validations:
         required: true
@@ -78,7 +78,7 @@ body:
     attributes:
         label: Full File Name
         description: The complete filename of the kernel you flashed
-        placeholder: "e.g., WKSU-13971-android14-6.1.134-2025-05-AnyKernel3.zip"
+        placeholder: "e.g., KSUN-13971-android14-6.1.134-2025-05-AnyKernel3.zip"
     validations:
         required: true
 
@@ -104,7 +104,7 @@ body:
     attributes:
         label: Last Working File Name
         description: The filename of the last working kernel (if any)
-        placeholder: "e.g., WKSU-13970-android14-6.1.134-2025-05-AnyKernel3.zip"
+        placeholder: "e.g., KSUN-13970-android14-6.1.134-2025-05-AnyKernel3.zip"
     validations:
         required: false
 
