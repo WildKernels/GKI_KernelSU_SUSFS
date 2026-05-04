@@ -350,8 +350,8 @@ jobs:
         
         echo "✅ Build environment ready"
         echo "   CCACHE_DIR: $CCACHE_DIR"
-        #echo "   LDCACHE_DIR: $LDCACHE_DIR"
-        #echo "   Compiler wrappers: $GITHUB_WORKSPACE/ccache-bin"
+        echo "   LDCACHE_DIR: $LDCACHE_DIR"
+        echo "   Compiler wrappers: $GITHUB_WORKSPACE/ccache-bin"
 
     - name: Build Kernel
       env:

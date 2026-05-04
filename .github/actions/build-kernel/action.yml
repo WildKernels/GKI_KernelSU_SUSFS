@@ -17,6 +17,10 @@ runs:
           SKIP_CP_KERNEL_HDR=1 \
           GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" \
           BUILD_CONFIG=common/build.config.gki.aarch64 \
+          $CCACHE_DIR="$CCACHE_DIR" \
+          $LDCACHE_DIR="$LDCACHE_DIR" \
+          CC=$CC CXX=$CXX HOSTCC=$HOSTCC HOSTCXX=$HOSTCXX \
+          LD=$LD HOSTLD=$HOSTLD \
           build/build.sh -j"$(nproc)"
         else
           cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
