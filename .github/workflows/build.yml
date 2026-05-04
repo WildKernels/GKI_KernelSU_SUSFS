@@ -210,8 +210,8 @@ jobs:
     
     - name: Check bazel cache hit
       run: |
-        if [ "${{ steps.restore-restore-bazel-cache.outputs.cache-hit }}" = "true" ]; then
-          echo "✅ bazel cache HIT - Key: ${{ steps.restore-restore-bazel-cache.outputs.cache-key }} - Size: ${{ steps.restore-restore-bazel-cache.outputs.cache-size }}"
+        if [ "${{ steps.restore-bazel-cache.outputs.cache-hit }}" = "true" ]; then
+          echo "✅ bazel cache HIT - Key: ${{ steps.restore-bazel-cache.outputs.cache-key }} - Size: ${{ steps.restore-bazel-cache.outputs.cache-size }}"
         else
           echo "❌ bazel cache MISS - Fresh build"
         fi
@@ -311,36 +311,38 @@ jobs:
         #echo "CLANG_PREBUILT_BIN=$GITHUB_WORKSPACE/ccache-bin" >> $GITHUB_ENV
 
         export CCACHE_MAXSIZE="12G"
-        echo CCACHE_MAXSIZE="12G" >> $GITHUB_ENV
-        export CCACHE_COMPILERCHECK="content"
-        echo CCACHE_COMPILERCHECK="content" >> $GITHUB_ENV
-        export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
-        echo CCACHE_BASEDIR="${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+        echo CCACHE_MAXSIZE="$CCACHE_MAXSIZE" >> $GITHUB_ENV
+        export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
+        echo CCACHE_COMPILERCHECK="$CCACHE_COMPILERCHECK" >> $GITHUB_ENV
+        #export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
+        #echo CCACHE_BASEDIR="${GITHUB_WORKSPACE}" >> $GITHUB_ENV
         export CCACHE_NOHASHDIR="true"
         echo CCACHE_NOHASHDIR="true" >> $GITHUB_ENV
-        export CCACHE_IGNOREOPTIONS="--sysroot*"
-        echo CCACHE_IGNOREOPTIONS="--sysroot*" >> $GITHUB_ENV
-        export CCACHE_COMPRESSION="true"
-        echo CCACHE_COMPRESSION="true" >> $GITHUB_ENV
-        export CCACHE_COMPRESSLEVEL="3"
-        echo CCACHE_COMPRESSION_LEVEL="3" >> $GITHUB_ENV
-        export CCACHE_DIRECT="true"
-        echo CCACHE_DIRECT="true" >> $GITHUB_ENV
-        export CCACHE_FILE_CLONE="true"
-        echo CCACHE_FILE_CLONE="true" >> $GITHUB_ENV
-        export CCACHE_INODE_CACHE="true"
-        echo CCACHE_INODE_CACHE="true" >> $GITHUB_ENV
-        export CCACHE_IS_KERNEL_COMPILING="true"
-        echo CCACHE_IS_KERNEL_COMPILING="true" >> $GITHUB_ENV
-        export CCACHE_UMASK="002"
-        echo CCACHE_UMASK="002" >> $GITHUB_ENV
-        export CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale"
-        echo CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale" >> $GITHUB_ENV
-        
-        if ccache --help 2>&1 | grep -q 'depend_mode'; then
-          export CCACHE_DEPEND=true
-          echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
-        fi
+        #export CCACHE_IGNOREOPTIONS="--sysroot*"
+        #echo CCACHE_IGNOREOPTIONS="--sysroot*" >> $GITHUB_ENV
+        #export CCACHE_COMPRESSION="true"
+        #echo CCACHE_COMPRESSION="true" >> $GITHUB_ENV
+        #export CCACHE_COMPRESSLEVEL="3"
+        #echo CCACHE_COMPRESSION_LEVEL="3" >> $GITHUB_ENV
+        #export CCACHE_DIRECT="true"
+        #echo CCACHE_DIRECT="true" >> $GITHUB_ENV
+        #export CCACHE_FILE_CLONE="true"
+        #echo CCACHE_FILE_CLONE="true" >> $GITHUB_ENV
+        #export CCACHE_INODE_CACHE="true"
+        #echo CCACHE_INODE_CACHE="true" >> $GITHUB_ENV
+        #export CCACHE_IS_KERNEL_COMPILING="true"
+        #echo CCACHE_IS_KERNEL_COMPILING="true" >> $GITHUB_ENV
+        #export CCACHE_UMASK="002"
+        #echo CCACHE_UMASK="002" >> $GITHUB_ENV
+        #export CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale"
+        #echo CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale" >> $GITHUB_ENV
+        export CCACHE_HARDLINK="true"
+        echo CCACHE_HARDLINK="$CCACHE_HARDLINK" >> $GITHUB_ENV
+
+        #if ccache --help 2>&1 | grep -q 'depend_mode'; then
+        #  export CCACHE_DEPEND=true
+        #  echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
+        #fi
         
         # Initialize ccache
         #ccache -M 100G
@@ -351,7 +353,7 @@ jobs:
         echo "✅ Build environment ready"
         echo "   CCACHE_DIR: $CCACHE_DIR"
         echo "   LDCACHE_DIR: $LDCACHE_DIR"
-        echo "   Compiler wrappers: $GITHUB_WORKSPACE/ccache-bin"
+        #echo "   Compiler wrappers: $GITHUB_WORKSPACE/ccache-bin"
 
     - name: Build Kernel
       env:
