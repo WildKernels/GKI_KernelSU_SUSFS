@@ -256,6 +256,67 @@ jobs:
         set -euo pipefail
         
         # Download and install ccache
+        echo "Installing ccache..."
+        curl -LfsS --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --tcp-fastopen -H "User-Agent: Mozilla/5.0" "https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/ccache/ccache-x86-64" -o ccache || { echo "❌ Failed to download ccache"; exit 1; }
+        sudo cp -f ./ccache /usr/bin/ccache || { echo "❌ Failed to install ccache"; exit 1; }
+        sudo chmod +x /usr/bin/ccache
+        rm -f ./ccache
+        
+        # Step 1: Verify ccache is installed
+        echo "Verifying ccache installation..."
+        /usr/bin/ccache --version || { echo "❌ ccache not found"; exit 1; }
+        echo "✅ ccache installed at /usr/bin/ccache"
+        
+        # Step 2: Create symlinks directory
+        SYMLINK_DIR="/usr/lib/ccache"
+        echo "Creating symlinks directory: $SYMLINK_DIR"
+        sudo mkdir -p "$SYMLINK_DIR"
+        
+        # Step 3: Create symlinks for compilers (DO USE symlinks, NOT hard links)
+        echo "Creating compiler symlinks..."
+        for compiler in gcc g++ cc c++ clang clang++; do
+          sudo ln -sf /usr/bin/ccache "$SYMLINK_DIR/$compiler" || { echo "❌ Failed to create symlink for $compiler"; exit 1; }
+        done
+        echo "✅ Symlinks created in $SYMLINK_DIR"
+        
+        # Step 4: Prepend symlinks directory to PATH (MUST come before /usr/bin)
+        echo "Prepending $SYMLINK_DIR to PATH..."
+        echo "export PATH=\"$SYMLINK_DIR:\$PATH\"" >> "$GITHUB_ENV"
+        export PATH="$SYMLINK_DIR:$PATH"
+        
+        # Step 5: Verify the setup
+        echo "Verifying compiler masquerading..."
+        which gcc | grep "$SYMLINK_DIR" || { echo "❌ gcc not pointing to ccache symlinks"; exit 1; }
+        which g++ | grep "$SYMLINK_DIR" || { echo "❌ g++ not pointing to ccache symlinks"; exit 1; }
+        echo "✅ gcc and g++ now routed through ccache"
+        
+        # Step 6: Configure ccache (optional - set max size, compression, etc.)
+        CCACHE_MAX_SIZE="12G"
+        echo "Setting max cache size to $CCACHE_MAX_SIZE..."
+        sudo ccache -M "$CCACHE_MAX_SIZE" || ccache -M "$CCACHE_MAX_SIZE"
+        
+        # Enable compression (faster cache, slightly slower compilation)
+        ccache --set-config compression=true
+        
+        # Step 7: Show ccache stats setup
+        echo "✅ ccache setup complete!"
+        ccache --show-stats
+        
+        # Step 8: Print what's done for debugging
+        echo "--- ccache setup info ---"
+        echo "ccache binary: $(which ccache)"
+        echo "gcc via ccache: $(which gcc)"
+        echo "g++ via ccache: $(which g++)"
+        echo "symlinks dir: $SYMLINK_DIR"
+        echo "max size: $(ccache --show-stats | grep 'cache size' | awk '{print $3}')"
+    - name: 'Setup ccache and Build Environment'
+      shell: bash
+      if: false
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        
+        # Download and install ccache
         #echo "Installing ccache..."
         #curl -LfsS --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --tcp-fastopen -H "User-Agent: Mozilla/5.0" "https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/ccache/ccache-x86-64" -o ccache || { echo "❌ Failed to download ccache"; exit 1; }
         #sudo cp -f ./ccache /usr/bin/ccache || { echo "❌ Failed to install ccache"; exit 1; }
