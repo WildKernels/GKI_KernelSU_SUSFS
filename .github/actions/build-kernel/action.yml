@@ -12,17 +12,17 @@ runs:
         if [ -f "build/build.sh" ]; then
           SKIP_MRPROPER=1 \
           LTO=thin \
-          SKIP_VENDOR_BOOT=1 \
-          SKIP_EXT_MODULES=1 \
-          SKIP_CP_KERNEL_HDR=1 \
+          #SKIP_VENDOR_BOOT=1 \
+          #SKIP_EXT_MODULES=1 \
+          #SKIP_CP_KERNEL_HDR=1 \
           GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" \
           BUILD_CONFIG=common/build.config.gki.aarch64 \
           CC="/usr/bin/ccache clang" \
-          CXX="/usr/bin/ccache clang++" \
-          HOSTCC="/usr/bin/ccache clang" \
-          HOSTCXX="/usr/bin/ccache clang++" \
-          LD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper" \
-          HOSTLD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper" \
+          #CXX="/usr/bin/ccache clang++" \
+          #HOSTCC="/usr/bin/ccache clang" \
+          #HOSTCXX="/usr/bin/ccache clang++" \
+          #LD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper" \
+          #HOSTLD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper" \
           build/build.sh -j"$(nproc)"
         else
           cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
