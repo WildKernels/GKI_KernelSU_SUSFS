@@ -251,6 +251,7 @@ jobs:
 
     - name: Setup ccache for Android kernel
       shell: bash
+      if: false
       working-directory: ${{ github.workspace }}
       run: |
         set -Eeuo pipefail
@@ -304,10 +305,10 @@ jobs:
         "${CCACHE_BIN}" --show-config || true
         "${CCACHE_BIN}" --zero-stats || true
         "${CCACHE_BIN}" --show-stats || true
-        
+
     - name: 'Setup ccache and Build Environment'
       shell: bash
-      if: false
+      if: true
       working-directory: ${{ github.workspace }}
       run: |
         set -euo pipefail

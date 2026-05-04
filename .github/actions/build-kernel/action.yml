@@ -11,23 +11,21 @@ runs:
       set -euo pipefail
 
       # Prepend ccache symlinks directory BEFORE /usr/bin
-      SYMLINK_DIR="/usr/lib/ccache"
-      export PATH="${SYMLINK_DIR}:${PATH}"
+      #SYMLINK_DIR="/usr/lib/ccache"
+      #export PATH="${SYMLINK_DIR}:${PATH}"
 
       # Use plain clang names, not "/usr/bin/ccache clang"
-      export CC=clang
-      export CXX=clang++
+      #export CC=clang
+      #export CXX=clang++
 
       if [ -f "build/build.sh" ]; then
         SKIP_MRPROPER=1 \
         LTO=thin \
         GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" \
         BUILD_CONFIG=common/build.config.gki.aarch64 \
-        CC=clang \
-        CXX=clang++ \
-        CCACHE_DIR="${HOME}/.ccache" \
-        CCACHE_EXEC="${CCACHE_BIN:-/usr/bin/ccache}" \
-        build/build.sh -j"$(nproc)"
+        build/build.sh -j"$(nproc)" \
+        CC="/usr/bin/ccache clang" \
+        CXX="/usr/bin/ccache clang++"
       else
         cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
         tools/bazel build \
@@ -38,7 +36,3 @@ runs:
           --cache_dir=$GITHUB_WORKSPACE/kernel/.cache/bazel \
           //common:kernel_aarch64
       fi
-    env:
-      CCACHE_DIR: ${{ env.CCACHE_DIR }}
-      CCACHE_EXEC: /usr/bin/ccache
-        
