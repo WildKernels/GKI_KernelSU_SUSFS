@@ -4,28 +4,41 @@ description: 'Builds kernel using legacy build.sh or Bazel (kleaf)'
 runs:
   using: composite
   steps:
-    - name: 'Build Kernel'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        set -euo pipefail
-        if [ -f "build/build.sh" ]; then
-          SKIP_MRPROPER=1 \
-          LTO=thin \
-          #SKIP_VENDOR_BOOT=1 \
-          #SKIP_EXT_MODULES=1 \
-          #SKIP_CP_KERNEL_HDR=1 \
-          GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" \
-          BUILD_CONFIG=common/build.config.gki.aarch64 \
-          CC="/usr/bin/ccache clang" \
-          #CXX="/usr/bin/ccache clang++" \
-          #HOSTCC="/usr/bin/ccache clang" \
-          #HOSTCXX="/usr/bin/ccache clang++" \
-          #LD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper" \
-          #HOSTLD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper" \
-          build/build.sh -j"$(nproc)"
-        else
-          cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
-          tools/bazel build --config=release --notrim --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment --disk_cache=$LDCACHE_DIR --cache_dir=$GITHUB_WORKSPACE/kernel/.cache/bazel //common:kernel_aarch64
-        fi
+  - name: 'Build Kernel'
+    shell: bash
+    working-directory: ${{ github.workspace }}/kernel
+    run: |
+      set -euo pipefail
+
+      # Prepend ccache symlinks directory BEFORE /usr/bin
+      SYMLINK_DIR="/usr/lib/ccache"
+      export PATH="${SYMLINK_DIR}:${PATH}"
+
+      # Use plain clang names, not "/usr/bin/ccache clang"
+      export CC=clang
+      export CXX=clang++
+
+      if [ -f "build/build.sh" ]; then
+        SKIP_MRPROPER=1 \
+        LTO=thin \
+        GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" \
+        BUILD_CONFIG=common/build.config.gki.aarch64 \
+        CC=clang \
+        CXX=clang++ \
+        CCACHE_DIR="${HOME}/.ccache" \
+        CCACHE_EXEC="${CCACHE_BIN:-/usr/bin/ccache}" \
+        build/build.sh -j"$(nproc)"
+      else
+        cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
+        tools/bazel build \
+          --config=release \
+          --notrim \
+          --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment \
+          --disk_cache=$LDCACHE_DIR \
+          --cache_dir=$GITHUB_WORKSPACE/kernel/.cache/bazel \
+          //common:kernel_aarch64
+      fi
+    env:
+      CCACHE_DIR: ${{ env.CCACHE_DIR }}
+      CCACHE_EXEC: /usr/bin/ccache
         
