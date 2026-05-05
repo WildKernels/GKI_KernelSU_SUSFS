@@ -281,9 +281,9 @@ jobs:
         #ccache -z
         
         echo "✅ Build environment ready"
-        echo "   CCACHE_DIR: $CCACHE_DIR"
+        #echo "   CCACHE_DIR: $CCACHE_DIR"
         #echo "   LDCACHE_DIR: $LDCACHE_DIR"
-        
+
     - name: Restore build caches (ccache)
       id: restore-ccache
       uses: ./.github/actions/restore-cache
