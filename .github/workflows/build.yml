@@ -26,6 +26,12 @@ jobs:
     timeout-minutes: 60
 
     steps:
+    - name: Display system disk usage
+      run: |
+        echo "=== Disk usage summary ==="
+        df -h
+        echo ""
+
     - name: Checkout Repository
       uses: actions/checkout@v5
 
@@ -50,16 +56,34 @@ jobs:
         rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
         testing: false
 
+    - name: Display system disk usage
+      run: |
+        echo "=== Disk usage summary ==="
+        df -h
+        echo ""
+
     - name: Setup more Swap (for LTO)
       uses: thejerrybao/setup-swap-space@v1   # or pierotofy/set-swap-space
       with:
         swap-size-gb: 10          # 10-24 GB is common for heavy LTO
         # swap-space-path: /mnt/swapfile   # optional
 
+    - name: Display system disk usage
+      run: |
+        echo "=== Disk usage summary ==="
+        df -h
+        echo ""
+
     - name: Setup Build Environment
       uses: ./.github/actions/setup-build-environment
       env:
         BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
+
+    - name: Display system disk usage
+      run: |
+        echo "=== Disk usage summary ==="
+        df -h
+        echo ""
           
     - name: Download Kernel Repository
       uses: ./.github/actions/download-kernel
@@ -68,6 +92,12 @@ jobs:
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
         os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
         use_repo: ${{ inputs.use_repo }}
+
+    - name: Display system disk usage
+      run: |
+        echo "=== Disk usage summary ==="
+        df -h
+        echo ""
 
     - name: Extract Sublevel and Set File Name
       id: extract
@@ -177,6 +207,12 @@ jobs:
         path: patch-rejects/
         if-no-files-found: ignore
         compression-level: 9
+
+    - name: Display system disk usage
+      run: |
+        echo "=== Disk usage summary ==="
+        df -h
+        echo ""
 
     - name: 'Setup ccache and Build Environment'
       shell: bash
@@ -334,11 +370,23 @@ jobs:
         du -sh /home/runner/.ld_cache || true
         ls -l /home/runner/.ld_cache || true
 
+    - name: Display system disk usage
+      run: |
+        echo "=== Disk usage summary ==="
+        df -h
+        echo ""
+
     - name: Build Kernel
       env:
         SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
       uses: ./.github/actions/build-kernel
+
+    - name: Display system disk usage
+      run: |
+        echo "=== Disk usage summary ==="
+        df -h
+        echo ""
 
     - name: Post-build cache stats
       id: post-cache-stats
