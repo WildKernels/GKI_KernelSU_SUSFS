@@ -1,33 +1,21 @@
-name: Setup Wild KSU
-description: Download and configure Wild KSU with version tracking
+name: Setup KernelSU
+description: Download and configure KernelSU with version tracking
 
 runs:
   using: composite
   steps:
-    - name: Download Wild KSU
+    - name: Download KernelSU
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail
-
-        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s 2887ea49428bc3fb5184e7c35223f0a9a47ad100
-        
-        cd KernelSU-Next/kernel
-        
-        COMMITS_COUNT=$(/usr/bin/git rev-list --count HEAD)
-        BASE_VERSION=30000
-        KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
-        sed -i "s/^KSU_VERSION_FALLBACK := 1$/KSU_VERSION_FALLBACK := ${KSU_VERSION}/" Kbuild
-
-        KSU_GIT_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.1")"
-        sed -i "s/^KSU_VERSION_TAG_FALLBACK := v0.0.1$/KSU_VERSION_TAG_FALLBACK := ${KSU_GIT_TAG}/" Kbuild
-
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
     - name: Enable KernelSU Config
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/gki_defconfig.fragment" << 'EOF'
         # KernelSU Configuration
         CONFIG_KSU=y
         EOF
@@ -35,7 +23,7 @@ runs:
     - name: Extract KSU Version Info
       id: ksu-version
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
+      working-directory: ${{ github.workspace }}/kernel/KernelSU
       run: |
         # Extract and export KSU version info
         KSU_GIT_VERSION=$(git rev-list --count HEAD 2>/dev/null)
