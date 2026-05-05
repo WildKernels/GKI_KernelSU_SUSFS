@@ -234,12 +234,15 @@ jobs:
         echo CCACHE_COMPRESSION="true" >> $GITHUB_ENV
         export CCACHE_COMPRESSLEVEL="9"
         echo CCACHE_COMPRESSION_LEVEL="9" >> $GITHUB_ENV
-        export CCACHE_DIRECT="true"
-        echo CCACHE_DIRECT="true" >> $GITHUB_ENV
-        export CCACHE_FILE_CLONE="true"
-        echo CCACHE_FILE_CLONE="true" >> $GITHUB_ENV
-        export CCACHE_INODE_CACHE="true"
-        echo CCACHE_INODE_CACHE="true" >> $GITHUB_ENV
+        # Temporarily disabled for cache hit testing
+        # export CCACHE_DIRECT="true"
+        # echo CCACHE_DIRECT="true" >> "$GITHUB_ENV"
+        # Temporarily disabled for cache hit testing
+        # export CCACHE_FILE_CLONE="true"
+        # echo CCACHE_FILE_CLONE="true" >> "$GITHUB_ENV"
+        # Temporarily disabled for cache hit testing
+        # export CCACHE_INODE_CACHE="true"
+        # echo CCACHE_INODE_CACHE="true" >> "$GITHUB_ENV"
         export CCACHE_IS_KERNEL_COMPILING="true"
         echo CCACHE_IS_KERNEL_COMPILING="true" >> $GITHUB_ENV
         export CCACHE_UMASK="002"
