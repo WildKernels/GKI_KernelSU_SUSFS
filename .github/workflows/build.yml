@@ -424,7 +424,7 @@ jobs:
         set -euo pipefail
         echo "📊 Cache sizes after build:"
         echo "   CCACHE usage:"
-        du -sh "$CCACHE_DIR" || echo "   (no ccache directory)"
+        du -sh "/home/runner/.ccache" || echo "   (no ccache directory)"
         #echo "   LDCACHE usage:"
         #du -sh "$LDCACHE_DIR" || echo "   (no ldcache directory)"
         
