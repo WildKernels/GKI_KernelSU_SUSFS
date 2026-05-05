@@ -418,19 +418,6 @@ jobs:
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
       uses: ./.github/actions/build-kernel
 
-    - name: 'Report Cache Sizes'
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "📊 Cache sizes after build:"
-        echo "   CCACHE usage:"
-        du -sh "/home/runner/.ccache" || echo "   (no ccache directory)"
-        #echo "   LDCACHE usage:"
-        #du -sh "$LDCACHE_DIR" || echo "   (no ldcache directory)"
-        
-        echo "Perform cache eviction!"
-        # 3h = 10800s using seconds to support older ccache
-        ccache --evict-older-than 10800s
 
     - name: Post-build cache stats
       id: post-cache-stats
