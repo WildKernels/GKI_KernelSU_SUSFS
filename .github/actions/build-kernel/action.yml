@@ -10,6 +10,9 @@ runs:
     run: |
       set -euo pipefail
       if [ -f "build/build.sh" ]; then
+        SKIP_VENDOR_BOOT=1 \
+        SKIP_EXT_MODULES=1 \
+        SKIP_CP_KERNEL_HDR=1 \
         SKIP_MRPROPER=1 \
         LTO=thin \
         GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" \
