@@ -30,17 +30,44 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       run: |
         FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-          repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --depth=1 --partial-clone
-          REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
+        repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --depth=1 --partial-clone
+        REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
         DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
         DEPRECATED=false
-        if grep -q deprecated <<< $REMOTE_BRANCH; then
+        if grep -q deprecated <<< "$REMOTE_BRANCH"; then
           sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           echo "⚠ Note: Branch ${FORMATTED_BRANCH} is considered deprecated."
           DEPRECATED=true
         fi
         echo "deprecated=$DEPRECATED" >> $GITHUB_OUTPUT
-        repo sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle --optimize
+
+        MAX_RETRIES=3
+        RETRY_DELAY_SHORT=15
+        SYNC_TIMEOUT="5m"
+        attempt=1
+
+        while [ $attempt -le $MAX_RETRIES ]; do
+          echo "Attempt $attempt/$MAX_RETRIES: repo sync (timeout $SYNC_TIMEOUT)..."
+          if timeout $SYNC_TIMEOUT repo sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle --optimize; then
+            echo "repo sync succeeded on attempt $attempt."
+            break
+          fi
+          rc=$?
+          if [ $rc -eq 124 ]; then
+            echo "repo sync timed out after $SYNC_TIMEOUT."
+          else
+            echo "repo sync failed with exit code $rc."
+          fi
+          if [ $attempt -lt $MAX_RETRIES ]; then
+            echo "Cleaning workspace and retrying after ${RETRY_DELAY_SHORT}s..."
+            rm -rf .repo
+            sleep $RETRY_DELAY_SHORT
+          else
+            echo "All $MAX_RETRIES attempts failed." >&2
+            exit $rc
+          fi
+          attempt=$((attempt+1))
+        done
 
     - name: Download manifest.xml for branch (with deprecated fallback)
       shell: bash
