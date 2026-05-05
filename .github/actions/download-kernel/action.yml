@@ -40,8 +40,7 @@ runs:
           DEPRECATED=true
         fi
         echo "deprecated=$DEPRECATED" >> $GITHUB_OUTPUT
-        repo sync -c -j8 --fail-fast --no-tags --force-sync --no-clone-bundle --optimize
-        #-j$(nproc --all)
+        repo sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle --optimize
 
     - name: Download manifest.xml for branch (with deprecated fallback)
       shell: bash
