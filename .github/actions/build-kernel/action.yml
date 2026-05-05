@@ -9,23 +9,15 @@ runs:
     working-directory: ${{ github.workspace }}/kernel
     run: |
       set -euo pipefail
-
-      # Prepend ccache symlinks directory BEFORE /usr/bin
-      #SYMLINK_DIR="/usr/lib/ccache"
-      #export PATH="${SYMLINK_DIR}:${PATH}"
-
-      # Use plain clang names, not "/usr/bin/ccache clang"
-      #export CC=clang
-      #export CXX=clang++
-
       if [ -f "build/build.sh" ]; then
         SKIP_MRPROPER=1 \
         LTO=thin \
         GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" \
         BUILD_CONFIG=common/build.config.gki.aarch64 \
         build/build.sh -j"$(nproc)" \
-        CC="/usr/bin/ccache clang" \
-        CXX="/usr/bin/ccache clang++"
+        $BUILDARGS
+        #CC="/usr/bin/ccache clang" \
+        #CXX="/usr/bin/ccache clang++"
       else
         cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
         tools/bazel build \

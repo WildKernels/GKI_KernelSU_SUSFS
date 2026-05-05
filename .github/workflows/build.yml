@@ -200,89 +200,77 @@ jobs:
         echo "✅ ccache binary verified: $(/usr/bin/ccache --version | head -1)"
         
         # Setup cache directories
-        #export CCACHE_DIR="/home/runner/.ccache"
-        #echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
-        #export LDCACHE_DIR="/home/runner/.ld_cache"
-        #echo "LDCACHE_DIR=$LDCACHE_DIR" >> $GITHUB_ENV
-        #mkdir -p "$CCACHE_DIR" "$LDCACHE_DIR"
+        export CCACHE_DIR="/home/runner/.ccache"
+        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+        export LDCACHE_DIR="/home/runner/.ld_cache"
+        echo "LDCACHE_DIR=$LDCACHE_DIR" >> $GITHUB_ENV
+        mkdir -p "$CCACHE_DIR" "$LDCACHE_DIR"
         
         # Create LD wrapper for thin-LTO caching
-        #cat > "$GITHUB_WORKSPACE/kernel/common/ld-wrapper" << 'EOF'
+        cat > "$GITHUB_WORKSPACE/kernel/common/ld-wrapper" << 'EOF'
         #!/bin/bash
-        #ld.lld "$@" --thinlto-cache-dir="$LDCACHE_DIR" --thinlto-jobs="$(nproc --all)"
-        #EOF
-        #chmod +x "$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
-
-        # Setup ccache compiler wrappers in PATH (masquerade method)
-        # This intercepts compiler invocations regardless of how the build system calls them
-        #mkdir -p "$GITHUB_WORKSPACE/ccache-bin"
-        #cp /usr/bin/ccache "$GITHUB_WORKSPACE/ccache-bin/clang"
-        #cp /usr/bin/ccache "$GITHUB_WORKSPACE/ccache-bin/clang++"
-        #cp /usr/bin/ccache "$GITHUB_WORKSPACE/ccache-bin/gcc"
-        #cp /usr/bin/ccache "$GITHUB_WORKSPACE/ccache-bin/g++"
-        #cp /usr/bin/ccache "$GITHUB_WORKSPACE/ccache-bin/ld.lld"
-        #chmod +x "$GITHUB_WORKSPACE/ccache-bin"/*
+        ld.lld "$@" --thinlto-cache-dir="$LDCACHE_DIR" --thinlto-jobs="$(nproc --all)"
+        EOF
+        chmod +x "$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
         
-        # Export environment variables for subsequent steps
-        #echo "PATH=$GITHUB_WORKSPACE/ccache-bin:$PATH" >> $GITHUB_ENV
-        
-        #export CC="/usr/bin/ccache clang"
+        CC="/usr/bin/ccache clang"
         #echo "CC=$CC" >> $GITHUB_ENV
-        #export CXX="/usr/bin/ccache clang++"
+        CXX="/usr/bin/ccache clang++"
         #echo "CXX=$CXX" >> $GITHUB_ENV
-        #export HOSTCC="/usr/bin/ccache clang"
+        HOSTCC="/usr/bin/ccache clang"
         #echo "HOSTCC=$HOSTCC" >> $GITHUB_ENV
-        #export HOSTCXX="/usr/bin/ccache clang++"
+        HOSTCXX="/usr/bin/ccache clang++"
         #echo "HOSTCXX=$HOSTCXX" >> $GITHUB_ENV
-        #export LD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
+        LD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
         #echo "LD=$LD" >> $GITHUB_ENV
-        #export HOSTLD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
+        HOSTLD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
         #echo "HOSTLD=$HOSTLD" >> $GITHUB_ENV
-        #echo "CLANG_PREBUILT_BIN=$GITHUB_WORKSPACE/ccache-bin" >> $GITHUB_ENV
+        export BUILDARGS="CC=\"$CC\" CXX=\"$CXX\" HOSTCC=\"$HOSTCC\" HOSTCXX=\"$HOSTCXX\" LD=\"$LD\" HOSTLD=\"$HOSTLD\""
+        echo "BUILDARGS=$BUILDARGS" >> $GITHUB_ENV
 
         export CCACHE_MAXSIZE="12G"
         echo CCACHE_MAXSIZE="$CCACHE_MAXSIZE" >> $GITHUB_ENV
         export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
         echo CCACHE_COMPILERCHECK="$CCACHE_COMPILERCHECK" >> $GITHUB_ENV
-        #export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
-        #echo CCACHE_BASEDIR="${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+        export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
+        echo CCACHE_BASEDIR="${GITHUB_WORKSPACE}" >> $GITHUB_ENV
         export CCACHE_NOHASHDIR="true"
         echo CCACHE_NOHASHDIR="true" >> $GITHUB_ENV
-        #export CCACHE_IGNOREOPTIONS="--sysroot*"
-        #echo CCACHE_IGNOREOPTIONS="--sysroot*" >> $GITHUB_ENV
-        #export CCACHE_COMPRESSION="true"
-        #echo CCACHE_COMPRESSION="true" >> $GITHUB_ENV
-        #export CCACHE_COMPRESSLEVEL="3"
-        #echo CCACHE_COMPRESSION_LEVEL="3" >> $GITHUB_ENV
-        #export CCACHE_DIRECT="true"
-        #echo CCACHE_DIRECT="true" >> $GITHUB_ENV
-        #export CCACHE_FILE_CLONE="true"
-        #echo CCACHE_FILE_CLONE="true" >> $GITHUB_ENV
-        #export CCACHE_INODE_CACHE="true"
-        #echo CCACHE_INODE_CACHE="true" >> $GITHUB_ENV
-        #export CCACHE_IS_KERNEL_COMPILING="true"
-        #echo CCACHE_IS_KERNEL_COMPILING="true" >> $GITHUB_ENV
-        #export CCACHE_UMASK="002"
-        #echo CCACHE_UMASK="002" >> $GITHUB_ENV
-        #export CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale"
-        #echo CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale" >> $GITHUB_ENV
-        export CCACHE_HARDLINK="true"
-        echo CCACHE_HARDLINK="$CCACHE_HARDLINK" >> $GITHUB_ENV
+        export CCACHE_IGNOREOPTIONS="--sysroot*"
+        echo CCACHE_IGNOREOPTIONS="--sysroot*" >> $GITHUB_ENV
+        export CCACHE_COMPRESSION="true"
+        echo CCACHE_COMPRESSION="true" >> $GITHUB_ENV
+        export CCACHE_COMPRESSLEVEL="9"
+        echo CCACHE_COMPRESSION_LEVEL="9" >> $GITHUB_ENV
+        export CCACHE_DIRECT="true"
+        echo CCACHE_DIRECT="true" >> $GITHUB_ENV
+        export CCACHE_FILE_CLONE="true"
+        echo CCACHE_FILE_CLONE="true" >> $GITHUB_ENV
+        export CCACHE_INODE_CACHE="true"
+        echo CCACHE_INODE_CACHE="true" >> $GITHUB_ENV
+        export CCACHE_IS_KERNEL_COMPILING="true"
+        echo CCACHE_IS_KERNEL_COMPILING="true" >> $GITHUB_ENV
+        export CCACHE_UMASK="002"
+        echo CCACHE_UMASK="002" >> $GITHUB_ENV
+        export CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale"
+        echo CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale" >> $GITHUB_ENV
+        #export CCACHE_HARDLINK="true"
+        #echo CCACHE_HARDLINK="$CCACHE_HARDLINK" >> $GITHUB_ENV
 
-        #if ccache --help 2>&1 | grep -q 'depend_mode'; then
-        #  export CCACHE_DEPEND=true
-        #  echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
-        #fi
+        if ccache --help 2>&1 | grep -q 'depend_mode'; then
+          export CCACHE_DEPEND=true
+          echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
+        fi
         
         # Initialize ccache
         #ccache -M 100G
-        #ccache -p
-        #ccache -s
-        #ccache -z
+        ccache -p
+        ccache -s
+        ccache -z
         
         echo "✅ Build environment ready"
-        #echo "   CCACHE_DIR: $CCACHE_DIR"
-        #echo "   LDCACHE_DIR: $LDCACHE_DIR"
+        echo "   CCACHE_DIR: $CCACHE_DIR"
+        echo "   LDCACHE_DIR: $LDCACHE_DIR"
 
     - name: Restore build caches (ccache)
       id: restore-ccache
@@ -355,69 +343,11 @@ jobs:
         echo "pre_ld_size=$pre_ld_size" >> $GITHUB_OUTPUT
         echo "pre_ld_files=$pre_ld_files" >> $GITHUB_OUTPUT
 
-    - name: Setup ccache for Android kernel
-      shell: bash
-      if: false
-      working-directory: ${{ github.workspace }}
-      run: |
-        set -Eeuo pipefail
-
-        CCACHE_BIN="/usr/bin/ccache"
-        CCACHE_URL="https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/ccache/ccache-x86-64"
-        CCACHE_LINK_DIR="/usr/lib/ccache"
-        CCACHE_DIR="${HOME}/.ccache"
-        CCACHE_MAX_SIZE="12G"
-
-        echo "== Install ccache =="
-        if ! sudo test -x "${CCACHE_BIN}"; then
-          curl -LfsS \
-            --retry 5 \
-            --retry-delay 5 \
-            --retry-all-errors \
-            --connect-timeout 30 \
-            -H "User-Agent: Mozilla/5.0" \
-            "${CCACHE_URL}" \
-            -o ./ccache
-          sudo install -m 0755 ./ccache "${CCACHE_BIN}"
-          rm -f ./ccache
-        fi
-
-        echo "== Create clang symlinks =="
-        sudo mkdir -p "${CCACHE_LINK_DIR}"
-        for compiler in clang clang++; do
-          sudo ln -sf "${CCACHE_BIN}" "${CCACHE_LINK_DIR}/${compiler}"
-        done
-
-        echo "== Export env =="
-        {
-          echo "CCACHE_DIR=${CCACHE_DIR}"
-          echo "CCACHE_EXEC=${CCACHE_BIN}"
-          echo "CCACHE_BASEDIR=${GITHUB_WORKSPACE}"
-          echo "CCACHE_COMPRESS=true"
-          echo "CCACHE_COMPRESSLEVEL=6"
-          echo "USE_CCACHE=1"
-        } >> "${GITHUB_ENV}"
-
-        mkdir -p "${CCACHE_DIR}"
-
-        echo "== Configure ccache =="
-        "${CCACHE_BIN}" --set-config=cache_dir="${CCACHE_DIR}"
-        "${CCACHE_BIN}" --set-config=base_dir="${GITHUB_WORKSPACE}"
-        "${CCACHE_BIN}" --set-config=compression=true
-        "${CCACHE_BIN}" --set-config=compression_level=6
-        "${CCACHE_BIN}" --max-size="${CCACHE_MAX_SIZE}"
-
-        echo "== Show ccache config =="
-        "${CCACHE_BIN}" --show-config || true
-        "${CCACHE_BIN}" --zero-stats || true
-        "${CCACHE_BIN}" --show-stats || true
-
     - name: Build Kernel
       env:
         SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
       uses: ./.github/actions/build-kernel
-
 
     - name: Post-build cache stats
       id: post-cache-stats
@@ -451,6 +381,9 @@ jobs:
         echo "=== .cache/bazel ==="
         du -sh /home/runner/.cache/bazel || true
         ls -l /home/runner/.cache/bazel || true
+        echo "=== .ld_cache ==="
+        du -sh /home/runner/.ld_cache || true
+        ls -l /home/runner/.ld_cache || true
 
     - name: Save ccache cache
       uses: ./.github/actions/save-cache
