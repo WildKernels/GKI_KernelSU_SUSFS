@@ -237,7 +237,7 @@ runs:
 
     - name: Revert Android 14 6.1 Fake Patches
       shell: bash
-      if: inputs.kernel_version == '6.1' && inputs.android_version == 'android14'
+      if: inputs.kernel_version == '6.1' && inputs.android_version == 'android14' && false
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         if [ "${{ inputs.sublevel }}" -ge "141" ]; then
@@ -303,7 +303,7 @@ runs:
         fi
 
     - name: Apply Android 14 6.1 Fixes
-      if: inputs.android_version == 'android14' && inputs.kernel_version == '6.1'
+      if: inputs.android_version == 'android14' && inputs.kernel_version == '6.1' && false
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
