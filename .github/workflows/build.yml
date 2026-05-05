@@ -213,20 +213,12 @@ jobs:
         EOF
         chmod +x "$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
         
-        CC="/usr/bin/ccache clang"
-        #echo "CC=$CC" >> $GITHUB_ENV
-        CXX="/usr/bin/ccache clang++"
-        #echo "CXX=$CXX" >> $GITHUB_ENV
-        HOSTCC="/usr/bin/ccache clang"
-        #echo "HOSTCC=$HOSTCC" >> $GITHUB_ENV
-        HOSTCXX="/usr/bin/ccache clang++"
-        #echo "HOSTCXX=$HOSTCXX" >> $GITHUB_ENV
-        LD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
-        #echo "LD=$LD" >> $GITHUB_ENV
-        HOSTLD="$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
-        #echo "HOSTLD=$HOSTLD" >> $GITHUB_ENV
-        export BUILDARGS="CC=\"$CC\" CXX=\"$CXX\" HOSTCC=\"$HOSTCC\" HOSTCXX=\"$HOSTCXX\" LD=\"$LD\" HOSTLD=\"$HOSTLD\""
-        echo "BUILDARGS=$BUILDARGS" >> $GITHUB_ENV
+        echo "CC=/usr/bin/ccache clang" >> "$GITHUB_ENV"
+        echo "CXX=/usr/bin/ccache clang++" >> "$GITHUB_ENV"
+        echo "HOSTCC=/usr/bin/ccache clang" >> "$GITHUB_ENV"
+        echo "HOSTCXX=/usr/bin/ccache clang++" >> "$GITHUB_ENV"
+        echo "LD=$GITHUB_WORKSPACE/kernel/common/ld-wrapper" >> "$GITHUB_ENV"
+        echo "HOSTLD=$GITHUB_WORKSPACE/kernel/common/ld-wrapper" >> "$GITHUB_ENV"
 
         export CCACHE_MAXSIZE="12G"
         echo CCACHE_MAXSIZE="$CCACHE_MAXSIZE" >> $GITHUB_ENV
