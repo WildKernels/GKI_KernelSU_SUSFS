@@ -43,12 +43,12 @@ runs:
 
         MAX_RETRIES=3
         RETRY_DELAY_SHORT=15
-        SYNC_TIMEOUT="5m"
+        SYNC_TIMEOUT="10m"
         attempt=1
 
         while [ $attempt -le $MAX_RETRIES ]; do
           echo "Attempt $attempt/$MAX_RETRIES: repo sync (timeout $SYNC_TIMEOUT)..."
-          if timeout $SYNC_TIMEOUT repo sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle --optimize; then
+          if timeout $SYNC_TIMEOUT repo sync -c -j16 --fail-fast --no-tags --force-sync --no-clone-bundle --optimized-fetch --retry-fetches=3; then
             echo "repo sync succeeded on attempt $attempt."
             break
           fi
