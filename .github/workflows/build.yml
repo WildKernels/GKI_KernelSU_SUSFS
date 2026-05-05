@@ -274,14 +274,6 @@ jobs:
         compression_level: 9
         restore_keys: |
           buildcache-
-
-    - name: Check ccache hit
-      run: |
-        if [ "${{ steps.restore-ccache.outputs.cache-hit }}" = "true" ]; then
-          echo "✅ ccache HIT - Key: ${{ steps.restore-ccache.outputs.cache-key }} - Size: ${{ steps.restore-ccache.outputs.cache-size }}"
-        else
-          echo "❌ ccache MISS - Fresh build"
-        fi
     
     - name: Restore build caches (bazel)
       id: restore-bazel-cache
@@ -293,14 +285,6 @@ jobs:
         compression_level: 9
         restore_keys: |
           buildcache-
-    
-    - name: Check bazel cache hit
-      run: |
-        if [ "${{ steps.restore-bazel-cache.outputs.cache-hit }}" = "true" ]; then
-          echo "✅ bazel cache HIT - Key: ${{ steps.restore-bazel-cache.outputs.cache-key }} - Size: ${{ steps.restore-bazel-cache.outputs.cache-size }}"
-        else
-          echo "❌ bazel cache MISS - Fresh build"
-        fi
 
     - name: Restore build caches (LTO/ld_cache)
       id: restore-ldcache
@@ -313,27 +297,39 @@ jobs:
         restore_keys: |
           buildcache-
 
-    - name: Check ld_cache hit
+    - name: Check cache hit
       run: |
+        if [ "${{ steps.restore-ccache.outputs.cache-hit }}" = "true" ]; then
+          echo "✅ ccache HIT - Key: ${{ steps.restore-ccache.outputs.cache-key }} - Size: ${{ steps.restore-ccache.outputs.cache-size }}"
+        else
+          echo "❌ ccache MISS - Fresh build"
+        fi
+        if [ "${{ steps.restore-bazel-cache.outputs.cache-hit }}" = "true" ]; then
+          echo "✅ bazel cache HIT - Key: ${{ steps.restore-bazel-cache.outputs.cache-key }} - Size: ${{ steps.restore-bazel-cache.outputs.cache-size }}"
+        else
+          echo "❌ bazel cache MISS - Fresh build"
+        fi
         if [ "${{ steps.restore-ldcache.outputs.cache-hit }}" = "true" ]; then
           echo "✅ ld_cache HIT - Key: ${{ steps.restore-ldcache.outputs.cache-key }} - Size: ${{ steps.restore-ldcache.outputs.cache-size }}"
         else
           echo "❌ ld_cache MISS - Fresh build"
         fi
+        ccache -p
+        ccache -s
+        ccache -z
 
-    - name: Pre-build cache stats
-      id: pre-cache-stats
+    - name: List cache contents
+      working-directory: ${{ github.workspace }}
       run: |
-        set -euo pipefail
-        stats=$(ccache -s || true)
-        pre_hits=$(echo "$stats" | awk '/cache hit/ {h+=$NF} END{print (h+0)}')
-        pre_misses=$(echo "$stats" | awk '/cache miss/ {m+=$NF} END{print (m+0)}')
-        echo "pre_hits=$pre_hits" >> $GITHUB_OUTPUT
-        echo "pre_misses=$pre_misses" >> $GITHUB_OUTPUT
-        pre_ld_size=$(du -sh "/home/runner/.ld_cache" 2>/dev/null | awk '{print $1}' || echo "0B")
-        pre_ld_files=$(find "/home/runner/.ld_cache" -type f 2>/dev/null | wc -l || true)
-        echo "pre_ld_size=$pre_ld_size" >> $GITHUB_OUTPUT
-        echo "pre_ld_files=$pre_ld_files" >> $GITHUB_OUTPUT
+        echo "=== .ccache ==="
+        du -sh /home/runner/.ccache || true
+        ls -l /home/runner/.ccache || true
+        echo "=== .cache/bazel ==="
+        du -sh /home/runner/.cache/bazel || true
+        ls -l /home/runner/.cache/bazel || true
+        echo "=== .ld_cache ==="
+        du -sh /home/runner/.ld_cache || true
+        ls -l /home/runner/.ld_cache || true
 
     - name: Build Kernel
       env:
