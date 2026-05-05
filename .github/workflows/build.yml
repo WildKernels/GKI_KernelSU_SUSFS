@@ -345,24 +345,7 @@ jobs:
       id: post-cache-stats
       run: |
         set -euo pipefail
-        stats=$(ccache -s || true)
-        post_hits=$(echo "$stats" | awk '/cache hit/ {h+=$NF} END{print (h+0)}')
-        post_misses=$(echo "$stats" | awk '/cache miss/ {m+=$NF} END{print (m+0)}')
-        pre_hits=${{ steps.pre-cache-stats.outputs.pre_hits }}
-        pre_misses=${{ steps.pre-cache-stats.outputs.pre_misses }}
-        delta_hits=$((post_hits - pre_hits)) || true
-        delta_misses=$((post_misses - pre_misses)) || true
-        delta_total=$((delta_hits + delta_misses))
-        if [ "$delta_total" -gt 0 ]; then
-          percent=$(( delta_hits * 100 / delta_total ))
-          echo "ccache hit during build: ${percent}% (${delta_hits} hits / ${delta_total} accesses)"
-        else
-          echo "No compiler activity detected (no ccache accesses)."
-        fi
-        post_ld_size=$(du -sh "/home/runner/.ld_cache" 2>/dev/null | awk '{print $1}' || echo "0B")
-        post_ld_files=$(find "/home/runner/.ld_cache" -type f 2>/dev/null | wc -l || true)
-        echo "ld_cache size before: ${{ steps.pre-cache-stats.outputs.pre_ld_size }}, after: $post_ld_size"
-        echo "ld_cache files before: ${{ steps.pre-cache-stats.outputs.pre_ld_files }}, after: $post_ld_files"
+        ccache -s
 
     - name: List cache contents
       working-directory: ${{ github.workspace }}
