@@ -1,5 +1,11 @@
 name: 'Show Cache Stats'
 description: 'Displays statistics for ccache and Bazel remote cache to help analyze cache performance and hit rates'
+inputs:
+  clear_stats:
+    description: 'Whether to clear ccache stats after displaying (default: true)'
+    required: true
+    type: boolean
+    default: true
 
 runs:
   using: 'composite'
@@ -53,10 +59,14 @@ runs:
         echo "hit_rate=${HIT_RATE}%"
         echo "direct_rate=${DIRECT_RATE}%"
 
-        echo "=== ccache reset ==="
-        echo "====================="
-        ccache -z || true
-        echo "====================="
+        if [ "${{ inputs.clear_stats }}" = "true" ]; then
+          echo "=== ccache reset ==="
+          echo "====================="
+          ccache -z || true
+          echo "====================="
+        else
+          echo "Keeping ccache stats for next run"
+        fi
 
     - name: Show ccache folder Stats
       shell: bash
