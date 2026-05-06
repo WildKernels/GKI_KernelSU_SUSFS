@@ -165,10 +165,11 @@ runs:
           sed -i '/int ret.*= 0, copied.*= 0;/{
           /int ret.*= 0, copied.*= 0;/!d
           a\
-              unsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;\
-              pagemap_entry_t *res = NULL;
+            unsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;\
+            pagemap_entry_t *res = NULL;
           }' fs/proc/task_mmu.c
         fi
+        cat fs/proc/task_mmu.c
         if [ "${{ inputs.sublevel }}" -le "92" ]; then
           echo "Applying base.c Android 15 6.6 Fake Patch"
           sed -i '/^#include <linux\/cpufreq_times.h>$/a #include <linux/dma-buf.h>' fs/proc/base.c
