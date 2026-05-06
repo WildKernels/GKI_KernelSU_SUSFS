@@ -1,0 +1,57 @@
+name: 'Show Cache Stats'
+description: 'Displays statistics for ccache and Bazel remote cache to help analyze cache performance and hit rates'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Show ccache Stats
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        echo "===================="
+        echo "=== ccache stats ==="
+        echo "===================="
+        ccache -s || true
+        echo "====================="
+        echo "=== ccache config ==="
+        echo "====================="
+        ccache -p || true
+        echo "====================="
+
+    - name: Show ccache folder Stats
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        echo "==============="
+        echo "=== .ccache ==="
+        echo "==============="
+        du -sh /home/runner/.ccache || true
+        ls -l /home/runner/.ccache || true
+        echo "==============="
+
+    - name: Show Bazel Cache folder Stats
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        echo "===================="
+        echo "=== .cache/bazel ==="
+        echo "===================="
+        du -sh /home/runner/.cache/bazel || true
+        ls -l /home/runner/.cache/bazel || true
+        echo "===================="
+        
+    - name: Show ld cache folder Stats
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        echo "================="
+        echo "=== .ld_cache ==="
+        echo "================="
+        du -sh /home/runner/.ld_cache || true
+        ls -l /home/runner/.ld_cache || true
+        echo "================="
+        

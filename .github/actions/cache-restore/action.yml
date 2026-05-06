@@ -1,0 +1,253 @@
+name: 'Restore Cache'
+description: 'Restores cache from GitHub Releases. Supports both single and multiple cache paths/keys/buckets.'
+
+inputs:
+  cache_path:
+    description: 'Single path where cache should be restored (use cache_paths for multiple)'
+    required: false
+    type: string
+  cache_paths:
+    description: 'Multiline list of paths where caches should be restored (one per line)'
+    required: false
+    type: string
+    default: ""
+  cache_key:
+    description: 'Primary key to restore cache (use cache_keys for multiple)'
+    required: false
+    type: string
+  cache_keys:
+    description: 'Multiline list of primary keys to restore caches (one per line, must match cache_paths)'
+    required: false
+    type: string
+    default: ""
+  restore_keys:
+    description: 'Multiline list of keys (fallback prefixes)'
+    required: false
+    type: string
+    default: ""
+  cache_bucket:
+    description: 'Single tag name for the release (use cache_buckets for multiple)'
+    required: false
+    default: 'general-cache'
+  cache_buckets:
+    description: 'Multiline list of tag names for releases (one per line, must match cache_paths)'
+    required: false
+    type: string
+    default: ""
+  compression_level:
+    description: 'Compression level (0-9). 0 = No compression, 1 = Fast, 19 = Best.'
+    required: false
+    type: number
+    default: 6
+
+outputs:
+  cache-hit:
+    description: 'Returns "true" if at least one cache was found and restored, "false" otherwise'
+    value: ${{ steps.restore.outputs.cache-hit }}
+  cache-key:
+    description: 'The key that matched (primary or fallback). Multiple entries joined by comma.'
+    value: ${{ steps.restore.outputs.cache-key }}
+  cache-size:
+    description: 'Size of restored cache in human-readable format. Multiple entries joined by comma.'
+    value: ${{ steps.restore.outputs.cache-size }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect and Download Cache
+      id: restore
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        TARGET_REPO: "${{ github.repository }}"
+      run: |
+        # Validate and parse inputs
+        PATHS_INPUT="${{ inputs.cache_paths }}"
+        KEYS_INPUT="${{ inputs.cache_keys }}"
+        BUCKETS_INPUT="${{ inputs.cache_buckets }}"
+        
+        # If multiple inputs are empty, fall back to single inputs
+        if [ -z "$PATHS_INPUT" ]; then
+          PATHS_INPUT="${{ inputs.cache_path }}"
+        fi
+        if [ -z "$KEYS_INPUT" ]; then
+          KEYS_INPUT="${{ inputs.cache_key }}"
+        fi
+        if [ -z "$BUCKETS_INPUT" ]; then
+          BUCKETS_INPUT="${{ inputs.cache_bucket }}"
+        fi
+        
+        # Split inputs into arrays
+        IFS=$'\n' read -rd '' -a PATHS_ARRAY <<<"$PATHS_INPUT" || true
+        IFS=$'\n' read -rd '' -a KEYS_ARRAY <<<"$KEYS_INPUT" || true
+        IFS=$'\n' read -rd '' -a BUCKETS_ARRAY <<<"$BUCKETS_INPUT" || true
+        
+        # Validate array lengths match
+        if [[ ${#PATHS_ARRAY[@]} -ne ${#KEYS_ARRAY[@]} ]] || [[ ${#PATHS_ARRAY[@]} -ne ${#BUCKETS_ARRAY[@]} ]]; then
+          echo "::error::Mismatch in array lengths: paths=${#PATHS_ARRAY[@]}, keys=${#KEYS_ARRAY[@]}, buckets=${#BUCKETS_ARRAY[@]}"
+          exit 1
+        fi
+        
+        ARIA2_OPTS=(
+          "-x16" "-s16" "-k1M" "-j5" "--file-allocation=none"
+          "--header=User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "--header=Accept: */*"
+          "--header=Connection: keep-alive"
+        )
+        
+        ARIA2_OPTS+=("--quiet" "--summary-interval=0" "--console-log-level=error")
+        
+        # Collect results
+        OVERALL_HIT=false
+        MATCHED_KEYS=()
+        CACHE_SIZES=()
+        
+        # Process each cache entry
+        for ((idx=0; idx<${#PATHS_ARRAY[@]}; idx++)); do
+          CACHE_PATH="${PATHS_ARRAY[$idx]}"
+          CACHE_KEY="${KEYS_ARRAY[$idx]}"
+          CACHE_BUCKET="${BUCKETS_ARRAY[$idx]}"
+          
+          [ -z "$CACHE_PATH" ] && continue
+          
+          TAG_NAME="$CACHE_BUCKET"
+          BASE_URL="https://github.com/${TARGET_REPO}/releases/download/$TAG_NAME"
+          ASSETS_URL="https://github.com/${TARGET_REPO}/releases/expanded_assets/$TAG_NAME"
+          
+          echo "::group:: [$((idx+1))/$${#PATHS_ARRAY[@]}] Cache: $CACHE_BUCKET - Fetching Asset List"
+          HTTP_RESPONSE=$(curl -sL -A "Mozilla/5.0" -w "%{http_code}" "$ASSETS_URL" -o assets.html || echo "404")
+          
+          if [ "$HTTP_RESPONSE" -eq 200 ]; then
+            ALL_ASSETS=$(grep -oP "download/$TAG_NAME/\K[^\"' ]+" assets.html | sort -u || echo "")
+          else
+            echo "Status $HTTP_RESPONSE: Failed to fetch assets from scraper endpoint."
+            ALL_ASSETS=""
+          fi
+          rm -f assets.html
+          
+          if [ -z "$ALL_ASSETS" ]; then
+            echo "No assets found in bucket '$TAG_NAME'. Skipping."
+            echo "::endgroup::"
+            continue
+          fi
+          
+          echo "Successfully fetched asset list. Has $(echo "$ALL_ASSETS" | wc -l) assets."
+          echo "::endgroup::"
+          
+          SEARCH_LIST=$(printf "%s\n%s" "$CACHE_KEY" "${{ inputs.restore_keys }}" | sed '/^$/d')
+          
+          FOUND=false
+          while read -r KEY; do
+            [ -z "$KEY" ] && continue
+            echo "::group:: [$((idx+1))/$${#PATHS_ARRAY[@]}] Searching Prefix: $KEY"
+            
+            MATCH=$(echo "$ALL_ASSETS" | grep "^cache-$KEY" | sort -r | head -n 1 || true)
+            
+            if [ -z "$MATCH" ]; then
+                echo "Not found."
+                echo "::endgroup::"
+                continue
+            fi
+            
+            BASE_FILENAME=$(echo "$MATCH" | sed -E 's/\.(tzst|tar)(\.part[a-z]{2})?$//')
+            EXT=$(echo "$MATCH" | grep -oP '\.(tzst|tar)' | head -n 1)
+            
+            [[ "$MATCH" == *".part"* ]] && IS_SPLIT=true || IS_SPLIT=false
+            [ "$EXT" = ".tzst" ] && COMPRESSED=true || COMPRESSED=false
+            FOUND=true
+            
+            echo "✅ Hit! Restoring $BASE_FILENAME$EXT"
+            echo "::endgroup::"
+            
+            echo "::group:: [$((idx+1))/$${#PATHS_ARRAY[@]}] Downloading Cache"
+            
+            download_asset() {
+              local filename="$1"
+              local url="$2"
+              local max_retries=3
+              local attempt=1
+              
+              while [ $attempt -le $max_retries ]; do
+                echo "  Attempt $attempt: Downloading $filename..."
+                
+                if timeout 10m aria2c "${ARIA2_OPTS[@]}" --retry-wait=10 --max-tries=10 -o "$filename" "$url"; then
+                  return 0
+                fi
+                
+                echo "  ⚠️ Download failed or timed out. Retrying in 5s..."
+                sleep 5
+                attempt=$((attempt + 1))
+              done
+              return 1
+            }
+            
+            if [ "$IS_SPLIT" = "true" ]; then
+              for part in {a..z}{a..z}; do
+                PART_NAME="$BASE_FILENAME$EXT.part$part"
+                if echo "$ALL_ASSETS" | grep -q "^$PART_NAME$"; then
+                  if ! download_asset "$PART_NAME" "$BASE_URL/$PART_NAME"; then
+                    echo "::error::Failed to download $PART_NAME after multiple retries."
+                    exit 1
+                  fi
+                else break; fi
+              done
+            else
+              if ! download_asset "$BASE_FILENAME$EXT" "$BASE_URL/$BASE_FILENAME$EXT"; then
+                echo "::error::Failed to download $BASE_FILENAME$EXT after multiple retries."
+                exit 1
+              fi
+            fi
+            echo "::endgroup::"
+            
+            echo "::group:: [$((idx+1))/$${#PATHS_ARRAY[@]}] Extracting Cache"
+            mkdir -p "$CACHE_PATH"
+            FINAL_ARCHIVE="$BASE_FILENAME$EXT"
+            EXTRACT_DIR="$(dirname "$CACHE_PATH")"
+            
+            extract_cache() {
+              local cmd="$1"
+              sh -c "$cmd" > /dev/null 2>&1
+            }
+            
+            if [ "$IS_SPLIT" = "true" ]; then
+              PARTS=$(ls "$FINAL_ARCHIVE.part"* | sort)
+              if [ "$COMPRESSED" = "true" ]; then
+                extract_cache "cat $PARTS | tar -I 'zstd -d -T0' -xvf - -C '$EXTRACT_DIR'"
+              else
+                extract_cache "cat $PARTS | tar -xvf - -C '$EXTRACT_DIR'"
+              fi
+              rm -f $PARTS
+            else
+              if [ "$COMPRESSED" = "true" ]; then
+                extract_cache "tar -I 'zstd -d -T0' -xvf '$FINAL_ARCHIVE' -C '$EXTRACT_DIR'"
+              else
+                extract_cache "tar -xvf '$FINAL_ARCHIVE' -C '$EXTRACT_DIR'"
+              fi
+              rm -f "$FINAL_ARCHIVE"
+            fi
+            echo "✅ Restore complete."
+            echo "::endgroup::"
+            
+            # Track results for this entry
+            OVERALL_HIT=true
+            MATCHED_KEYS+=("$KEY")
+            CACHE_SIZE=$(du -sh "$CACHE_PATH" 2>/dev/null | awk '{print $1}' || echo "unknown")
+            CACHE_SIZES+=("$CACHE_SIZE")
+            break
+          done <<< "$SEARCH_LIST"
+          
+          if [ "$FOUND" = "false" ]; then
+              echo "⚠️ No cache matches found for bucket '$CACHE_BUCKET'. Proceeding with fresh run."
+              MATCHED_KEYS+=("none")
+              CACHE_SIZES+=("0B")
+          fi
+        done
+        
+        # Output results
+        if [ "$OVERALL_HIT" = "true" ]; then
+          echo "cache-hit=true" >> $GITHUB_OUTPUT
+        else
+          echo "cache-hit=false" >> $GITHUB_OUTPUT
+        fi
+        echo "cache-key=$(IFS=,; echo "${MATCHED_KEYS[*]}")" >> $GITHUB_OUTPUT
+        echo "cache-size=$(IFS=,; echo "${CACHE_SIZES[*]}")" >> $GITHUB_OUTPUT

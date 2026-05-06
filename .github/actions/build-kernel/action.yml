@@ -27,8 +27,9 @@ runs:
       else
         cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
         tools/bazel build \
+          --linkopt="--thinlto-cache-dir=/home/runner/.ld_cache" \
           --config=fast \
           --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment \
-          --disk_cache="$BAZEL_DISK_CACHE_DIR" \
+          --disk_cache="$BAZEL_CACHE_DIR" \
           //common:kernel_aarch64
       fi

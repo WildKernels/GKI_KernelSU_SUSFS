@@ -26,12 +26,6 @@ jobs:
     timeout-minutes: 60
 
     steps:
-    - name: Display system disk usage
-      run: |
-        echo "=== Disk usage summary ==="
-        df -h
-        echo ""
-
     - name: Checkout Repository
       uses: actions/checkout@v5
 
@@ -42,7 +36,7 @@ jobs:
         kernel_version: ${{ inputs.kernel_version }}
 
     - name: Free Disk Space
-      if: true
+      if: false
       uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
       with:
         remove_android: true
@@ -56,34 +50,16 @@ jobs:
         rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
         testing: false
 
-    - name: Display system disk usage
-      run: |
-        echo "=== Disk usage summary ==="
-        df -h
-        echo ""
-
     - name: Setup more Swap (for LTO)
       uses: thejerrybao/setup-swap-space@v1   # or pierotofy/set-swap-space
       with:
         swap-size-gb: 10          # 10-24 GB is common for heavy LTO
         # swap-space-path: /mnt/swapfile   # optional
 
-    - name: Display system disk usage
-      run: |
-        echo "=== Disk usage summary ==="
-        df -h
-        echo ""
-
     - name: Setup Build Environment
       uses: ./.github/actions/setup-build-environment
       env:
         BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
-
-    - name: Display system disk usage
-      run: |
-        echo "=== Disk usage summary ==="
-        df -h
-        echo ""
           
     - name: Download Kernel Repository
       uses: ./.github/actions/download-kernel
@@ -92,12 +68,6 @@ jobs:
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
         os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
         use_repo: ${{ inputs.use_repo }}
-
-    - name: Display system disk usage
-      run: |
-        echo "=== Disk usage summary ==="
-        df -h
-        echo ""
 
     - name: Extract Sublevel and Set File Name
       id: extract
@@ -208,195 +178,48 @@ jobs:
         if-no-files-found: ignore
         compression-level: 9
 
-    - name: Display system disk usage
-      run: |
-        echo "=== Disk usage summary ==="
-        df -h
-        echo ""
-
-    - name: 'Setup ccache and Build Environment'
-      shell: bash
-      if: true
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        set -euo pipefail
-        if [ -f "build/build.sh" ]; then
-          # Download and install ccache
-          echo "Installing ccache..."
-          curl -LfsS --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --tcp-fastopen -H "User-Agent: Mozilla/5.0" "https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/ccache/ccache-x86-64" -o ccache || { echo "❌ Failed to download ccache"; exit 1; }
-          sudo cp -f ./ccache /usr/bin/ccache || { echo "❌ Failed to install ccache"; exit 1; }
-          sudo chmod +x /usr/bin/ccache
-          rm -f ./ccache
-          
-          # Verify ccache
-          if ! /usr/bin/ccache --version > /dev/null 2>&1; then
-            echo "❌ ccache installation failed or binary is corrupted"
-            exit 1
-          fi
-          echo "✅ ccache binary verified: $(/usr/bin/ccache --version | head -1)"
-          
-          # Setup cache directories
-          export CCACHE_DIR="/home/runner/.ccache"
-          echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
-          export LDCACHE_DIR="/home/runner/.ld_cache"
-          echo "LDCACHE_DIR=$LDCACHE_DIR" >> $GITHUB_ENV
-          mkdir -p "$CCACHE_DIR" "$LDCACHE_DIR"
-          
-          # Create LD wrapper for thin-LTO caching
-          cat > "$GITHUB_WORKSPACE/kernel/common/ld-wrapper" << 'EOF'
-          #!/bin/bash
-          ld.lld "$@" --thinlto-cache-dir="$LDCACHE_DIR" --thinlto-jobs="$(nproc --all)"
-          EOF
-          chmod +x "$GITHUB_WORKSPACE/kernel/common/ld-wrapper"
-          
-          echo "CC=/usr/bin/ccache clang" >> "$GITHUB_ENV"
-          echo "CXX=/usr/bin/ccache clang++" >> "$GITHUB_ENV"
-          echo "HOSTCC=/usr/bin/ccache clang" >> "$GITHUB_ENV"
-          echo "HOSTCXX=/usr/bin/ccache clang++" >> "$GITHUB_ENV"
-          echo "LD=$GITHUB_WORKSPACE/kernel/common/ld-wrapper" >> "$GITHUB_ENV"
-          echo "HOSTLD=$GITHUB_WORKSPACE/kernel/common/ld-wrapper" >> "$GITHUB_ENV"
-
-          export CCACHE_MAXSIZE="12G"
-          echo CCACHE_MAXSIZE="$CCACHE_MAXSIZE" >> $GITHUB_ENV
-          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
-          echo CCACHE_COMPILERCHECK="$CCACHE_COMPILERCHECK" >> $GITHUB_ENV
-          export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
-          echo CCACHE_BASEDIR="${GITHUB_WORKSPACE}" >> $GITHUB_ENV
-          export CCACHE_NOHASHDIR="true"
-          echo CCACHE_NOHASHDIR="true" >> $GITHUB_ENV
-          export CCACHE_IGNOREOPTIONS="--sysroot*"
-          echo CCACHE_IGNOREOPTIONS="--sysroot*" >> $GITHUB_ENV
-          export CCACHE_COMPRESSION="true"
-          echo CCACHE_COMPRESSION="true" >> $GITHUB_ENV
-          export CCACHE_COMPRESSLEVEL="9"
-          echo CCACHE_COMPRESSION_LEVEL="9" >> $GITHUB_ENV
-          # Temporarily disabled for cache hit testing
-          # export CCACHE_DIRECT="true"
-          # echo CCACHE_DIRECT="true" >> "$GITHUB_ENV"
-          # Temporarily disabled for cache hit testing
-          # export CCACHE_FILE_CLONE="true"
-          # echo CCACHE_FILE_CLONE="true" >> "$GITHUB_ENV"
-          # Temporarily disabled for cache hit testing
-          # export CCACHE_INODE_CACHE="true"
-          # echo CCACHE_INODE_CACHE="true" >> "$GITHUB_ENV"
-          export CCACHE_IS_KERNEL_COMPILING="true"
-          echo CCACHE_IS_KERNEL_COMPILING="true" >> $GITHUB_ENV
-          export CCACHE_UMASK="002"
-          echo CCACHE_UMASK="002" >> $GITHUB_ENV
-          export CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale"
-          echo CCACHE_SLOPPINESS="file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale" >> $GITHUB_ENV
-          #export CCACHE_HARDLINK="true"
-          #echo CCACHE_HARDLINK="$CCACHE_HARDLINK" >> $GITHUB_ENV
-
-          if ccache --help 2>&1 | grep -q 'depend_mode'; then
-            export CCACHE_DEPEND=true
-            echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
-          fi
-          
-          # Initialize ccache
-          #ccache -M 100G
-          ccache -p
-          ccache -s
-          ccache -z
-          
-          echo "✅ Build environment ready"
-          echo "   CCACHE_DIR: $CCACHE_DIR"
-          echo "   LDCACHE_DIR: $LDCACHE_DIR"
-        else
-          export BAZEL_DISK_CACHE_DIR="/home/runner/.bazel_disk_cache"
-          echo "BAZEL_DISK_CACHE_DIR=$BAZEL_DISK_CACHE_DIR" >> $GITHUB_ENV
-          mkdir -p "$BAZEL_DISK_CACHE_DIR"
-
-          echo "✅ Build environment ready"
-          echo "BAZEL_DISK_CACHE_DIR: $BAZEL_DISK_CACHE_DIR"
-        fi
-
-    - name: Restore build caches (ccache)
-      id: restore-ccache
-      uses: ./.github/actions/restore-cache
+    - name: 'Setup Cache and Build Environment'
+      uses: ./.github/actions/cache-setup
       with:
-        cache_path: /home/runner/.ccache
-        cache_key: buildcache-${{ inputs.kernel_version }}
-        cache_bucket: "ccache-cache"
-        compression_level: 9
-        restore_keys: |
-          buildcache-
-    
-    - name: Restore build caches (bazel)
-      id: restore-bazel-cache
-      uses: ./.github/actions/restore-cache
-      with:
-        cache_path: /home/runner/.cache/bazel
-        cache_key: buildcache-${{ inputs.kernel_version }}
-        cache_bucket: "bazel-cache"
-        compression_level: 9
-        restore_keys: |
-          buildcache-
+        android_version: ${{ steps.parse.outputs.android_version }}
+        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
 
-    - name: Restore build caches (bazel disk cache)
-      id: restore-bazel-disk-cache
-      uses: ./.github/actions/restore-cache
+    - name: Restore build caches (ccache, bazel, bazel-disk, lto)
+      id: restore-caches
+      uses: ./.github/actions/cache-restore
       with:
-        cache_path: /home/runner/.bazel_disk_cache
-        cache_key: buildcache-${{ inputs.kernel_version }}
-        cache_bucket: "bazel-disk-cache"
-        compression_level: 9
-        restore_keys: |
-          buildcache-
-
-    - name: Restore build caches (LTO/ld_cache)
-      id: restore-ldcache
-      uses: ./.github/actions/restore-cache
-      with:
-        cache_path: /home/runner/.ld_cache
-        cache_key: buildcache-${{ inputs.kernel_version }}
-        cache_bucket: "lto-cache"
+        cache_paths: |
+          /home/runner/.ccache
+          /home/runner/.cache/bazel
+          /home/runner/.ld_cache
+        cache_keys: |
+          buildcache-${{ inputs.kernel_version }}
+          buildcache-${{ inputs.kernel_version }}
+          buildcache-${{ inputs.kernel_version }}
+          buildcache-${{ inputs.kernel_version }}
+        cache_buckets: |
+          ccache-cache
+          bazel-cache
+          bazel-disk-cache
+          lto-cache
         compression_level: 9
         restore_keys: |
           buildcache-
 
     - name: Check cache hit
       run: |
-        if [ "${{ steps.restore-ccache.outputs.cache-hit }}" = "true" ]; then
-          echo "✅ ccache HIT - Key: ${{ steps.restore-ccache.outputs.cache-key }} - Size: ${{ steps.restore-ccache.outputs.cache-size }}"
+        if [ "${{ steps.restore-caches.outputs.cache-hit }}" = "true" ]; then
+          echo "✅ Cache HIT"
+          echo "   Keys: ${{ steps.restore-caches.outputs.cache-key }}"
+          echo "   Sizes: ${{ steps.restore-caches.outputs.cache-size }}"
         else
-          echo "❌ ccache MISS - Fresh build"
+          echo "❌ No caches found - Fresh build"
         fi
-        if [ "${{ steps.restore-bazel-cache.outputs.cache-hit }}" = "true" ]; then
-          echo "✅ bazel cache HIT - Key: ${{ steps.restore-bazel-cache.outputs.cache-key }} - Size: ${{ steps.restore-bazel-cache.outputs.cache-size }}"
-        else
-          echo "❌ bazel cache MISS - Fresh build"
-        fi
-        if [ "${{ steps.restore-ldcache.outputs.cache-hit }}" = "true" ]; then
-          echo "✅ ld_cache HIT - Key: ${{ steps.restore-ldcache.outputs.cache-key }} - Size: ${{ steps.restore-ldcache.outputs.cache-size }}"
-        else
-          echo "❌ ld_cache MISS - Fresh build"
-        fi
-        ccache -p
-        ccache -s
-        ccache -z
 
-    - name: List cache contents
-      working-directory: ${{ github.workspace }}
-      run: |
-        echo "=== .ccache ==="
-        du -sh /home/runner/.ccache || true
-        ls -l /home/runner/.ccache || true
-        echo "=== .cache/bazel ==="
-        du -sh /home/runner/.cache/bazel || true
-        ls -l /home/runner/.cache/bazel || true
-        echo "=== .ld_cache ==="
-        du -sh /home/runner/.ld_cache || true
-        ls -l /home/runner/.ld_cache || true
-        echo "=== .bazel_disk_cache ==="
-        du -sh /home/runner/.bazel_disk_cache || true
-        ls -l /home/runner/.bazel_disk_cache || true
-
-    - name: Display system disk usage
-      run: |
-        echo "=== Disk usage summary ==="
-        df -h
-        echo ""
+    - name: List cache stats
+      uses: ./.github/actions/cache-stats
 
     - name: Build Kernel
       env:
@@ -443,54 +266,26 @@ jobs:
         echo "direct_rate=${DIRECT_RATE}%"
 
     - name: List cache contents
-      working-directory: ${{ github.workspace }}
-      run: |
-        echo "=== .ccache ==="
-        du -sh /home/runner/.ccache || true
-        ls -l /home/runner/.ccache || true
-        echo "=== .cache/bazel ==="
-        du -sh /home/runner/.cache/bazel || true
-        ls -l /home/runner/.cache/bazel || true
-        echo "=== .ld_cache ==="
-        du -sh /home/runner/.ld_cache || true
-        ls -l /home/runner/.ld_cache || true
-        echo "=== .bazel_disk_cache ==="
-        du -sh /home/runner/.bazel_disk_cache || true
-        ls -l /home/runner/.bazel_disk_cache || true
+      uses: ./.github/actions/cache-stats
 
-    - name: Save ccache cache
-      uses: ./.github/actions/save-cache
+    - name: Save build caches (ccache, bazel, bazel-disk, lto)
+      uses: ./.github/actions/cache-save
       with:
-        cache_path: /home/runner/.ccache
-        cache_key: buildcache-${{ inputs.kernel_version }}
-        cache_bucket: "ccache-cache"
-        compression_level: 9
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        cache_paths: |
+          /home/runner/.ccache
+          /home/runner/.cache/bazel
 
-    - name: Save bazel cache
-      uses: ./.github/actions/save-cache
-      with:
-        cache_path: /home/runner/.cache/bazel
-        cache_key: buildcache-${{ inputs.kernel_version }}
-        cache_bucket: "bazel-cache"
-        compression_level: 9
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Save bazel disk cache
-      uses: ./.github/actions/save-cache
-      with:
-        cache_path: /home/runner/.bazel_disk_cache
-        cache_key: buildcache-${{ inputs.kernel_version }}
-        cache_bucket: "bazel-disk-cache"
-        compression_level: 9
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Save LTO LD cache
-      uses: ./.github/actions/save-cache
-      with:
-        cache_path: /home/runner/.ld_cache
-        cache_key: buildcache-${{ inputs.kernel_version }}
-        cache_bucket: "lto-cache"
+          /home/runner/.ld_cache
+        cache_keys: |
+          buildcache-${{ inputs.kernel_version }}
+          buildcache-${{ inputs.kernel_version }}
+          buildcache-${{ inputs.kernel_version }}
+          buildcache-${{ inputs.kernel_version }}
+        cache_buckets: |
+          ccache-cache
+          bazel-cache
+          bazel-disk-cache
+          lto-cache
         compression_level: 9
         github_token: ${{ secrets.GITHUB_TOKEN }}
 
