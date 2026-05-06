@@ -137,9 +137,10 @@ runs:
       if: inputs.kernel_version == '6.1' && inputs.android_version == 'android14'
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        if [ "${{ inputs.sublevel }}" -ge "141" ]; then
+        if [ "${{ inputs.sublevel }}" -ge "138" ]; then
           echo "Applying base.c Android 14 6.1 Fake Patch"
           sed -i '/^#include <linux\/cpufreq_times.h>$/a #include <linux/dma-buf.h>' fs/proc/base.c
+          sed -i '/^#include <trace\/events\/oom.h>$/a #include <trace/hooks/sched.h>' fs/proc/base.c
         fi
         if [ "${{ inputs.sublevel }}" -ge "157" ]; then
           echo "Applying namespace.c Android 14 6.1 Fake Patch"
@@ -237,12 +238,13 @@ runs:
 
     - name: Revert Android 14 6.1 Fake Patches
       shell: bash
-      if: inputs.kernel_version == '6.1' && inputs.android_version == 'android14' && false
+      if: inputs.kernel_version == '6.1' && inputs.android_version == 'android14'
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        if [ "${{ inputs.sublevel }}" -ge "141" ]; then
+        if [ "${{ inputs.sublevel }}" -ge "138" ]; then
           echo "Reverting base.c Android 14 6.1 Fake Patch"
           sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
+          sed -i '/^#include <trace\/hooks\/sched.h>$/d' fs/proc/base.c
         fi
         if [ "${{ inputs.sublevel }}" -ge "157" ]; then
           echo "Reverting namespace.c Android 14 6.1 Fake Patch"

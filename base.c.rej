@@ -1,0 +1,13 @@
+--- fs/proc/base.c
++++ fs/proc/base.c
+@@ -100,6 +100,10 @@
+ #include <linux/cn_proc.h>
+ #include <linux/cpufreq_times.h>
+ #include <linux/dma-buf.h>
++#if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
++#include <linux/susfs_def.h>
++#endif
++
+ #include <trace/events/oom.h>
+ #include <trace/hooks/sched.h>
+ #include "internal.h"
