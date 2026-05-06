@@ -198,11 +198,9 @@ jobs:
           buildcache-${{ inputs.kernel_version }}
           buildcache-${{ inputs.kernel_version }}
           buildcache-${{ inputs.kernel_version }}
-          buildcache-${{ inputs.kernel_version }}
         cache_buckets: |
           ccache-cache
           bazel-cache
-          bazel-disk-cache
           lto-cache
         compression_level: 9
         restore_keys: |
@@ -274,7 +272,7 @@ jobs:
         cache_paths: |
           /home/runner/.ccache
           /home/runner/.cache/bazel
-
+          /home/runner/.bazel_disk_cache
           /home/runner/.ld_cache
         cache_keys: |
           buildcache-${{ inputs.kernel_version }}
