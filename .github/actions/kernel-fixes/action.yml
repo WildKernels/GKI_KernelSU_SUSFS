@@ -39,6 +39,42 @@ runs:
         else
           echo "[SKIP] GLIBC version < 2.38, skipping Makefile fix."
         fi
+
+    - name: 'Create GitHub Summary for Makefile changes'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        echo "## Makefile and parse-options.c Fixes Applied" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### GLIBC Check" >> $GITHUB_STEP_SUMMARY
+        GLIBC_VERSION="$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}')"
+        echo "- Detected GLIBC Version: **$GLIBC_VERSION**" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n 1)" = "2.38" ]; then
+          echo "### Changes Made" >> $GITHUB_STEP_SUMMARY
+          
+          # Check if Makefile was modified
+          if grep -q "EXTRA_CFLAGS" tools/bpf/resolve_btfids/Makefile; then
+            echo "✅ **Makefile Modified**: Added EXTRA_CFLAGS to MAKE command" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "EXTRA_CFLAGS" tools/bpf/resolve_btfids/Makefile | head -n 1 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Makefile Not Modified**: Pattern not found or sed failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check parse-options.c changes
+          if grep -q "^int i;" tools/lib/subcmd/parse-options.c; then
+            echo "✅ **parse-options.c Modified**: Added variable declarations and fixed loop syntax" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **parse-options.c Not Modified**: Conditions not met or sed failed" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "### No Changes" >> $GITHUB_STEP_SUMMARY
+          echo "- GLIBC < 2.38, skipping all fixes" >> $GITHUB_STEP_SUMMARY
+        fi
         
     - name: 'Apply mmap.c fix for specific versions'
       shell: bash
