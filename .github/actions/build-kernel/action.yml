@@ -30,7 +30,7 @@ runs:
           --config=release \
           --notrim \
           --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment \
-          --disk_cache=$LDCACHE_DIR \
-          --cache_dir=$GITHUB_WORKSPACE/kernel/.cache/bazel \
+          --disk_cache=/home/runner/.ld_cache/ \
+          --cache_dir=/home/runner/.cache/bazel \
           //common:kernel_aarch64
       fi
