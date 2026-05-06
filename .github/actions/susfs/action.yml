@@ -303,17 +303,3 @@ runs:
         if [[ "$SHOW_PAD_FIX" = "1" ]]; then
           sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
         fi
-
-    - name: Apply Android 14 6.1 Fixes
-      if: inputs.android_version == 'android14' && inputs.kernel_version == '6.1' && false
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        if [ "${{ inputs.sublevel }}" -le "141" ]; then
-        sed -i '/#include "fd.h"/r'<(cat <<'EOF'
-        #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-        #include <linux/susfs_def.h>
-        #endif
-        EOF
-        ) fs/proc/base.c
-        fi
