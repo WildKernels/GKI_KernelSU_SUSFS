@@ -17,15 +17,15 @@ inputs:
 runs:
   using: composite
   steps:
-    - shell: bash  
-      if: true
+    - name: 'Apply Makefile and parse-options.c fixes for GLIBC >= 2.38'
+      working-directory: ${{ github.workspace }}/kernel/common
+      shell: bash
       run: |
         set -euo pipefail
         GLIBC_VERSION="$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}')"
         echo "[INFO] Detected GLIBC version: $GLIBC_VERSION"
         if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n 1)" = "2.38" ]; then
           echo "[INFO] GLIBC >= 2.38, applying Makefile fix."
-          cd "$GITHUB_WORKSPACE/kernel/common"
           sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile 2>/dev/null || true
           if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && "${{ inputs.sublevel }}" -le 186 ]] || \
              [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && "${{ inputs.sublevel }}" -le 119 ]] || \
@@ -40,9 +40,13 @@ runs:
           echo "[SKIP] GLIBC version < 2.38, skipping Makefile fix."
         fi
         
-
+    - name: 'Apply mmap.c fix for specific versions'
+      shell: bash
+      if: ${{ inputs.kernel_version == '6.6' && inputs.android_version == 'android15' && inputs.sublevel <= '58' }}
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
         echo "[INFO] Checking for android15 + kernel 6.6 include fix..."
-        if [[ "${{ inputs.android_version }}" = "android15" && "${{ inputs.kernel_version }}" = "6.6" ]]; then
+        if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
           echo "[MATCH] android15 + 6.6, checking for fs.h include."
           cd "$GITHUB_WORKSPACE/kernel/common"
           if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
@@ -53,7 +57,8 @@ runs:
           fi
         fi
 
-    - shell: bash
+    - name: 'Apply mmap.c fix for specific versions'
+      shell: bash
       if: ${{ (inputs.kernel_version == '5.10' && inputs.android_version == 'android12' && inputs.sublevel == 226) || (inputs.kernel_version == '5.10' && inputs.android_version == 'android13' && inputs.sublevel == 223) || (inputs.kernel_version == '5.15' && inputs.android_version == 'android13' && inputs.sublevel == 167)  || (inputs.kernel_version == '5.10' && inputs.android_version == 'android13' && inputs.sublevel == 223) || (inputs.kernel_version == '5.15' && inputs.android_version == 'android14' && inputs.sublevel == 167) }}
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
