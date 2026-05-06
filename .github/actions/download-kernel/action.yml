@@ -29,17 +29,24 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
+        set -e
+
         FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-        repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --depth=1 --partial-clone
-        REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
-        DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
-        DEPRECATED=false
-        if grep -q deprecated <<< "$REMOTE_BRANCH"; then
-          sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
-          echo "⚠ Note: Branch ${FORMATTED_BRANCH} is considered deprecated."
-          DEPRECATED=true
-        fi
-        echo "deprecated=$DEPRECATED" >> $GITHUB_OUTPUT
+
+        init_repo() {
+          repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --depth=1 --partial-clone
+          REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
+          DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
+          DEPRECATED=false
+          if grep -q deprecated <<< "$REMOTE_BRANCH"; then
+            sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" "$DEFAULT_MANIFEST_PATH"
+            echo "⚠ Note: Branch ${FORMATTED_BRANCH} is considered deprecated."
+            DEPRECATED=true
+          fi
+          echo "deprecated=$DEPRECATED" >> $GITHUB_OUTPUT
+        }
+
+        init_repo
 
         MAX_RETRIES=3
         RETRY_DELAY_SHORT=15
@@ -62,6 +69,7 @@ runs:
             echo "Cleaning workspace and retrying after ${RETRY_DELAY_SHORT}s..."
             rm -rf .repo
             sleep $RETRY_DELAY_SHORT
+            init_repo
           else
             echo "All $MAX_RETRIES attempts failed." >&2
             exit $rc
