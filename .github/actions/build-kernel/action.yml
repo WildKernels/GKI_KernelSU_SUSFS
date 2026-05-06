@@ -27,10 +27,8 @@ runs:
       else
         cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
         tools/bazel build \
-          --config=release \
-          --notrim \
+          --config=fast \
           --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment \
-          --disk_cache=/home/runner/.ld_cache/ \
-          --cache_dir=/home/runner/.cache/bazel \
+          --disk_cache="$BAZEL_DISK_CACHE_DIR" \
           //common:kernel_aarch64
       fi
