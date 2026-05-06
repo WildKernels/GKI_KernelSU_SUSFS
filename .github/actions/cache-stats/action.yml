@@ -29,7 +29,7 @@ runs:
           echo "ccache is installed"
         else
           echo "ccache not installed, exiting"
-          exit 1
+          exit 0
         fi
         STATS="$(ccache -s)"
         
