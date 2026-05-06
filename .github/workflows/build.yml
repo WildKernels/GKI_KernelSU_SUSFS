@@ -210,8 +210,12 @@ jobs:
       run: |
         if [ "${{ steps.restore-caches.outputs.cache-hit }}" = "true" ]; then
           echo "✅ Cache HIT"
-          echo "   Keys: ${{ steps.restore-caches.outputs.cache-key }}"
-          echo "   Sizes: ${{ steps.restore-caches.outputs.cache-size }}"
+          IFS=',' read -ra KEYS <<< "${{ steps.restore-caches.outputs.cache-key }}"
+          IFS=',' read -ra SIZES <<< "${{ steps.restore-caches.outputs.cache-size }}"
+          
+          for i in "${!KEYS[@]}"; do
+            echo "   [${i}] ${KEYS[$i]} (${SIZES[$i]})"
+          done
         else
           echo "❌ No caches found - Fresh build"
         fi
