@@ -152,14 +152,14 @@ runs:
 
     - name: Apply Android 15 6.6 Fake Patches
       shell: bash
-      if: inputs.kernel_version == '6.6' && inputs.android_version == 'android15' && false
+      if: inputs.kernel_version == '6.6' && inputs.android_version == 'android15'
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         echo "Applying 6.6 SUSFS fixes"
-        if [ "${{ inputs.sublevel }}" -le "46" ]; then
-          echo "Applying namespace.c Android 15 6.6 Fake Patch"
-          sed -i '/^#include <trace\/hooks\/blk.h>$/a #include <trace/hooks/fs.h>' fs/namespace.c
-        fi
+        #if [ "${{ inputs.sublevel }}" -le "46" ]; then
+        #  echo "Applying namespace.c Android 15 6.6 Fake Patch"
+        #  sed -i '/^#include <trace\/hooks\/blk.h>$/a #include <trace/hooks/fs.h>' fs/namespace.c
+        #fi
         if [ "${{ inputs.sublevel }}" -le "58" ]; then
           echo "Applying task_mmu.c Android 15 6.6 Fake Patch"
           sed -i '/int ret.*= 0, copied.*= 0;/{
@@ -258,14 +258,14 @@ runs:
 
     - name: Revert Android 15 6.6 Fake Patches
       shell: bash
-      if: inputs.kernel_version == '6.6' && inputs.android_version == 'android15' && false
+      if: inputs.kernel_version == '6.6' && inputs.android_version == 'android15'
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         echo "Reverting 6.6 Fake Patches"
-        if [ "${{ inputs.sublevel }}" -le "46" ]; then
-          echo "Reverting namespace.c Android 15 6.6 Fake Patch"
-          sed -i '/^#include <trace\/hooks\/fs.h>$/d' fs/namespace.c
-        fi
+        #if [ "${{ inputs.sublevel }}" -le "46" ]; then
+        #  echo "Reverting namespace.c Android 15 6.6 Fake Patch"
+        #  sed -i '/^#include <trace\/hooks\/fs.h>$/d' fs/namespace.c
+        #fi
         if [ "${{ inputs.sublevel }}" -le "58" ]; then
           echo "Reverting task_mmu.c Android 15 6.6 Fake Patch"
           sed -i '/unsigned int nr_subpages.*__PAGE_SIZE.*PAGE_SIZE/d' fs/proc/task_mmu.c
