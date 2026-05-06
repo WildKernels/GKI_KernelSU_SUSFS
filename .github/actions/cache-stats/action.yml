@@ -19,6 +19,45 @@ runs:
         ccache -p || true
         echo "====================="
 
+        if command -v ccache >/dev/null 2>&1; then
+          echo "ccache is installed"
+        else
+          echo "ccache not installed, exiting"
+          exit 1
+        fi
+        STATS="$(ccache -s)"
+        
+        CACHEABLE=$(echo "$STATS" | awk '/Cacheable calls:/ {
+          match($0, /[0-9]+/); 
+          print substr($0, RSTART, RLENGTH)
+        }' | head -n1)
+        
+        HITS=$(echo "$STATS" | awk '/^[[:space:]]*Hits:/ {
+          match($0, /[0-9]+/); 
+          print substr($0, RSTART, RLENGTH)
+        }' | head -n1)
+        
+        DIRECT=$(echo "$STATS" | awk '/Direct:/ {
+          match($0, /[0-9]+/); 
+          print substr($0, RSTART, RLENGTH)
+        }' | head -n1)
+        
+        if [ "${CACHEABLE:-0}" -gt 0 ]; then
+          HIT_RATE=$(awk -v h="${HITS:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (h/c)*100}')
+          DIRECT_RATE=$(awk -v d="${DIRECT:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (d/c)*100}')
+        else
+          HIT_RATE="0.0"
+          DIRECT_RATE="0.0"
+        fi
+        
+        echo "hit_rate=${HIT_RATE}%"
+        echo "direct_rate=${DIRECT_RATE}%"
+
+        echo "=== ccache reset ==="
+        echo "====================="
+        ccache -z || true
+        echo "====================="
+
     - name: Show ccache folder Stats
       shell: bash
       working-directory: ${{ github.workspace }}

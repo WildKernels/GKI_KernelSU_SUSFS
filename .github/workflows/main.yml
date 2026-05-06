@@ -296,12 +296,12 @@ jobs:
         set -e
 
         FEATURE_SET="${{ inputs.feature_set }}"
-        KSUN_COMMIT="${{ needs.fetch-commits.outputs.ksu_commit }}"
-        KSUN_TAG="${{ needs.fetch-commits.outputs.ksu_tag }}"
-        AK3_COMMIT="${{ needs.fetch-commits.outputs.anykernel_commit }}"
-        PATCHES_COMMIT="${{ needs.fetch-commits.outputs.patches_commit }}"
-        SUSFS_MAP="${{ needs.fetch-commits.outputs.susfs_commit }}"
-        BBG_COMMIT="${{ needs.fetch-commits.outputs.bbg_commit }}"
+        KSUN_COMMIT="2887ea49428bc3fb5184e7c35223f0a9a47ad100"
+        KSUN_TAG="dev"
+        AK3_COMMIT="gki-2.0"
+        PATCHES_COMMIT="main"
+        SUSFS_MAP="gki-android12-5.10:e2b0f05ccca5f8fdfc33991c036672235ce48f05,gki-android13-5.10:97234f8e35cdc3b8ea22d05c98ab9829f6421d67,gki-android13-5.15:bf9bf0091bcd4d0072d845ea62484f3011f8d5a8,gki-android14-5.15:667368cf274311a62971671035738b154be1c062,gki-6.1:e1c57040136760a57969fc6b1378cc936a257561,gki-6.6:5009b9edee98fbe66b1a3cb22c603690d81b7817,gki-6.12:5c34dec2c3b69af1d72ac4a89b179741fc602a79"
+        BBG_COMMIT="main"
         SUSFS_VERSION="v2.1.0"
         : > release_body.md
 
@@ -386,12 +386,12 @@ jobs:
       run: |
         set -e
 
-        KSUN_COMMIT="${{ needs.fetch-commits.outputs.ksu_commit }}"
-        KSUN_TAG="${{ needs.fetch-commits.outputs.ksu_tag }}"
-        AK3_COMMIT="${{ needs.fetch-commits.outputs.anykernel_commit }}"
-        PATCHES_COMMIT="${{ needs.fetch-commits.outputs.patches_commit }}"
-        SUSFS_MAP="${{ needs.fetch-commits.outputs.susfs_commit }}"
-        BBG_COMMIT="${{ needs.fetch-commits.outputs.bbg_commit }}"
+        KSUN_COMMIT="2887ea49428bc3fb5184e7c35223f0a9a47ad100"
+        KSUN_TAG="dev"
+        AK3_COMMIT="gki-2.0"
+        PATCHES_COMMIT="main"
+        SUSFS_MAP="gki-android12-5.10:e2b0f05ccca5f8fdfc33991c036672235ce48f05,gki-android13-5.10:97234f8e35cdc3b8ea22d05c98ab9829f6421d67,gki-android13-5.15:bf9bf0091bcd4d0072d845ea62484f3011f8d5a8,gki-android14-5.15:667368cf274311a62971671035738b154be1c062,gki-6.1:e1c57040136760a57969fc6b1378cc936a257561,gki-6.6:5009b9edee98fbe66b1a3cb22c603690d81b7817,gki-6.12:5c34dec2c3b69af1d72ac4a89b179741fc602a79"
+        BBG_COMMIT="main"
 
         short() { echo "${1:0:8}"; }
 

@@ -220,8 +220,10 @@ jobs:
           echo "❌ No caches found - Fresh build"
         fi
 
-    - name: List cache stats
+    - name: Get Cache Stats
       uses: ./.github/actions/cache-stats
+      with:
+        clear_stats: true
 
     - name: Build Kernel
       env:
@@ -229,46 +231,10 @@ jobs:
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
       uses: ./.github/actions/build-kernel
 
-    - name: Display system disk usage
-      run: |
-        echo "=== Disk usage summary ==="
-        df -h
-        echo ""
-
-    - name: Post-build cache stats
-      id: post-cache-stats
-      run: |
-        set -euo pipefail
-        STATS="$(ccache -s)"
-        
-        CACHEABLE=$(echo "$STATS" | awk '/Cacheable calls:/ {
-          match($0, /[0-9]+/); 
-          print substr($0, RSTART, RLENGTH)
-        }' | head -n1)
-        
-        HITS=$(echo "$STATS" | awk '/^[[:space:]]*Hits:/ {
-          match($0, /[0-9]+/); 
-          print substr($0, RSTART, RLENGTH)
-        }' | head -n1)
-        
-        DIRECT=$(echo "$STATS" | awk '/Direct:/ {
-          match($0, /[0-9]+/); 
-          print substr($0, RSTART, RLENGTH)
-        }' | head -n1)
-        
-        if [ "${CACHEABLE:-0}" -gt 0 ]; then
-          HIT_RATE=$(awk -v h="${HITS:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (h/c)*100}')
-          DIRECT_RATE=$(awk -v d="${DIRECT:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (d/c)*100}')
-        else
-          HIT_RATE="0.0"
-          DIRECT_RATE="0.0"
-        fi
-        
-        echo "hit_rate=${HIT_RATE}%"
-        echo "direct_rate=${DIRECT_RATE}%"
-
-    - name: List cache contents
+    - name: Get Cache Stats
       uses: ./.github/actions/cache-stats
+      with:
+        clear_stats: false
 
     - name: Save build caches (ccache, bazel, bazel-disk, lto)
       uses: ./.github/actions/cache-save
@@ -276,17 +242,14 @@ jobs:
         cache_paths: |
           /home/runner/.ccache
           /home/runner/.cache/bazel
-          /home/runner/.bazel_disk_cache
           /home/runner/.ld_cache
         cache_keys: |
-          buildcache-${{ inputs.kernel_version }}
           buildcache-${{ inputs.kernel_version }}
           buildcache-${{ inputs.kernel_version }}
           buildcache-${{ inputs.kernel_version }}
         cache_buckets: |
           ccache-cache
           bazel-cache
-          bazel-disk-cache
           lto-cache
         compression_level: 9
         github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -83,17 +83,11 @@ runs:
           export CCACHE_DEPEND=true
           echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
         fi
-          
-        echo "===================="
-        echo "=== ccache stats ==="
-        echo "===================="
-        ccache -s
-        echo "====================="
+        
         echo "=== ccache config ==="
         echo "====================="
         ccache -p
-        echo "====================="
-        ccache -z
+        echo "=====================
 
         echo "✅ ccache ready"
         echo "CCACHE_DIR: $CCACHE_DIR"
