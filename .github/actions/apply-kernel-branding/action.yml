@@ -34,13 +34,20 @@ runs:
         KERNEL_PART=$(echo "$VERSION" | cut -d- -f2)
 
         if [ "${{ inputs.variant }}" == "Wild" ]; then
+          # 获取 git commit hash 用于伪装小米官方完整格式
+          KERNEL_HASH=$(git rev-parse --short=12 HEAD 2>/dev/null | head -c 12)
+          if [ -z "$KERNEL_HASH" ] || [ ${#KERNEL_HASH} -lt 12 ]; then
+            KERNEL_HASH="614238d0d630"
+          fi
+          # 移除原 setlocalversion 的 echo 输出行
           tac scripts/setlocalversion | awk '!seen && /^echo / {seen=1; next} 1' | tac > scripts/setlocalversion.tmp
           mv scripts/setlocalversion.tmp scripts/setlocalversion
           if [[ "$KERNEL_PART" == "6.6" || "$KERNEL_PART" == "6.12" ]]; then
             KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
-            echo "echo \"$KERNEL_STRING-mi\"" >> scripts/setlocalversion
+            echo "echo \"$KERNEL_STRING-android14-11-g${KERNEL_HASH}-mi\"" >> scripts/setlocalversion
           else
-            echo 'echo "-mi"' >> scripts/setlocalversion
+            # 输出完整小米官方格式: -android14-11-g<hash>-mi
+            echo "echo \"-android14-11-g${KERNEL_HASH}-mi\"" >> scripts/setlocalversion
           fi
           chmod +x scripts/setlocalversion
         else
@@ -56,8 +63,7 @@ runs:
 
         echo "Spoofing build timestamp to match Xiaomi official build..."
 
-        # Spoof: 伪装编译时间为小米官方时间(2026-02-03 05:51:45 UTC)
-        # 而不是真实的 git commit 时间(暴露社区编译特征)
+        # 伪装小米官方编译时间 2026-02-03 05:51:45 UTC
         COMMIT_TIMESTAMP=1770097905
 
         export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
@@ -66,7 +72,7 @@ runs:
         export KBUILD_BUILD_TIMESTAMP="@${COMMIT_TIMESTAMP}"
         echo "KBUILD_BUILD_TIMESTAMP=@${COMMIT_TIMESTAMP}" >> "$GITHUB_ENV"
 
-        # Spoof: 伪装 build user 和 host
+        # 伪装 build user 和 host 为小米官方
         echo "KBUILD_BUILD_USER=builder" >> "$GITHUB_ENV"
         echo "KBUILD_BUILD_HOST=pangu-build-component-system" >> "$GITHUB_ENV"
 

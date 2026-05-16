@@ -175,7 +175,25 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch || true
+        # IMPORTANT: 不能加 || true, 必须让 patch 失败时整个 build fail
+        # 否则 SUSFS patch 没真正应用,但 build 仍然成功,出来的内核空有 user 工具没内核实现
+        echo "==== Applying SUSFS patch (strict mode) ===="
+        if patch -p1 --dry-run < 50_add_susfs_in_gki-${{ inputs.version }}.patch; then
+          patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
+          echo "[OK] SUSFS patch applied successfully"
+        else
+          echo "[FAIL] SUSFS patch dry-run failed, attempting with --merge"
+          patch -p1 --merge < 50_add_susfs_in_gki-${{ inputs.version }}.patch || {
+            echo "[ERROR] SUSFS patch failed even with --merge. Aborting build."
+            exit 1
+          }
+        fi
+        # 验证: 检查关键 SUSFS 代码是否真的应用了
+        if ! grep -q "susfs" fs/proc/base.c 2>/dev/null && ! grep -q "susfs" fs/namespace.c 2>/dev/null; then
+          echo "[ERROR] SUSFS patch appeared to apply, but no susfs references found in source!"
+          exit 1
+        fi
+        echo "[OK] SUSFS verified in kernel source"
 
     - name: Revert Android 12 5.10 Fake Patches
       shell: bash
