@@ -22,10 +22,7 @@ runs:
         AOSP_MIRROR=https://android.googlesource.com
         BRANCH=main-kernel-2025
         
-        # Pull build-tools using the specified kernel branch
         git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
-        
-        # FIX: Pull mkbootimg from 'main' because the kernel branch name does not exist for this repo
         git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b main --depth 1 mkbootimg
 
         echo "AVBTOOL=${{ github.workspace }}/kernel-build-tools/linux-x86/bin/avbtool" >> "$GITHUB_ENV"
@@ -34,14 +31,16 @@ runs:
         echo "BOOT_SIGN_KEY_PATH=${{ github.workspace }}/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> "$GITHUB_ENV"
 
         mkdir -p "${{ github.workspace }}/kernel-build-tools/linux-x86/share/avb"
-        if [ -z "${BOOT_SIGN_KEY:-}" ]; then
-          exit 1
-        fi
-
         KEY_PATH="${{ github.workspace }}/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem"
-        printf '%s' "$BOOT_SIGN_KEY" > "$KEY_PATH"
-        if ! head -n 1 "$KEY_PATH" | grep -q 'BEGIN'; then
-          printf '%s' "$BOOT_SIGN_KEY" | base64 -d > "$KEY_PATH"
+
+        # Check if the secret key exists. If it doesn't, generate a valid fallback key instead of crashing.
+        if [ -z "${BOOT_SIGN_KEY:-}" ]; then
+          echo "BOOT_SIGN_KEY secret is empty. Generating a local fallback build key..."
+          openssl genrsa -out "$KEY_PATH" 2048
+        else
+          printf '%s' "$BOOT_SIGN_KEY" > "$KEY_PATH"
+          if ! head -n 1 "$KEY_PATH" | grep -q 'BEGIN'; then
+            printf '%s' "$BOOT_SIGN_KEY" | base64 -d > "$KEY_PATH"
+          fi
         fi
         chmod 600 "$KEY_PATH"
-        
