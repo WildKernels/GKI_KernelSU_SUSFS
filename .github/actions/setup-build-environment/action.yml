@@ -21,8 +21,12 @@ runs:
 
         AOSP_MIRROR=https://android.googlesource.com
         BRANCH=main-kernel-2025
+        
+        # Pull build-tools using the specified kernel branch
         git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
-        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
+        
+        # FIX: Pull mkbootimg from 'main' because the kernel branch name does not exist for this repo
+        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b main --depth 1 mkbootimg
 
         echo "AVBTOOL=${{ github.workspace }}/kernel-build-tools/linux-x86/bin/avbtool" >> "$GITHUB_ENV"
         echo "MKBOOTIMG=${{ github.workspace }}/mkbootimg/mkbootimg.py" >> "$GITHUB_ENV"
@@ -40,3 +44,4 @@ runs:
           printf '%s' "$BOOT_SIGN_KEY" | base64 -d > "$KEY_PATH"
         fi
         chmod 600 "$KEY_PATH"
+        
