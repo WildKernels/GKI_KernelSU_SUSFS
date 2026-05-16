@@ -38,31 +38,37 @@ runs:
           mv scripts/setlocalversion.tmp scripts/setlocalversion
           if [[ "$KERNEL_PART" == "6.6" || "$KERNEL_PART" == "6.12" ]]; then
             KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
-            echo "echo \"$KERNEL_STRING-Wild\"" >> scripts/setlocalversion
+            echo "echo \"$KERNEL_STRING-mi\"" >> scripts/setlocalversion
           else
-            echo 'echo "-Wild"' >> scripts/setlocalversion
+            echo 'echo "-mi"' >> scripts/setlocalversion
           fi
           chmod +x scripts/setlocalversion
         else
           if grep -q '^CONFIG_LOCALVERSION=' "$DEFCONFIG"; then
             LOCALVERSION_VALUE="$(grep -m1 '^CONFIG_LOCALVERSION=' "$DEFCONFIG" | sed -E 's/^CONFIG_LOCALVERSION="?([^"]*)"?$/\1/')"
-           echo "CONFIG_LOCALVERSION=\"${LOCALVERSION_VALUE}-Wild\"" >> "$CONFIG_FRAGMENT"
+           echo "CONFIG_LOCALVERSION=\"${LOCALVERSION_VALUE}-mi\"" >> "$CONFIG_FRAGMENT"
           else
-            echo 'CONFIG_LOCALVERSION="-Wild"' >> "$CONFIG_FRAGMENT"
+            echo 'CONFIG_LOCALVERSION="-mi"' >> "$CONFIG_FRAGMENT"
           fi
         fi
 
         : > .scmversion
 
-        echo "Getting last commit timestamp from kernel source..."
+        echo "Spoofing build timestamp to match Xiaomi official build..."
 
-        COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+        # Spoof: 伪装编译时间为小米官方时间(2026-02-03 05:51:45 UTC)
+        # 而不是真实的 git commit 时间(暴露社区编译特征)
+        COMMIT_TIMESTAMP=1770097905
 
         export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
         echo "SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP" >> $GITHUB_ENV
         
         export KBUILD_BUILD_TIMESTAMP="@${COMMIT_TIMESTAMP}"
         echo "KBUILD_BUILD_TIMESTAMP=@${COMMIT_TIMESTAMP}" >> "$GITHUB_ENV"
+
+        # Spoof: 伪装 build user 和 host
+        echo "KBUILD_BUILD_USER=builder" >> "$GITHUB_ENV"
+        echo "KBUILD_BUILD_HOST=pangu-build-component-system" >> "$GITHUB_ENV"
 
     - name: Apply Kernel Configuration
       if: ${{ inputs.variant == 'Wild' }}
