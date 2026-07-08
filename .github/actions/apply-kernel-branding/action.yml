@@ -24,11 +24,6 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        CONFIG_FRAGMENT="${{ github.workspace }}/wild_gki.fragment"
-        touch "$CONFIG_FRAGMENT"
-
-        DEFCONFIG="${{ github.workspace }}/kernel/common/arch/arm64/configs/gki_defconfig"
-
         VERSION="${{ inputs.version }}"
         ANDROID_PART=$(echo "$VERSION" | cut -d- -f1)
         KERNEL_PART=$(echo "$VERSION" | cut -d- -f2)
@@ -84,3 +79,10 @@ runs:
         CONFIG_LOCALVERSION=""
         # CONFIG_LOCALVERSION_AUTO is not set
         EOF
+        if [[ ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
+          KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
+          sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING-Wild\"" >> scripts/setlocalversion
+        else
+          sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART-Wild\"" >> scripts/setlocalversion
+        fi
+        chmod +x scripts/setlocalversion

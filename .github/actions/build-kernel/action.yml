@@ -1,55 +1,123 @@
 name: 'Build Kernel'
 description: 'Builds kernel using legacy build.sh or Bazel (kleaf)'
+inputs:
+  bypass:
+    description: 'Whether to add the bypass hack or not'
+    required: true
+  version:
+    description: 'Kernel config version (e.g., android14-6.1)'
+    required: true
 
 runs:
   using: composite
   steps:
-  - name: 'Build Kernel'
+  - name: 'Activate Bypass'
     shell: bash
     working-directory: ${{ github.workspace }}/kernel
     run: |
       set -euo pipefail
+      if [ "${{ inputs.bypass }}" = "true" ]; then
+        if [[ ${{ inputs.version }} == "android14-6.1" || ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
+          TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module/version.c"
+        else
+          TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module.c"
+        fi
 
-      GKI_KCONFIG_FRAGMENT_PATH="${{ github.workspace }}/wild_gki.fragment"
-      GKI_DEFCONFIG_WRAPPER_PATH="${{ github.workspace }}/wild_gki.wrap.sh"
+        sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
 
-      cat > "${GKI_DEFCONFIG_WRAPPER_PATH}" <<EOF
-      append_cmd POST_DEFCONFIG_CMDS 'if [ -f "${GKI_KCONFIG_FRAGMENT_PATH}" ]; then \${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -O \${OUT_DIR} \${OUT_DIR}/.config "${GKI_KCONFIG_FRAGMENT_PATH}"; fi && (cd \${KERNEL_DIR} && make O=\${OUT_DIR} olddefconfig)'
-      EOF
+        if ! grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
+          echo "Patch failed! 'return 1;' not found at bad_version:"
+          grep -A 10 "bad_version:" "$TARGET_FILE" || true
+          exit 1
+        fi
+      else
+        echo "Bypass hack not applied as per input parameter."
+      fi
 
-      # Override expensive GKI build.sh artifact defaults we do not need in CI.
-      GKI_BUILD_CONFIG_FRAGMENT_PATH="${{ github.workspace }}/gki_build_overrides.fragment"
-      cat > "${GKI_BUILD_CONFIG_FRAGMENT_PATH}" <<'EOF'
-      BUILD_GKI_ARTIFACTS=
-      BUILD_GKI_CERTIFICATION_TOOLS=0
-      BUILD_SYSTEM_DLKM=0
-
-      # Skip heavy packaging steps we don't need in CI
-      SKIP_VENDOR_BOOT=1
-      SKIP_EXT_MODULES=1
-      SKIP_CP_KERNEL_HDR=1
-      SKIP_MRPROPER=1
-      EOF
-
+  - name: Setup Kernel Configs
+    if: false
+    uses: ./.github/actions/set-kernel-config
+  
+  - name: 'Build Kernel'
+    shell: bash
+    working-directory: ${{ github.workspace }}/kernel
+    run: |
+      cat common/arch/arm64/configs/gki_defconfig
+      sed -i 's/check_defconfig//' ./common/build.config.gki
       if [ -f "build/build.sh" ]; then
-        #SKIP_MRPROPER=1 \
+        BUILD_GKI_ARTIFACTS= \
+        BUILD_GKI_CERTIFICATION_TOOLS=0 \
+        BUILD_SYSTEM_DLKM=0 \
+        SKIP_VENDOR_BOOT=1 \
+        SKIP_EXT_MODULES=1 \
+        SKIP_CP_KERNEL_HDR=1 \
+        OUT_DIR="/home/runner/out" \
         LTO=thin \
-        GKI_DEFCONFIG_FRAGMENT="${GKI_DEFCONFIG_WRAPPER_PATH}" \
-        GKI_BUILD_CONFIG_FRAGMENT="${GKI_BUILD_CONFIG_FRAGMENT_PATH}" \
         BUILD_CONFIG=common/build.config.gki.aarch64 \
         build/build.sh -j"$(nproc)" \
-        CC="$CC" \
-        CXX="$CXX" \
-        HOSTCC="$HOSTCC" \
-        HOSTCXX="$HOSTCXX" \
-        LD="$LD" \
-        HOSTLD="$HOSTLD"
+        CC="/usr/bin/ccache clang" \
+        CXX="/usr/bin/ccache clang+" \
+        HOSTCC="/usr/bin/ccache clang" \
+        HOSTCXX="/usr/bin/ccache clang+" \
+        LD="${{ github.workspace }}/kernel/common/ld-wrapper" \
+        HOSTLD="${{ github.workspace }}/kernel/common/ld-wrapper"
       else
-        cp "${{ github.workspace }}/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
-        tools/bazel build \
-          --linkopt="--thinlto-cache-dir=/home/runner/.ld_cache" \
-          --config=fast \
-          --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment \
-          --disk_cache="$BAZEL_CACHE_DIR" \
-          //common:kernel_aarch64
+        if [[ ${{ inputs.version }} == "android16-6.12" ]]; then
+          if [ "${{ inputs.bypass }}" = "false" ]; then
+            sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
+          fi
+          tools/bazel run \
+            --config=fast \
+            --config=stamp \
+            --disk_cache=/home/runner/.cache/bazel \
+            //common:kernel_aarch64_dist \
+            -- --destdir=/home/runner/out
+        else
+          tools/bazel run \
+            --config=fast \
+            --config=stamp \
+            --disk_cache=/home/runner/.cache/bazel \
+            //common:kernel_aarch64_dist \
+            -- --dist_dir=/home/runner/out
+        fi
       fi
+
+      cat /home/runner/out/common/.config || true
+
+  - name: 'Gather Build Artifacts'
+    shell: bash
+    working-directory: ${{ github.workspace }}
+    run: |
+      set -euo pipefail
+      if [ -f "/home/runner/out/dist/Image" ]; then
+        echo "Found Image at /home/runner/out/dist/Image"
+        if [[ ${{ inputs.bypass }} == "true" ]]; then
+          cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+        else
+          cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Image"
+          echo "Kernel Version:"
+          strings "/home/runner/out/dist/Image" | grep -m1 "^Linux version "
+        fi
+          exit 0
+        fi
+      if [ -f "/home/runner/out/Image" ]; then
+        echo "Found Image at /home/runner/out/Image"
+        if [[ ${{ inputs.bypass }} == "true" ]]; then
+          cp "/home/runner/out/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+        else
+          cp "/home/runner/out/Image" "${{ github.workspace }}/AnyKernel3/Image"
+        fi
+        exit 0
+      fi
+
+      exit 1
+
+  - name: 'Patch AnyKernel3 for Bypass Hack'
+    shell: bash
+    if: ${{ inputs.bypass == 'true' }}
+    working-directory: ${{ github.workspace }}/AnyKernel3
+    run: |
+      set -euo pipefail
+      cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
+      patch -p1 < bypass.patch
+

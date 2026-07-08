@@ -20,31 +20,13 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Apply Kernel Configuration
-      shell: bash
-      run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
-        # Mountify Support
-        CONFIG_OVERLAY_FS=y
-        CONFIG_TMPFS_XATTR=y
-        CONFIG_TMPFS_POSIX_ACL=y
-
-        # KPatch-Next Support
-        CONFIG_KALLSYMS=y
-        CONFIG_KALLSYMS_ALL=y
-
-        EOF
-        # CONFIG_TRIM_UNUSED_KSYMS is not set
-        # add this here for later
-
-
-    - name: Add RUST build configs
-      shell: bash
-      if: ${{ inputs.version == 'android16-6.12' && inputs.sublevel >= '38' && false }}
-      run: |
-        set -euo pipefail
-        echo "Add Build based configs"
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
-        # CONFIG_ANDROID_BINDER_IPC_RUST is not set
-        CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=m
-        EOF
+    - name: Enable Kernel Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_OVERLAY_FS=y
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
+          CONFIG_KALLSYMS=y
+          CONFIG_KALLSYMS_ALL=y
+          

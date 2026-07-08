@@ -26,12 +26,21 @@ runs:
       working-directory: ${{ github.workspace }}
       run: |
         set -euo pipefail
-        # Download and install ccache
+        # Install ccache from shared artifact (downloaded once by prepare-ccache job)
         echo "Installing ccache..."
-        curl -LfsS --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --tcp-fastopen -H "User-Agent: Mozilla/5.0" "https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/ccache/ccache-x86-64" -o ccache || { echo "❌ Failed to download ccache"; exit 1; }
-        sudo cp -f ./ccache /usr/bin/ccache || { echo "❌ Failed to install ccache"; exit 1; }
-        sudo chmod +x /usr/bin/ccache
-        rm -f ./ccache
+        if [ -s "${{ github.workspace }}/ccache-dl/ccache" ]; then
+          sudo cp -f "${{ github.workspace }}/ccache-dl/ccache" /usr/bin/ccache || { echo "❌ Failed to install ccache"; exit 1; }
+          sudo chmod +x /usr/bin/ccache
+          rm -rf "${{ github.workspace }}/ccache-dl"
+          echo "✅ installed custom ccache from shared artifact"
+        else
+          # Fallback: download directly (prepare-ccache may have failed)
+          echo "⚠️ shared ccache artifact unavailable; downloading directly..."
+          curl -LfsS --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --tcp-fastopen -H "User-Agent: Mozilla/5.0" "https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/ccache/ccache-x86-64" -o ccache || { echo "❌ Failed to download ccache"; exit 1; }
+          sudo cp -f ./ccache /usr/bin/ccache || { echo "❌ Failed to install ccache"; exit 1; }
+          sudo chmod +x /usr/bin/ccache
+          rm -f ./ccache
+        fi
         
         # Verify ccache
         if ! /usr/bin/ccache --version > /dev/null 2>&1; then
@@ -44,11 +53,6 @@ runs:
         export CCACHE_DIR="/home/runner/.ccache"
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
         mkdir -p "$CCACHE_DIR"
-        
-        echo "CC=/usr/bin/ccache clang" >> "$GITHUB_ENV"
-        echo "CXX=/usr/bin/ccache clang++" >> "$GITHUB_ENV"
-        echo "HOSTCC=/usr/bin/ccache clang" >> "$GITHUB_ENV"
-        echo "HOSTCXX=/usr/bin/ccache clang++" >> "$GITHUB_ENV"
 
         export CCACHE_MAXSIZE="12G"
         echo CCACHE_MAXSIZE="$CCACHE_MAXSIZE" >> $GITHUB_ENV
@@ -103,14 +107,13 @@ runs:
       run: |
         set -euo pipefail
         export BAZEL_CACHE_DIR="/home/runner/.cache/bazel"
-        echo "BAZEL_CACHE_DIR=$BAZEL_CACHE_DIR" >> $GITHUB_ENV
         mkdir -p "$BAZEL_CACHE_DIR"
         
         # Set bazel disk cache size limit to 8GB
-        export BAZEL_DISK_CACHE_SIZE="8589934592"
-        echo "BAZEL_DISK_CACHE_SIZE=$BAZEL_DISK_CACHE_SIZE" >> $GITHUB_ENV
+        #export BAZEL_DISK_CACHE_SIZE="8589934592"
+        #echo "BAZEL_DISK_CACHE_SIZE=$BAZEL_DISK_CACHE_SIZE" >> $GITHUB_ENV
 
-        echo "✅ Bazel Cache ready (max 8GB)"
+        #echo "✅ Bazel Cache ready (max 8GB)"
         echo "BAZEL_CACHE_DIR: $BAZEL_CACHE_DIR"
 
     - name: Setup ld cache
@@ -129,10 +132,6 @@ runs:
         EOF
         chmod +x "${{ github.workspace }}/kernel/common/ld-wrapper"
 
-        # Setup cache directories
-        echo "LD=${{ github.workspace }}/kernel/common/ld-wrapper" >> "$GITHUB_ENV"
-        echo "HOSTLD=${{ github.workspace }}/kernel/common/ld-wrapper" >> "$GITHUB_ENV"
-        
         # Set size limit via environment (4GB)
         echo "LDCACHE_MAX_SIZE=4294967296" >> "$GITHUB_ENV"
 

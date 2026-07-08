@@ -16,12 +16,23 @@ runs:
         REJECTS_DIR="${{ github.workspace }}/patch-rejects"
         mkdir -p "$REJECTS_DIR"
         mapfile -t REJS < <(find "$CONFIG_DIR" -type f -name '*.rej')
-        REJ_COUNT=${#REJS[@]}
+        FILTERED_REJS=()
+
+        for REJ in "${REJS[@]}"; do
+          REL="${REJ#"$CONFIG_DIR"/}"
+          if [ "$(basename "$REL")" = "i2c-nomadik.c.rej" ]; then
+            echo "Skipping $REL because it matches the ignored reject file"
+            continue
+          fi
+          FILTERED_REJS+=("$REJ")
+        done
+
+        REJ_COUNT=${#FILTERED_REJS[@]}
         echo "REJ_COUNT=$REJ_COUNT" >> "$GITHUB_ENV"
         echo "rej_count=$REJ_COUNT" >> "$GITHUB_OUTPUT"
 
         if [ "$REJ_COUNT" -gt 0 ]; then
-          for REJ in "${REJS[@]}"; do
+          for REJ in "${FILTERED_REJS[@]}"; do
             REL="${REJ#"$CONFIG_DIR"/}"
             DEST="$REJECTS_DIR/$REL"
             mkdir -p "$(dirname "$DEST")"

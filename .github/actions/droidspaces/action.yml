@@ -58,7 +58,7 @@ runs:
 
     - name: Export IPC symbols for module linkage
       shell: bash
-      if: 
+      if: inputs.version == 'android16-6.12'
       working-directory: ${{ github.workspace }}/kernel
       run: |
         echo >> "${{ github.workspace }}/kernel/common/ipc/namespace.c"
@@ -66,15 +66,16 @@ runs:
         echo >> "${{ github.workspace }}/kernel/common/ipc/msgutil.c"
         echo 'EXPORT_SYMBOL_GPL(init_ipc_ns);' >> "${{ github.workspace }}/kernel/common/ipc/msgutil.c"
 
-    - name: Enable Configs
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
-        CONFIG_SYSVIPC=y
-        CONFIG_POSIX_MQUEUE=y
-        CONFIG_IPC_NS=y
-        CONFIG_PID_NS=y
-        CONFIG_DEVTMPFS=y
-        EOF
+    - name: Enable Kernel Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_PID_NS=y
+          CONFIG_SYSVIPC=y
+          CONFIG_POSIX_MQUEUE=y
+          CONFIG_IPC_NS=y
+          CONFIG_DEVTMPFS=y
+          CONFIG_BINFMT_MISC=y
+          CONFIG_BINFMT_SCRIPT=y
+          CONFIG_BINFMT_ELF=y
 

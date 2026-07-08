@@ -11,15 +11,16 @@ on:
         description: "Feature Set"
         required: false
         type: string
-      variant:
-        description: "Build Variant (All, Normal, Bypass, Wild)"
+      ksu_branch:
+        description: "KernelSU branch or commit (empty = latest dev)"
         required: false
         type: string
-      use_repo:
-        description: "Use repo for downloading kernel source"
+        default: ""
+      susfs_commit:
+        description: "SUSFS commit hash (empty = latest on auto-derived branch)"
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ""
 
 jobs:
   generate-matrix:
@@ -41,30 +42,22 @@ jobs:
 
           CONFIG_JSON=$(cat "${{ inputs.config_file }}" | jq -c .)
 
-          # Build the variant list as a JSON array
-          if [ "${{ inputs.variant }}" = "All" ] || [ -z "${{ inputs.variant }}" ]; then
-            VARIANTS='["Normal","Bypass","Wild"]'
-          else
-            VARIANTS=$(jq -cn --arg v "${{ inputs.variant }}" '[$v]')
-          fi
-
           # Build { "include": [ {android_version:..., kernel_version:..., sublevel:..., os_patch_level:..., variant: ...}, ... ] }
+          # Always include Normal, and add any explicit per-item variant from the config.
           FINAL=$(jq -cn \
-            --argjson cfg "$CONFIG_JSON" \
-            --argjson variants "$VARIANTS" '
+            --argjson cfg "$CONFIG_JSON" '
             ($cfg.version | split("-")) as $version_parts
             | {
               include: (
                 [
                   $cfg.include[] as $item
-                  | $variants[] as $build_variant
                   | {
                       version: $cfg.version,
                       android_version: $version_parts[0],
                       kernel_version: $version_parts[1],
                       sublevel: $item.sublevel,
                       os_patch_level: $item.date,
-                      variant: $build_variant
+                      variant: "Normal"
                     }
                 ]
                 + [
@@ -99,5 +92,6 @@ jobs:
       os_patch_level: ${{ matrix.os_patch_level }}
       variant: ${{ matrix.variant }}
       feature_set: ${{ inputs.feature_set }}
-      use_repo: ${{ inputs.use_repo }}
+      ksu_branch: ${{ inputs.ksu_branch }}
+      susfs_commit: ${{ inputs.susfs_commit }}
     secrets: inherit

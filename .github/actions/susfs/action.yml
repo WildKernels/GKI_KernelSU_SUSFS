@@ -1,6 +1,10 @@
 name: Setup SUSFS
 description: Clone and apply SUSFS patches with version-specific fixes
 inputs:
+  susfs_commit:
+    description: 'SUSFS commit hash (empty = latest on auto-derived gki-{version} branch)'
+    required: false
+    default: ""
   version:
     description: 'Kernel config version (e.g., android15-6.6)'
     required: true
@@ -27,40 +31,31 @@ runs:
 
         SUSFS_BRANCH="gki-${{ inputs.version }}"
         SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"        
-        COMMITS_JSON="${{ github.workspace }}/.github/config/commits.json"
 
         echo "Preparing SUSFS for branch: $SUSFS_BRANCH"
         echo "Cloning latest from $SUSFS_BRANCH..."
         git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" susfs4ksu
 
-        SUSFS_COMMIT=$(jq -er --arg key "$SUSFS_BRANCH" '.susfs[$key]' "$COMMITS_JSON")
-        cd ${{ github.workspace }}/susfs4ksu
-        git checkout "$SUSFS_COMMIT"
+        if [ -n "${{ inputs.susfs_commit }}" ]; then
+          echo "Checking out SUSFS commit: ${{ inputs.susfs_commit }}"
+          cd ${{ github.workspace }}/susfs4ksu
+          git checkout "${{ inputs.susfs_commit }}"
+        fi
 
-    - name: Enable KernelSU SUSFS Config
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
-        # KernelSU SUSFS Configuration
-        CONFIG_KSU_SUSFS=y
-        CONFIG_KSU_SUSFS_SUS_PATH=y
-        CONFIG_KSU_SUSFS_SUS_MOUNT=y
-        CONFIG_KSU_SUSFS_SUS_KSTAT=y
-        CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-        CONFIG_KSU_SUSFS_ENABLE_LOG=y
-        CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-        CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-        CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-        CONFIG_KSU_SUSFS_SUS_MAP=y
-        EOF
-
-    - name: Apply KSU SUSFS Patches
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
-      run: |
-        cp ${{ github.workspace }}/kernel_patches/wild/ksun-4c9737a-susfs-v2.1.0-a14-6.1-ef16cbce.patch ./
-        patch -p1 < ksun-4c9737a-susfs-v2.1.0-a14-6.1-ef16cbce.patch
+    - name: Enable Kernel Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
 
     - name: Apply Kernel SUSFS Patches
       shell: bash
@@ -118,6 +113,14 @@ runs:
           perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
           perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
         fi
+        if [ "${{ inputs.sublevel }}" -ge "197" ]; then
+          echo "Applying namespace.c Android 13 5.15 Fake Patch"
+          sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
+        fi
+        if [ "${{ inputs.sublevel }}" -ge "197" ]; then
+          echo "Applying task_mmu.c Android 13 5.15 Fake Patch"
+          sed -i '/^#include <trace\/hooks\/mm.h>$/d' fs/proc/task_mmu.c
+        fi
 
     - name: Apply Android 14 6.1 Fake Patches
       shell: bash
@@ -146,6 +149,26 @@ runs:
         if [ "${{ inputs.sublevel }}" -le "30" ]; then
           echo "Applying taskmmu.c Android 15 6.6 Fake Patch"
           sed -i '/smap_gather_stats(vma, &mss, last_vma_end);/a\last_vma_end = vma->vm_end;' fs/proc/task_mmu.c
+          perl -0777 -i -pe '
+          @l = split /\n/;
+          for ($i = $#l; $i >= 0; $i--) {
+              if ($l[$i] =~ /last_vma_end = vma->vm_end;/) {
+                  $l[$i] = "\t\t\t\t" . $l[$i];
+                  splice(@l, $i + 1, 0, "\t\t\t}");
+
+                  # add { to the if line above
+                  for ($j = $i; $j >= 0; $j--) {
+                      if ($l[$j] =~ /if\s*\(vma->vm_end > last_vma_end\)/) {
+                          $l[$j] =~ s/\)\s*$/) {/;
+                          last;
+                      }
+                  }
+
+                  last;
+              }
+          }
+          $_ = join "\n", @l
+          ' fs/proc/task_mmu.c
         fi
         if [ "${{ inputs.sublevel }}" -le "92" ]; then
           echo "Applying base.c Android 15 6.6 Fake Patch"
@@ -168,7 +191,7 @@ runs:
         fi
         if [ "${{ inputs.sublevel }}" -ge "69" ]; then
           echo "Applying task_mmu.c Android 16 6.12 Fake Patch"
-          sed -i 's/vma_pages/vma_data_pages/g' fs/proc/task_mmu.c
+          sed -i 's/vma_data_pages/vma_pages/g' fs/proc/task_mmu.c
         fi
 
     - name: Apply Kernel SUSFS Patches
@@ -194,6 +217,7 @@ runs:
           exit 1
         fi
         echo "[OK] SUSFS verified in kernel source"
+        patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
 
     - name: Revert Android 12 5.10 Fake Patches
       shell: bash
@@ -242,6 +266,14 @@ runs:
           sed -i 's|i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val|i_uid_into_mnt(\&init_user_ns, \&fi->inode).val|g' fs/susfs.c
           sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|i_uid_into_mnt(\&init_user_ns, inode).val|g' fs/susfs.c
         fi
+        if [ "${{ inputs.sublevel }}" -ge "197" ]; then
+          echo "Reverting namespace.c Android 13 5.15 Fake Patch"
+          sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
+        fi
+        if [ "${{ inputs.sublevel }}" -ge "206" ]; then
+          echo "Reverting task_mmu.c Android 13 5.15 Fake Patch"
+          sed -i '/^#include <linux\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
+        fi
 
     - name: Revert Android 14 6.1 Fake Patches
       shell: bash
@@ -266,16 +298,11 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         echo "Reverting 6.6 Fake Patches"
-        if [ "${{ inputs.sublevel }}" -le "58" ]; then
-          echo "Reverting task_mmu.c Android 15 6.6 Fake Patch"
-          sed -i '/unsigned int nr_subpages.*__PAGE_SIZE.*PAGE_SIZE/d' fs/proc/task_mmu.c
-          sed -i '/pagemap_entry_t.*res.*NULL/d' fs/proc/task_mmu.c
-        fi
         if [ "${{ inputs.sublevel }}" -le "92" ]; then
           echo "Reverting base.c Android 15 6.6 Fake Patch"
           sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
         fi
-        if [ "${{ inputs.sublevel }}" -ge "57" ]; then
+        if [ "${{ inputs.sublevel }}" -le "57" ]; then
           echo "Reverting memory.c Android 15 6.6 Fake Patch"
           sed -i '/^#include <linux\/zswap.h>$/d' mm/memory.c
         fi

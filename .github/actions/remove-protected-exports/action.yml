@@ -49,3 +49,18 @@ runs:
             exit 1
           fi
         fi
+
+        # Remove protected_module_names_list for 6.12+ kernels (Bazel build system)
+        if grep -q 'protected_module_names_list' common/BUILD.bazel; then
+          BEFORE_BUILD_BAZEL_SHA="$(sha256sum common/BUILD.bazel | awk '{print $1}')"
+          perl -pi -e 's/^\s*protected_module_names_list\s*=\s*":gki_(?:aarch64|x86_64)_protected_module_names",\s*$//;' common/BUILD.bazel
+          AFTER_BUILD_BAZEL_SHA="$(sha256sum common/BUILD.bazel | awk '{print $1}')"
+          if [ "$BEFORE_BUILD_BAZEL_SHA" = "$AFTER_BUILD_BAZEL_SHA" ]; then
+            echo "Warning: common/BUILD.bazel was not modified for protected_module_names_list (may not be present)"
+          fi
+          if grep -q 'protected_module_names_list' common/BUILD.bazel; then
+            echo "Error: protected_module_names_list reference still present in common/BUILD.bazel"
+            grep -n 'protected_module_names_list' common/BUILD.bazel || true
+            exit 1
+          fi
+        fi

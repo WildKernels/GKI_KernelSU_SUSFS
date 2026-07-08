@@ -98,6 +98,18 @@ runs:
           echo "====================="
           ccache -z || true
           echo "====================="
+          
+          # Touch all files to prevent LRU eviction of freshly restored cache
+          if [ -d /home/runner/.ccache ] && find /home/runner/.ccache -type f -print -quit 2>/dev/null | grep -q .; then
+            echo "Updating ccache atime to prevent cache eviction..."
+            find /home/runner/.ccache -type f -exec touch -t $(date -d "1 day ago" +%Y%m%d%H%M) {} +
+            echo "✅ ccache atime updated"
+          fi
+          if [ -d /home/runner/.ld_cache ] && find /home/runner/.ld_cache -type f -print -quit 2>/dev/null | grep -q .; then
+            echo "Updating LTO cache atime to prevent cache eviction..."
+            find /home/runner/.ld_cache -type f -exec touch -t $(date -d "1 day ago" +%Y%m%d%H%M) {} +
+            echo "✅ LTO cache atime updated"
+          fi
         else
           echo "Keeping ccache stats for next run"
         fi

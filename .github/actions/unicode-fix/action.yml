@@ -1,0 +1,24 @@
+name: 'Apply Unicode Fix Patch'
+description: 'Apply unicode bypass fix patch with version-specific patch selection'
+inputs:
+  kernel_version:
+    description: 'Kernel version (e.g., 6.1)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Apply Unicode Fix Patch
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        KERNEL_VERSION="${{ inputs.kernel_version }}"
+        MIN_VERSION="5.16"
+
+        echo "Patching unicode!"
+        if [ "$(printf '%s\n' "$KERNEL_VERSION" "$MIN_VERSION" | sort -V | head -n1)" = "$KERNEL_VERSION" ]; then
+            patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/unicode_bypass_fix_6.1-.patch"
+        else
+            patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/unicode_bypass_fix_6.1+.patch"
+        fi

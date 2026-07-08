@@ -1,0 +1,23 @@
+name: 'Apply Ptrace Patch'
+description: 'Apply GKI ptrace compatibility patch for kernels < 5.16'
+inputs:
+  kernel_version:
+    description: 'Kernel version (e.g., 6.1)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Apply Ptrace Patch
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        KERNEL_VERSION="${{ inputs.kernel_version }}"
+        MIN_VERSION="5.16"
+        if [ "$(printf '%s\n' "$KERNEL_VERSION" "$MIN_VERSION" | sort -V | head -n1)" = "$KERNEL_VERSION" ]; then
+          echo "Patching ptrace!"
+          patch -p1 -F 3 < "${{ github.workspace }}/kernel_patches/gki_ptrace.patch"
+        else
+          echo "Kernel >= $MIN_VERSION, skipping ptrace patch"
+        fi

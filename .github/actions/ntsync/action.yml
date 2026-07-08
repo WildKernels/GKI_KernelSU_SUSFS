@@ -1,0 +1,42 @@
+name: 'Apply NTSync Patches'
+description: 'Apply ntsync compatibility patches and enable CONFIG_NTSYNC in defconfig'
+inputs:
+  version:
+    description: 'Kernel config version (e.g., android14-6.12)'
+    required: true
+  kernel_version:
+    description: 'Kernel version (e.g., 6.1)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Apply NTSync Patch
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        echo "Using patch: $(basename $NTSYNC_PATCH)"
+        if [[ ${{ inputs.version }} = "android16-6.12" ]]; then
+          echo "Removing pre-existing ntsync files for android16-6.12"
+          rm -f include/uapi/linux/ntsync.h
+          rm -f drivers/misc/ntsync.c
+        fi
+
+        if [[ ${{ inputs.version }} = "android13-5.10" ]]; then
+          cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android12-5.10.patch ${{ github.workspace }}/kernel/common
+          patch -p1 ntsync_compat_android12-5.10.patch
+        elif [[ ${{ inputs.version }} = "android14-5.15" ]]; then
+          cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android13-5.15.patch ${{ github.workspace }}/kernel/common
+          patch -p1 ntsync_compat_android13-5.15.patch
+        else
+          cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_${{ inputs.version }}.patch ${{ github.workspace }}/kernel/common
+          patch -p1 ntsync_compat_${{ inputs.version }}.patch
+        fi
+
+        cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_base.patch ${{ github.workspace }}/kernel/common
+        patch -p1 < ntsync_base.patch
+        cat >> "${{ github.workspace }}/kernel/common/arch/arm64/configs/gki_defconfig" << 'EOF'
+        CONFIG_NTSYNC=y
+        EOF

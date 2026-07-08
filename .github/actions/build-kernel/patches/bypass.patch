@@ -1,0 +1,47 @@
+diff --git a/anykernel.sh b/anykernel.sh
+index 7ac0233..864ecf4 100755
+--- a/anykernel.sh
++++ b/anykernel.sh
+@@ -21,7 +21,6 @@ supported.patchlevels=
+ supported.vendorpatchlevels=
+ '; } # end properties
+ 
+-
+ ### AnyKernel install
+ ## boot shell variables
+ block=boot
+diff --git a/tools/ak3-core.sh b/tools/ak3-core.sh
+index dfbec13..c9900f7 100755
+--- a/tools/ak3-core.sh
++++ b/tools/ak3-core.sh
+@@ -1051,8 +1051,30 @@ do_check_boot_version() {
+   ui_print "  -> Kernel version: COMPATIBLE ($new_ver >= $dev_ver)"
+ }
+ 
++do_flash_bypass() {
++  # do.flash_bypass=0 in anykernel.sh skips bypass option and flashs normal
++  if [ "$(file_getprop anykernel.sh do.flash_bypass)" != 1 ]; then
++    ui_print "  -> [NORMAL] do.flash_bypass=0: bypass option SKIPPED."
++    if [ -f "$AKHOME/Image" ]; then
++      ui_print "  -> [NORMAL] Flashing Normal Image..."
++    else
++      abort "  -> ERROR: Image not found. Abort."
++    fi
++  else
++    ui_print "  -> [BYPASS] do.flash_bypass=1: flash bypass option ENABLED."
++    if [ -f "$AKHOME/Bypass-Image" ]; then
++      cp -f "$AKHOME/Bypass-Image" "$AKHOME/Image" || abort "  -> ERROR: Failed to copy Bypass-Image. Abort."
++      ui_print "  -> [BYPASS] Flashing Bypass Image..."
++    else
++      abort "  -> ERROR: Bypass-Image not found. Abort."
++    fi
++  fi
++}
++ 
+ ### end methods
+ 
+ setup_ak;
+ 
+ do_check_boot_version;
++
++do_flash_bypass;

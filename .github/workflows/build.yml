@@ -27,9 +27,14 @@ on:
       feature_set:
         required: true
         type: string
-      use_repo:
+      ksu_branch:
         required: false
-        type: boolean
+        type: string
+        default: ""
+      susfs_commit:
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build-gki:
@@ -41,16 +46,20 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v5
 
-    - name: Free Disk Space
+    - name: 🧹 Emergency Disk Cleanup
       if: false
+      uses: ./.github/actions/disk-cleanup
+
+    - name: Free Disk Space
+      if: true
       uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
       with:
         remove_android: true
         remove_dotnet: true
         remove_haskell: true
         remove_tool_cache: true
-        #remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
-        #remove_packages_one_command: true
+        remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+        remove_packages_one_command: true
         remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
         rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
         rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
@@ -59,7 +68,7 @@ jobs:
     - name: Setup more Swap (for LTO)
       uses: thejerrybao/setup-swap-space@v1   # or pierotofy/set-swap-space
       with:
-        swap-size-gb: 10          # 10-24 GB is common for heavy LTO
+        swap-size-gb: 16          # 10-24 GB is common for heavy LTO
         # swap-space-path: /mnt/swapfile   # optional
 
     - name: Setup Build Environment
@@ -74,7 +83,33 @@ jobs:
         android_version: ${{ inputs.android_version }}
         kernel_version: ${{ inputs.kernel_version }}
         os_patch_level: ${{ inputs.os_patch_level }}
-        use_repo: ${{ inputs.use_repo }}
+
+    - name: Set Build Timestamp from Kernel Commit
+      shell: bash
+      run: |
+        set -x
+        # Hardcode the build timestamp to the 5th day of the patch level
+        # at 04:20 UTC, using the existing timestamp formats expected by the build.
+        OS_PATCH_LEVEL_INPUT="${{ inputs.os_patch_level }}"
+        if [[ "$OS_PATCH_LEVEL_INPUT" == lts* ]]; then
+          if [[ "$OS_PATCH_LEVEL_INPUT" =~ ^lts-([0-9]{2})$ ]]; then
+            OS_PATCH_LEVEL_YM="$(date -u +%Y)-${BASH_REMATCH[1]}"
+          else
+            OS_PATCH_LEVEL_YM="$(date -u +%Y-%m)"
+          fi
+        else
+          OS_PATCH_LEVEL_YM="$OS_PATCH_LEVEL_INPUT"
+        fi
+        FIXED_BUILD_DATE="${OS_PATCH_LEVEL_YM}-05 04:20:00 UTC"
+        SOURCE_DATE_EPOCH=$(date -u -d "$FIXED_BUILD_DATE" +%s)
+        echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >> $GITHUB_ENV
+        KBUILD_TS=$(date -u -d @${SOURCE_DATE_EPOCH} '+%a %b %d %H:%M:%S UTC %Y')
+        echo "KBUILD_BUILD_TIMESTAMP=${KBUILD_TS}" >> $GITHUB_ENV
+        # Keep git metadata aligned with the same fixed timestamp.
+        GIT_DATE=$(date -u -d @${SOURCE_DATE_EPOCH} '+%Y-%m-%dT%H:%M:%SZ')
+        echo "GIT_COMMITTER_DATE=${GIT_DATE}" >> $GITHUB_ENV
+        echo "GIT_AUTHOR_DATE=${GIT_DATE}" >> $GITHUB_ENV
+        echo "Build timestamp set to: $(date -u -d @${SOURCE_DATE_EPOCH} '+%Y-%m-%d %H:%M:%S UTC') (epoch: $SOURCE_DATE_EPOCH)"
 
     - name: Extract Sublevel and Set File Name
       id: extract
@@ -98,11 +133,14 @@ jobs:
     - name: Setup KernelSU-Next
       if: contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL'
       uses: ./.github/actions/kernelsu
+      with:
+        ksu_branch: ${{ inputs.ksu_branch }}
 
     - name: SUSFS
       if: contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL'
       uses: ./.github/actions/susfs
       with:
+        susfs_commit: ${{ inputs.susfs_commit }}
         version: ${{ inputs.version }}
         android_version: ${{ inputs.android_version }}
         kernel_version: ${{ inputs.kernel_version }}
@@ -117,8 +155,10 @@ jobs:
       if: contains(inputs.feature_set, 'NET') || inputs.feature_set == 'FULL'
       uses: ./.github/actions/networking
       with:
+        version: ${{ inputs.version }}
         kernel_version: ${{ inputs.kernel_version }}
         android_version: ${{ inputs.android_version }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: DroidSpaces-OSS Patches
       if: contains(inputs.feature_set, 'DS') || inputs.feature_set == 'FULL'
@@ -127,20 +167,30 @@ jobs:
         version: ${{ inputs.version }}
         kernel_version: ${{ inputs.kernel_version }}
 
-    - name: Setup Misc Configs
-      uses: ./.github/actions/misc
+    - name: Apply NTSync Patches
+      uses: ./.github/actions/ntsync
       with:
         version: ${{ inputs.version }}
         kernel_version: ${{ inputs.kernel_version }}
-        android_version: ${{ inputs.android_version }}
-        sublevel: ${{ steps.extract.outputs.sublevel }}
-        variant: ${{ inputs.variant }}
 
-    - name: Apply Module Check Bypass
-      if: ${{ inputs.variant == 'Bypass' }}
-      uses: ./.github/actions/module-check-bypass
+    - name: Apply Ptrace Patch
+      uses: ./.github/actions/ptrace
       with:
         kernel_version: ${{ inputs.kernel_version }}
+
+    - name: Apply Unicode Fix Patch
+      uses: ./.github/actions/unicode-fix
+      with:
+        kernel_version: ${{ inputs.kernel_version }}
+
+    - name: Apply Performance Patches
+      uses: ./.github/actions/performance
+      if: false
+      with:
+        kernel_version: ${{ inputs.kernel_version }}
+
+    - name: Setup Misc Configs
+      uses: ./.github/actions/misc
 
     - name: Apply Device-Specific Patches
       uses: ./.github/actions/apply-device-patches
@@ -174,6 +224,7 @@ jobs:
         variant: ${{ inputs.variant }}
         kernel_version: ${{ inputs.kernel_version }}
         android_version: ${{ inputs.android_version }}
+        version: ${{ inputs.version }}
         sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: Remove Protected Exports
@@ -184,17 +235,24 @@ jobs:
 
     - name: Scan and collect patch rejects
       id: scan
-      if: ${{ always() && inputs.variant == 'Normal' }}
+      if: ${{ always() }}
       uses: ./.github/actions/scan-patch-rejects
         
     - name: Upload Rejects
-      if: ${{ always() && inputs.variant == 'Normal' }}
+      if: ${{ always() }}
       uses: actions/upload-artifact@v7
       with:
         name: ${{ steps.extract.outputs.file_name }}-Rejects
         path: patch-rejects/
         if-no-files-found: ignore
         compression-level: 9
+
+    - name: Get prebuilt ccache (downloaded once by prepare-ccache)
+      uses: actions/download-artifact@v8
+      with:
+        name: ccache-binary
+        path: ccache-dl
+      continue-on-error: true
 
     - name: 'Setup Cache and Build Environment'
       uses: ./.github/actions/cache-setup
@@ -206,76 +264,47 @@ jobs:
 
     - name: Restore ccache
       id: restore-ccache
-      if: |
-        inputs.version == 'android12-5.10' ||
-        inputs.version == 'android13-5.10' ||
-        inputs.version == 'android13-5.15'
+      continue-on-error: true
+      if: inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15'
       uses: ./.github/actions/cache-restore
       with:
         cache_path: /home/runner/.ccache
         cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
         cache_bucket: ccache-cache
-        compression_level: 9
         restore_keys: |
           ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-          ${{ inputs.android_version }}-${{ inputs.kernel_version }}-
 
     - name: Restore lto-cache (ccache versions)
       id: restore-lto-ccache
-      if: |
-        inputs.version == 'android12-5.10' ||
-        inputs.version == 'android13-5.10' ||
-        inputs.version == 'android13-5.15'
+      continue-on-error: true
+      if: inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15'
       uses: ./.github/actions/cache-restore
       with:
         cache_path: /home/runner/.ld_cache
         cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
         cache_bucket: lto-cache
-        compression_level: 9
         restore_keys: |
           ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-          ${{ inputs.android_version }}-${{ inputs.kernel_version }}-
 
     - name: Restore bazel-cache
       id: restore-bazel
-      if: |
-        inputs.version == 'android14-5.15' ||
-        inputs.version == 'android14-6.1' ||
-        inputs.version == 'android15-6.6' ||
-        inputs.version == 'android16-6.12'
+      continue-on-error: true
+      if: inputs.version == 'android14-5.15' || inputs.version == 'android14-6.1' || inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12'
       uses: ./.github/actions/cache-restore
       with:
         cache_path: /home/runner/.cache/bazel
         cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
         cache_bucket: bazel-cache
-        compression_level: 9
         restore_keys: |
           ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-          ${{ inputs.android_version }}-${{ inputs.kernel_version }}-
-
-    - name: Restore lto-cache (bazel versions)
-      id: restore-lto-bazel
-      if: |
-        inputs.version == 'android14-5.15' ||
-        inputs.version == 'android14-6.1' ||
-        inputs.version == 'android15-6.6' ||
-        inputs.version == 'android16-6.12'
-      uses: ./.github/actions/cache-restore
-      with:
-        cache_path: /home/runner/.ld_cache
-        cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
-        cache_bucket: lto-cache
-        compression_level: 9
-        restore_keys: |
-          ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-          ${{ inputs.android_version }}-${{ inputs.kernel_version }}-
 
     - name: Check cache hit
       run: |
-        echo "Cache restore status:"        CCACHE_HIT="${{ steps.restore-ccache.outputs.cache-hit || 'skipped' }}"
+        echo "Cache restore status:"
+        CCACHE_HIT="${{ steps.restore-ccache.outputs.cache-hit || 'skipped' }}"
         LTO_CCACHE_HIT="${{ steps.restore-lto-ccache.outputs.cache-hit || 'skipped' }}"
         BAZEL_HIT="${{ steps.restore-bazel.outputs.cache-hit || 'skipped' }}"
-        LTO_BAZEL_HIT="${{ steps.restore-lto-bazel.outputs.cache-hit || 'skipped' }}"
+        LTO_BAZEL_HIT="skipped"
         echo "  ccache: $CCACHE_HIT"
         echo "  lto (ccache versions): $LTO_CCACHE_HIT"
         echo "  bazel: $BAZEL_HIT"
@@ -286,11 +315,17 @@ jobs:
       with:
         clear_stats: true
 
-    - name: Build Kernel
+    - name: Initialize Config Fragment
+      run: touch "${{ github.workspace }}/wild_gki.fragment"
+
+    - name: Build Normal Kernel
       env:
         SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
       uses: ./.github/actions/build-kernel
+      with:
+        version: ${{ inputs.version }}
+        bypass: false
 
     - name: Get Cache Stats
       uses: ./.github/actions/cache-stats
@@ -298,96 +333,120 @@ jobs:
         clear_stats: false
 
     - name: Save ccache
-      if: |
-        inputs.version == 'android12-5.10' ||
-        inputs.version == 'android13-5.10' ||
-        inputs.version == 'android13-5.15'
+      continue-on-error: true
       uses: ./.github/actions/cache-save
+      if: inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15'
       with:
         cache_path: /home/runner/.ccache
         cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
-        cache_bucket: ccache-cache
+        cache_bucket: "ccache-cache"
         compression_level: 9
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.MY_GITHUB_TOKEN }}
 
-    - name: Save lto-cache (ccache versions)
-      if: |
-        inputs.version == 'android12-5.10' ||
-        inputs.version == 'android13-5.10' ||
-        inputs.version == 'android13-5.15'
+    - name: Save lto-cache
+      continue-on-error: true
       uses: ./.github/actions/cache-save
+      if: inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15'
       with:
         cache_path: /home/runner/.ld_cache
         cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
-        cache_bucket: lto-cache
+        cache_bucket: "lto-cache"
         compression_level: 9
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.MY_GITHUB_TOKEN }}
 
     - name: Save bazel-cache
-      if: |
-        inputs.version == 'android14-5.15' ||
-        inputs.version == 'android14-6.1' ||
-        inputs.version == 'android15-6.6' ||
-        inputs.version == 'android16-6.12'
+      continue-on-error: true
       uses: ./.github/actions/cache-save
+      if:  inputs.version == 'android14-5.15' || inputs.version == 'android14-6.1' || inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12'
       with:
         cache_path: /home/runner/.cache/bazel
         cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
-        cache_bucket: bazel-cache
+        cache_bucket: "bazel-cache"
         compression_level: 9
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.MY_GITHUB_TOKEN }}
 
-    - name: Save lto-cache (bazel versions)
-      if: |
-        inputs.version == 'android14-5.15' ||
-        inputs.version == 'android14-6.1' ||
-        inputs.version == 'android15-6.6' ||
-        inputs.version == 'android16-6.12'
-      uses: ./.github/actions/cache-save
+    - name: Build Bypass Kernel
+      env:
+        SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
+        KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
+      uses: ./.github/actions/build-kernel
       with:
-        cache_path: /home/runner/.ld_cache
-        cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
-        cache_bucket: lto-cache
-        compression_level: 9
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        bypass: true
+        version: ${{ inputs.version }}
 
-    - name: Create Bootimgs Folder and Build Boot Images
-      uses: ./.github/actions/build-boot-images
-      with:
-        android_version: ${{ inputs.android_version }}
-        kernel_version: ${{ inputs.kernel_version }}
-        os_patch_level: ${{ inputs.os_patch_level }}
-        file_name: ${{ steps.extract.outputs.file_name }}
+    - name: 📋 Consolidated Build Summary
+      if: ${{ always() }}
+      shell: bash
+      run: |
+        SUMMARY_FILE="/tmp/build-summary-${{ steps.extract.outputs.file_name }}.md"
+        
+        # Determine build status
+        if [ "${{ job.status }}" = "success" ]; then
+          STATUS="✅ Success"
+        else
+          STATUS="❌ Failed"
+        fi
+        
+        # Get kernel version from Image if available
+        KERNEL_VER_STR=""
+        if [ -f "/home/runner/out/dist/Image" ]; then
+          KERNEL_VER_STR=$(strings "/home/runner/out/dist/Image" | grep -m1 "^Linux version " | sed 's/Linux version //' || echo "")
+        elif [ -f "/home/runner/out/Image" ]; then
+          KERNEL_VER_STR=$(strings "/home/runner/out/Image" | grep -m1 "^Linux version " | sed 's/Linux version //' || echo "")
+        fi
+        
+        # Get KSU version from env (set by kernelsu action)
+        KSU_VER="${KSU_VERSION:-N/A}"
+        KSU_TAG="${KSU_GIT_TAG:-N/A}"
+        
+        # Get SUSFS version from susfs.h if available
+        SUSFS_VER="N/A"
+        if [ -f "${{ github.workspace }}/kernel/common/include/linux/susfs.h" ]; then
+          SUSFS_VER=$(grep '#define SUSFS_VERSION' "${{ github.workspace }}/kernel/common/include/linux/susfs.h" | awk -F'"' '{print $2}' || echo "N/A")
+        fi
+        
+        # Get cache stats from env (set by cache-stats action)
+        CCACHE_HIT="${CCACHE_HIT_RATE:-N/A}"
+        
+        # Get build time (approximate from step timing)
+        BUILD_TIME="N/A"
+        
+        # Count warnings from build log if available
+        WARNINGS="N/A"
+        
+        {
+          echo "## ${{ inputs.android_version }} ${{ inputs.kernel_version }}.${{ inputs.sublevel }} (${{ inputs.variant }}) — ${STATUS}"
+          echo
+          echo "| Metric | Value |"
+          echo "|--------|-------|"
+          echo "| **Status** | ${STATUS} |"
+          echo "| **Kernel** | ${{ inputs.kernel_version }}.${{ inputs.sublevel }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} |"
+          if [ -n "$KERNEL_VER_STR" ]; then
+            echo "| **Version String** | \`${KERNEL_VER_STR}\` |"
+          fi
+          echo "| **KSU Version** | ${KSU_VER} |"
+          echo "| **KSU Tag** | ${KSU_TAG} |"
+          echo "| **SUSFS Version** | ${SUSFS_VER} |"
+          echo "| **Feature Set** | ${{ inputs.feature_set }} |"
+          echo "| **Variant** | ${{ inputs.variant }} |"
+          echo
+          
+          # Kernel Fixes
+          if [ -f /tmp/kernel-fixes-summary.md ]; then
+            echo "### 🔧 Kernel Fixes"
+            cat /tmp/kernel-fixes-summary.md
+            echo
+          fi
+        } > "$SUMMARY_FILE"
 
-    - name: Upload Boot Image (.img)
+    - name: Upload Build Summary Artifact
+      if: ${{ always() }}
       uses: actions/upload-artifact@v7
       with:
-        name: ${{ steps.extract.outputs.file_name }}-boot.img
-        path: ${{ github.workspace }}/boot-artifacts/${{ steps.extract.outputs.file_name }}-boot.img
-        if-no-files-found: error
-        archive: false
-
-    - name: Upload Boot Image (.img.gz)
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ steps.extract.outputs.file_name }}-boot-gz.img
-        path: ${{ github.workspace }}/boot-artifacts/${{ steps.extract.outputs.file_name }}-boot-gz.img
-        if-no-files-found: error
-        archive: false
-
-    - name: Upload Boot Image (.img.lz4)
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ steps.extract.outputs.file_name }}-boot-lz4.img
-        path: ${{ github.workspace }}/boot-artifacts/${{ steps.extract.outputs.file_name }}-boot-lz4.img
-        if-no-files-found: error
-        archive: false
-
-    - name: Prepare AnyKernel3 Zip
-      uses: ./.github/actions/prepare-anykernel3
-      with:
-        android_version: ${{ inputs.android_version }}
-        kernel_version: ${{ inputs.kernel_version }}
+        name: ${{ steps.extract.outputs.file_name }}-Summary
+        path: /tmp/build-summary-${{ steps.extract.outputs.file_name }}.md
+        if-no-files-found: ignore
+        compression-level: 9
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v7

@@ -14,9 +14,6 @@ inputs:
   os_patch_level:
     description: 'OS patch level (e.g., 2024-01)'
     required: true
-  use_repo:
-    description: 'Use repo for downloading kernel source'
-    required: false
 
 outputs:
   deprecated_branch:
@@ -27,7 +24,6 @@ runs:
   using: composite
   steps:
     - name: Initialize and Sync Kernel Repository
-      if: ${{ inputs.use_repo == 'true' }}
       id: sync
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
@@ -62,8 +58,8 @@ runs:
 
         while [ $attempt -le $MAX_RETRIES ]; do
           echo "Attempt $attempt/$MAX_RETRIES: repo sync (timeout $SYNC_TIMEOUT)..."
-          #if timeout $SYNC_TIMEOUT repo sync -c -j16 --fail-fast --no-tags --force-sync --no-clone-bundle --optimized-fetch --retry-fetches=3; then
-          if timeout $SYNC_TIMEOUT repo sync -c --no-tags --no-clone-bundle --optimized-fetch --retry-fetches=3; then
+          # Use minimal-shallow variant: current-branch, shallow init done above, reduce files downloaded
+          if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle --no-tags --jobs-checkout=4 -j4; then
             echo "repo sync succeeded on attempt $attempt."
             break
           fi
@@ -85,41 +81,63 @@ runs:
           attempt=$((attempt+1))
         done
 
-    - name: Download manifest.xml for branch (with deprecated fallback)
+    # --- Non-repo steps (commented out; we only use repo now) ---
+    # - name: Download manifest.xml for branch (with deprecated fallback)
+    #   shell: bash
+    #   working-directory: ${{ github.workspace }}/kernel
+    #   run: |
+    #     set -euo pipefail
+    #     VERSION="${{ inputs.version }}"
+    #     ANDROID_PART=$(echo "$VERSION" | cut -d- -f1)
+    #     KERNEL_PART=$(echo "$VERSION" | cut -d- -f2)
+    #     FORMATTED_BRANCH="${ANDROID_PART}-${KERNEL_PART}-${{ inputs.os_patch_level }}"
+    #     MAIN_MANIFEST_URL="https://android.googlesource.com/kernel/manifest/+/refs/heads/common-${FORMATTED_BRANCH}/default.xml?format=TEXT"
+    #     DEPRECATED_MANIFEST_URL="https://android.googlesource.com/kernel/manifest/+/refs/heads/deprecated/common-${FORMATTED_BRANCH}/default.xml?format=TEXT"
+    #     echo "Trying to fetch manifest from $MAIN_MANIFEST_URL"
+    #     if curl -fsSL "$MAIN_MANIFEST_URL" | base64 -d > manifest.xml; then
+    #       echo "Fetched manifest from $MAIN_MANIFEST_URL"
+    #     else
+    #       echo "Main manifest fetch failed, trying deprecated branch."
+    #       echo "⚠ Note: Branch common-${FORMATTED_BRANCH} is considered deprecated."
+    #       if curl -fsSL "$DEPRECATED_MANIFEST_URL" | base64 -d > manifest.xml; then
+    #         echo "Fetched manifest from $DEPRECATED_MANIFEST_URL"
+    #       else
+    #         echo "ERROR: Neither main nor deprecated branch exists for $FORMATTED_BRANCH" >&2
+    #         exit 22
+    #       fi
+    #     fi
+    #
+    # - name: Debug Show manifest.xml
+    #   shell: bash
+    #   working-directory: ${{ github.workspace }}/kernel
+    #   run: cat manifest.xml
+    #
+    # - name: Fast Parallel Archive Download
+    #   shell: bash
+    #   working-directory: ${{ github.workspace }}/kernel
+    #   run: |
+    #     python "${{ github.workspace }}/.github/actions/download-kernel/fast_parallel_download.py"
+
+    - name: Capture Kernel Common Commit Metadata
       shell: bash
-      if: ${{ inputs.use_repo != 'true' }}
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail
-        VERSION="${{ inputs.version }}"
-        ANDROID_PART=$(echo "$VERSION" | cut -d- -f1)
-        KERNEL_PART=$(echo "$VERSION" | cut -d- -f2)
-        FORMATTED_BRANCH="${ANDROID_PART}-${KERNEL_PART}-${{ inputs.os_patch_level }}"
-        MAIN_MANIFEST_URL="https://android.googlesource.com/kernel/manifest/+/refs/heads/common-${FORMATTED_BRANCH}/default.xml?format=TEXT"
-        DEPRECATED_MANIFEST_URL="https://android.googlesource.com/kernel/manifest/+/refs/heads/deprecated/common-${FORMATTED_BRANCH}/default.xml?format=TEXT"
-        echo "Trying to fetch manifest from $MAIN_MANIFEST_URL"
-        if curl -fsSL "$MAIN_MANIFEST_URL" | base64 -d > manifest.xml; then
-          echo "Fetched manifest from $MAIN_MANIFEST_URL"
-        else
-          echo "Main manifest fetch failed, trying deprecated branch."
-          echo "⚠ Note: Branch common-${FORMATTED_BRANCH} is considered deprecated."
-          if curl -fsSL "$DEPRECATED_MANIFEST_URL" | base64 -d > manifest.xml; then
-            echo "Fetched manifest from $DEPRECATED_MANIFEST_URL"
-          else
-            echo "ERROR: Neither main nor deprecated branch exists for $FORMATTED_BRANCH" >&2
-            exit 22
-          fi
+
+        if [[ ! -d common ]]; then
+          echo "WARNING: common folder not found; skipping commit metadata capture."
+          exit 0
         fi
 
-    - name: Debug Show manifest.xml
-      shell: bash
-      if: ${{ inputs.use_repo != 'true' }}
-      working-directory: ${{ github.workspace }}/kernel
-      run: cat manifest.xml
-      
-    - name: Fast Parallel Archive Download
-      shell: bash
-      if: ${{ inputs.use_repo != 'true' }}
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        python "${{ github.workspace }}/.github/actions/download-kernel/fast_parallel_download.py"
+        cd common
+
+        if [[ ! -d .git ]]; then
+          echo "WARNING: common is not a git checkout; skipping commit metadata capture."
+          exit 0
+        fi
+
+        COMMIT_DATE=$(git log -1 --format=%cI)
+        COMMIT_MSG=$(git log -1 --format=%s)
+
+        echo "Kernel common commit date: $COMMIT_DATE"
+        echo "Kernel common commit msg: $COMMIT_MSG"

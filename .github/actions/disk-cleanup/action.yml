@@ -1,0 +1,59 @@
+name: 'Disk Cleanup'
+description: 'Free up disk space by moving large unnecessary directories to a temporary location and deleting them in the background.'
+runs:
+  using: 'composite'
+  steps:
+    - name: Disk Cleanup by Deleting files
+      shell: bash
+      run: |
+        # Disk Cleanup by Deleting files
+        echo "::group::Disk Cleanup by Deleting files"
+        
+        echo "Instant relocation of unnecessary software..."
+        mkdir -p .background_trash/{1..18}
+        
+        safe_mv() {
+          if [ -e "$1" ]; then
+            sudo mv "$1" "$2"
+          fi
+        }
+        export -f safe_mv
+        
+        safe_mv /usr/share/dotnet ./.background_trash/1 &
+        safe_mv /usr/local/lib/android ./.background_trash/2 &
+        safe_mv /opt/ghc ./.background_trash/3 &
+        safe_mv /opt/hostedtoolcache/CodeQL ./.background_trash/4 &
+        safe_mv /usr/local/aws-sam-cli ./.background_trash/5 &
+        safe_mv /usr/local/share/chromium ./.background_trash/6 &
+        safe_mv /usr/local/share/powershell ./.background_trash/7 &
+        safe_mv /usr/local/lib/heroku ./.background_trash/8 &
+        safe_mv /usr/local/lib/node_modules ./.background_trash/9 &
+        safe_mv /opt/az ./.background_trash/10 &
+        safe_mv /opt/microsoft/powershell ./.background_trash/11 &
+        safe_mv /opt/hostedtoolcache/go ./.background_trash/12 &
+        safe_mv /opt/hostedtoolcache/PyPy ./.background_trash/13 &
+        safe_mv /opt/hostedtoolcache/node ./.background_trash/14 &
+        
+        sudo bash -c 'mv /usr/local/bin/aliyun /usr/local/bin/azcopy /usr/local/bin/bicep /usr/local/bin/cmake-gui /usr/local/bin/cpack /usr/local/bin/helm \
+        /usr/local/bin/hub /usr/local/bin/kubectl /usr/local/bin/minikube /usr/local/bin/node /usr/local/bin/packer /usr/local/bin/sam \
+        /usr/local/bin/stack /usr/local/bin/terraform /usr/local/bin/oc ./.background_trash/15 2>/dev/null || true' &
+        
+        sudo bash -c 'mv /usr/local/julia* ./.background_trash/16 2>/dev/null || true' &
+        sudo bash -c 'mv /usr/local/bin/pulumi* ./.background_trash/17 2>/dev/null || true' &
+        wait
+        
+        echo "Relocation complete."
+        echo "Launching background purge..."
+        (
+          sudo nice -n 19 ionice -c 3 rm -rf ./.background_trash
+          sudo apt-get purge -y firefox google-chrome-stable microsoft-edge-stable > /dev/null 2>&1 || true
+          sudo apt-get autoremove -y > /dev/null 2>&1 || true
+          sudo apt-get clean > /dev/null 2>&1 || true
+          if command -v docker >/dev/null 2>&1; then
+            docker rmi $(docker images -q) 2>/dev/null || true
+          fi
+        ) > /dev/null 2>&1 &
+        
+        disown
+        
+        echo "::endgroup::"

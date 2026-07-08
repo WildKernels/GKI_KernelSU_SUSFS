@@ -1,76 +1,151 @@
 name: 'Setup Networking Options'
 description: 'Set up kernel configuration fragment with required options'
 inputs:
+  version:
+    description: 'Kernel config version (e.g., android15-6.6)'
+    required: true
   kernel_version:
     description: 'Kernel version (e.g., 6.1)'
     required: true
   android_version:
     description: 'Android version (e.g., android14)'
     required: true
+  sublevel:
+    description: 'Kernel sublevel'
+    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Patch with BBRv3
-      if: ${{ inputs.kernel_version == '6.1' && false }}
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        set -euo pipefail
-        curl -L https://raw.githubusercontent.com/ahmed-alnassif/GKI-Duchamp/dev/kernel-patches/bbrv3/bbrv3.patch | patch -p1
+    - name: Enable IP Set & Firewall Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_IP_SET=y
+          CONFIG_IP_SET_MAX=65534
+          CONFIG_IP_SET_BITMAP_IP=y
+          CONFIG_IP_SET_BITMAP_IPMAC=y
+          CONFIG_IP_SET_BITMAP_PORT=y
+          CONFIG_IP_SET_HASH_IP=y
+          CONFIG_IP_SET_HASH_IPMARK=y
+          CONFIG_IP_SET_HASH_IPPORT=y
+          CONFIG_IP_SET_HASH_IPPORTIP=y
+          CONFIG_IP_SET_HASH_IPPORTNET=y
+          CONFIG_IP_SET_HASH_IPMAC=y
+          CONFIG_IP_SET_HASH_MAC=y
+          CONFIG_IP_SET_HASH_NETPORTNET=y
+          CONFIG_IP_SET_HASH_NET=y
+          CONFIG_IP_SET_HASH_NETNET=y
+          CONFIG_IP_SET_HASH_NETPORT=y
+          CONFIG_IP_SET_HASH_NETIFACE=y
+          CONFIG_IP_SET_LIST_SET=y
+          CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+          CONFIG_NETFILTER_XT_SET=y
+          CONFIG_NETFILTER_XT_TARGET_LOG=y
+          CONFIG_NETFILTER_XT_MATCH_RECENT=y
+          CONFIG_IP6_NF_NAT=y
+          CONFIG_IP6_NF_TARGET_MASQUERADE=y
 
-    - name: Add IP SET & IPv6_NAT Support
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
-        CONFIG_IP_SET=y
-        CONFIG_IP_SET_MAX=65534
-        CONFIG_IP_SET_BITMAP_IP=y
-        CONFIG_IP_SET_BITMAP_IPMAC=y
-        CONFIG_IP_SET_BITMAP_PORT=y
-        CONFIG_IP_SET_HASH_IP=y
-        CONFIG_IP_SET_HASH_IPMARK=y
-        CONFIG_IP_SET_HASH_IPPORT=y
-        CONFIG_IP_SET_HASH_IPPORTIP=y
-        CONFIG_IP_SET_HASH_IPPORTNET=y
-        CONFIG_IP_SET_HASH_IPMAC=y
-        CONFIG_IP_SET_HASH_MAC=y
-        CONFIG_IP_SET_HASH_NETPORTNET=y
-        CONFIG_IP_SET_HASH_NET=y
-        CONFIG_IP_SET_HASH_NETNET=y
-        CONFIG_IP_SET_HASH_NETPORT=y
-        CONFIG_IP_SET_HASH_NETIFACE=y
-        CONFIG_IP_SET_LIST_SET=y
-        CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
-        CONFIG_NETFILTER_XT_SET=y
-        CONFIG_NETFILTER_XT_TARGET_LOG=y
-        CONFIG_NETFILTER_XT_MATCH_RECENT=y
-        CONFIG_IP6_NF_NAT=y
-        CONFIG_IP6_NF_TARGET_MASQUERADE=y
-        EOF
+    - name: Enable TCP Congestion Control Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_TCP_CONG_ADVANCED=y
+          CONFIG_TCP_CONG_BBR=y
+          CONFIG_TCP_CONG_CUBIC=y
+          CONFIG_TCP_CONG_BIC=y
+          CONFIG_TCP_CONG_WESTWOOD=y
+          CONFIG_TCP_CONG_HTCP=y
+          CONFIG_DEFAULT_BBR=y
+          CONFIG_DEFAULT_TCP_CONG="bbr"
 
-    - name: Apply TCP Congestion Control
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
-        CONFIG_TCP_CONG_ADVANCED=y
-        CONFIG_TCP_CONG_BBR=y
-        CONFIG_TCP_CONG_CUBIC=y
-        CONFIG_TCP_CONG_BIC=y
-        CONFIG_TCP_CONG_WESTWOOD=y
-        CONFIG_TCP_CONG_HTCP=y
-        CONFIG_DEFAULT_BBR=y
-        CONFIG_DEFAULT_TCP_CONG="bbr"
-        CONFIG_NET_SCH_FQ=y
-        CONFIG_NET_SCH_FQ_CODEL=y
-        EOF
+    - name: Enable Traffic Shaping (Qdisc) Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_NET_SCH_FQ=y
+          CONFIG_NET_SCH_FQ_CODEL=y
+          CONFIG_NET_SCH_CAKE=y
 
+    - name: Enable Connection Marking Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_NET_ACT_CONNMARK=y
+
+    - name: Enable TTL/Hop Limit Target Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_IP_NF_TARGET_TTL=y
+          CONFIG_IP6_NF_TARGET_HL=y
+          CONFIG_IP6_NF_MATCH_HL=y
+
+    - name: Enable Wireguard VPN Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_WIREGUARD=y
+        
     - name: Apply Kernel Config for 5.10
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       if: inputs.kernel_version == '5.10'
       run: |
         sed -i 's/CONFIG_IP_SET_MAX/65534/g' net/netfilter/ipset/ip_set_core.c
-        
+
+    - name: Apply BBRv3 Patch
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        if [[ ${{ inputs.version }} == "android16-6.12" ]]; then
+          #patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"
+          echo "skipped"
+        elif [[ ${{ inputs.version }} == "android15-6.6" ]]; then
+          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"
+        elif [[ ${{ inputs.version }} == "android14-6.1" ]]; then
+          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android14-6.1.patch"
+        elif [[ ${{ inputs.version }} == "android14-5.15" ]]; then
+          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android14-6.1.patch"
+        elif [[ ${{ inputs.version }} == "android13-5.15" ]]; then
+          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android13-5.15.patch"
+        elif [[ ${{ inputs.version }} == "android13-5.10" ]]; then
+          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android12-5.10.patch"
+        elif [[ ${{ inputs.version }} == "android12-5.10" ]]; then
+          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android12-5.10.patch"
+        fi
+
+        if [[ ${{ inputs.version }} == "android12-5.10" || ${{ inputs.version }} == "android13-5.10" ]]; then
+          if ! grep -qF 'int proc_dou8vec_minmax(' ./include/linux/sysctl.h; then
+            patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/sysctl_add_proc_dou8vec_minmax.patch"
+            patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/sysctl_fix_data-races_in_proc_dou8vec_minmax.patch"
+          fi
+        fi
+
+        echo "✅ BBRv3 patches applied"
+
+    - name: Enable BBRv3 Kernel Config
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_TCP_CONG_BBR3=y
+
+    - name: Enable CIFS Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_CIFS=y
+          CONFIG_NETWORK_FILESYSTEMS=y
+          CONFIG_NETFS_SUPPORT=y
+          CONFIG_KEYS=y
+          CONFIG_CIFS_XATTR=ys
+          CONFIG_CIFS_POSIX=y
+   
+    - name: Fix CIFS on android16-6.12
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        if [[ ${{ inputs.version }} == "android16-6.12" ]]; then
+          sed -i '/"fs\/netfs\/netfs\.ko",/d' modules.bzl
+        fi

@@ -14,9 +14,6 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        # Add BBG to defconfig
-        echo "CONFIG_BBG=y" >> "${{ github.workspace }}/wild_gki.fragment"
-        
         # Modify security Kconfig to include baseband_guard in LSM
         sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' common/security/Kconfig
     
@@ -39,3 +36,9 @@ runs:
         # Extract and export BBG version info
         BBG_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
         echo "BBG_COMMIT=$BBG_COMMIT" >> $GITHUB_ENV
+
+    - name: Enable Kernel Configs
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_BBG=y

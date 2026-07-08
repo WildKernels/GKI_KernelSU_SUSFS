@@ -1,0 +1,82 @@
+name: 'Apply Performance Patches'
+description: 'Apply experimental kernel patches with version-specific logic'
+inputs:
+  kernel_version:
+    description: 'Kernel version (e.g., 6.1)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Apply Experimental Patches
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        KERNEL_VERSION="${{ inputs.kernel_version }}"
+        MIN_VERSION="5.16"
+
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/optimized_mem_operations.patch"
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/file_struct_8bytes_align.patch"
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/reduce_cache_pressure.patch"
+
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/mem_opt_prefetch.patch"
+
+        if [ "$(printf '%s\n' "$KERNEL_VERSION" "$MIN_VERSION" | sort -V | tail -n1)" = "$KERNEL_VERSION" ]; then
+          patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/optimise_memcmp.patch"
+        elif [ "$(printf '%s\n' "$KERNEL_VERSION" "5.11" | sort -V | tail -n1)" = "$KERNEL_VERSION" ]; then
+          sed -e 's/SYM_FUNC_START(__pi_memcmp)/SYM_FUNC_START_WEAK_PI(memcmp)/' -e 's/SYM_FUNC_END(__pi_memcmp)/SYM_FUNC_END_PI(memcmp)/' -e 's/SYM_FUNC_ALIAS_WEAK(memcmp, __pi_memcmp)/EXPORT_SYMBOL_NOKASAN(memcmp)/' "${{ github.workspace }}/kernel_patches/common/optimise_memcmp.patch" | patch -p1 --forward
+        else
+          echo "Optimised memcmp patch not found!"
+        fi
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/minimise_wakeup_time.patch"
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/int_sqrt.patch"
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/force_tcp_nodelay.patch"
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/reduce_gc_thread_sleep_time.patch"
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/add_timeout_wakelocks_globally.patch"
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/f2fs_reduce_congestion.patch"
+        patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/reduce_freeze_timeout.patch"
+
+        if [ "$(printf '%s\n' "$KERNEL_VERSION" "$MIN_VERSION" | sort -V | head -n1)" = "$KERNEL_VERSION" ]; then
+          patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/clear_page_16bytes_align.patch"
+        else
+          cat "${{ github.workspace }}/kernel_patches/common/clear_page_16bytes_align.patch" | sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' | patch -p1 -F3 --forward
+        fi
+
+        echo "Patching add_limitation_scaling_min_freq.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/add_limitation_scaling_min_freq.patch"
+        echo "Patching re_write_limitation_scaling_min_freq.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/re_write_limitation_scaling_min_freq.patch"
+        echo "Patching adjust_cpu_scan_order.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/adjust_cpu_scan_order.patch"
+        echo "Patching avoid_extra_s2idle_wake_attempts.patch"
+        FILE="drivers/base/power/wakeup.c"
+        # Check if the function exists
+        if grep -q "^void pm_system_wakeup(void)" "$FILE"; then
+            # Check if the line exists inside the function
+            if sed -n '/^void pm_system_wakeup(void)/,/^}/p' "$FILE" | grep -q 'suspend_abort_fs_sync();'; then
+                # Remove the line
+                sed -i '/^void pm_system_wakeup(void)/,/^}/{
+                    /suspend_abort_fs_sync();/d
+                }' "$FILE"
+            fi
+        fi
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/avoid_extra_s2idle_wake_attempts.patch"
+        echo "Patching disable_cache_hot_buddy.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/disable_cache_hot_buddy.patch"
+        echo "Patching f2fs_enlarge_min_fsync_blocks.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/f2fs_enlarge_min_fsync_blocks.patch"
+        echo "Patching increase_ext4_default_commit_age.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/increase_ext4_default_commit_age.patch"
+        echo "Patching increase_sk_mem_packets.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/increase_sk_mem_packets.patch"
+        echo "Patching reduce_pci_pme_wakeups.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/reduce_pci_pme_wakeups.patch"
+        echo "Patching silence_irq_cpu_logspam.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/silence_irq_cpu_logspam.patch"
+        echo "Patching silence_system_logspam.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/silence_system_logspam.patch"
+        echo "Patching use_unlikely_wrap_cpufreq.patch"
+        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/use_unlikely_wrap_cpufreq.patch"
+
+        echo "✅ Other patches applied"

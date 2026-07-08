@@ -89,42 +89,43 @@ runs:
     - name: 'Final Kernel Fixes Summary'
       shell: bash
       run: |
-        echo "## Final Kernel Fixes Summary" >> "$GITHUB_STEP_SUMMARY"
-        echo "" >> "$GITHUB_STEP_SUMMARY"
-        echo "**Kernel Version:** ${{ inputs.android_version }} + ${{ inputs.kernel_version }} (sublevel ${{ inputs.sublevel }})" >> "$GITHUB_STEP_SUMMARY"
-        echo "" >> "$GITHUB_STEP_SUMMARY"
-        echo "### Fix Status" >> "$GITHUB_STEP_SUMMARY"
+        SUMMARY_FILE="/tmp/kernel-fixes-summary.md"
+        echo "## Final Kernel Fixes Summary" >> "$SUMMARY_FILE"
+        echo "" >> "$SUMMARY_FILE"
+        echo "**Kernel Version:** ${{ inputs.android_version }} + ${{ inputs.kernel_version }} (sublevel ${{ inputs.sublevel }})" >> "$SUMMARY_FILE"
+        echo "" >> "$SUMMARY_FILE"
+        echo "### Fix Status" >> "$SUMMARY_FILE"
 
         GLIBC_VERSION="$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}')"
         if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n 1)" = "2.38" ]; then
           if [ "${MAKEFILE_FIXED:-false}" = "true" ]; then
-            echo "- Makefile EXTRA_CFLAGS fix: applied" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Makefile EXTRA_CFLAGS fix: applied" >> "$SUMMARY_FILE"
           elif [ "${MAKEFILE_FIXED:-false}" = "already_fixed" ]; then
-            echo "- Makefile EXTRA_CFLAGS fix: already present" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Makefile EXTRA_CFLAGS fix: already present" >> "$SUMMARY_FILE"
           else
-            echo "- Makefile EXTRA_CFLAGS fix: pattern not found" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Makefile EXTRA_CFLAGS fix: pattern not found" >> "$SUMMARY_FILE"
           fi
 
           if [ "${PARSE_OPTIONS_FIXED:-false}" = "true" ]; then
-            echo "- parse-options.c fix: applied" >> "$GITHUB_STEP_SUMMARY"
+            echo "- parse-options.c fix: applied" >> "$SUMMARY_FILE"
           else
-            echo "- parse-options.c fix: not applicable" >> "$GITHUB_STEP_SUMMARY"
+            echo "- parse-options.c fix: not applicable" >> "$SUMMARY_FILE"
           fi
         else
-          echo "- Makefile EXTRA_CFLAGS fix: skipped because GLIBC < 2.38" >> "$GITHUB_STEP_SUMMARY"
-          echo "- parse-options.c fix: skipped because GLIBC < 2.38" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Makefile EXTRA_CFLAGS fix: skipped because GLIBC < 2.38" >> "$SUMMARY_FILE"
+          echo "- parse-options.c fix: skipped because GLIBC < 2.38" >> "$SUMMARY_FILE"
         fi
 
         if [ "${MMAP_NAMESPACE_FIX:-not_applicable}" = "true" ]; then
-          echo "- fs/namespace.c include fix: applied" >> "$GITHUB_STEP_SUMMARY"
+          echo "- fs/namespace.c include fix: applied" >> "$SUMMARY_FILE"
         elif [ "${MMAP_NAMESPACE_FIX:-not_applicable}" = "already_present" ]; then
-          echo "- fs/namespace.c include fix: already present" >> "$GITHUB_STEP_SUMMARY"
+          echo "- fs/namespace.c include fix: already present" >> "$SUMMARY_FILE"
         else
-          echo "- fs/namespace.c include fix: not applicable" >> "$GITHUB_STEP_SUMMARY"
+          echo "- fs/namespace.c include fix: not applicable" >> "$SUMMARY_FILE"
         fi
 
         if [ "${MMAP_VM_FLAGS_FIX:-not_applicable}" = "true" ]; then
-          echo "- mm/mmap.c VM_PAD_MASK fix: applied" >> "$GITHUB_STEP_SUMMARY"
+          echo "- mm/mmap.c VM_PAD_MASK fix: applied" >> "$SUMMARY_FILE"
         else
-          echo "- mm/mmap.c VM_PAD_MASK fix: not applicable" >> "$GITHUB_STEP_SUMMARY"
+          echo "- mm/mmap.c VM_PAD_MASK fix: not applicable" >> "$SUMMARY_FILE"
         fi

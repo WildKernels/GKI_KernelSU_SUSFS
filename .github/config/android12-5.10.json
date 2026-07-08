@@ -146,6 +146,10 @@
       "date": "2025-12"
     },
     {
+      "sublevel": "252",
+      "date": "2026-04"
+    },
+    {
       "sublevel": "X",
       "date": "lts"
     }
