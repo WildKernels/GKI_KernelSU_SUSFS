@@ -1,0 +1,20 @@
+name: Setup SukiSU-Ultra
+description: Install SukiSU-Ultra builtin integration and optionally enable KPM
+
+inputs:
+  enable_kpm:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
+    - uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_KSU=y
+          ${{ inputs.enable_kpm == 'true' && 'CONFIG_KPM=y' || '' }}

@@ -1,0 +1,35 @@
+name: Validate Feature Selection
+description: Reject unsupported root solution and feature combinations before patching the kernel tree
+
+inputs:
+  root_solution:
+    required: true
+  enable_susfs:
+    required: true
+  enable_kpm:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        root="${{ inputs.root_solution }}"
+        susfs="${{ inputs.enable_susfs }}"
+        kpm="${{ inputs.enable_kpm }}"
+
+        case "$root" in
+          NONE|KERNELSU|SUKISU_ULTRA|KERNELSU_NEXT|KOWSU) ;;
+          *) echo "Invalid root solution: $root" >&2; exit 1 ;;
+        esac
+
+        if [[ "$root" == "NONE" && ( "$susfs" == "true" || "$kpm" == "true" ) ]]; then
+          echo "NONE cannot be combined with SUSFS or KPM" >&2
+          exit 1
+        fi
+
+        if [[ "$kpm" == "true" && "$root" != "SUKISU_ULTRA" ]]; then
+          echo "KPM requires SUKISU_ULTRA" >&2
+          exit 1
+        fi

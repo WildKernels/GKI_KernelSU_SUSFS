@@ -28,27 +28,36 @@ on:
           - android15-6.6
           - android16-6.12
         default: All
-      feature_set:
-        description: "Feature Set"
+      root_solution:
+        description: "Root solution"
         type: choice
         options:
-          - KSUN+SUSFS+BBG+NET+DS
-          - KSUN+SUSFS+BBG
-          - KSUN+SUSFS+NET
-          - KSUN+SUSFS+DS
-          - KSUN+SUSFS
-          - KSUN+BBG
-          - KSUN+NET
-          - KSUN+DS
-          - KSUN
           - NONE
-          - FULL
-        default: FULL
-      ksu_branch:
-        description: "KernelSU branch or commit (empty = latest dev-susfs branch tip)"
-        type: string
-        required: false
-        default: ""
+          - KERNELSU
+          - SUKISU_ULTRA
+          - KERNELSU_NEXT
+          - KOWSU
+        default: KERNELSU_NEXT
+      enable_susfs:
+        description: "Enable SUSFS"
+        type: boolean
+        default: true
+      enable_kpm:
+        description: "Enable KPM (SukiSU-Ultra only)"
+        type: boolean
+        default: false
+      enable_ds:
+        description: "Enable DroidSpaces-OSS"
+        type: boolean
+        default: true
+      enable_bbg:
+        description: "Enable Baseband Guard"
+        type: boolean
+        default: true
+      enable_net:
+        description: "Enable networking patches"
+        type: boolean
+        default: true
       susfs_commit_android12-5-10:
         description: "SUSFS commit for android12-5.10 (empty = latest branch tip)"
         type: string
@@ -124,8 +133,12 @@ jobs:
     uses: ./.github/workflows/prepare.yml
     with:
       config_file: .github/config/android12-5.10.json
-      feature_set: ${{ inputs.feature_set || 'FULL' }}
-      ksu_branch: ${{ inputs.ksu_branch }}
+      root_solution: ${{ inputs.root_solution }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_kpm: ${{ inputs.enable_kpm }}
+      enable_ds: ${{ inputs.enable_ds }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_net: ${{ inputs.enable_net }}
       susfs_commit: ${{ inputs.susfs_commit_android12-5-10 }}
     secrets: inherit
 
@@ -135,8 +148,12 @@ jobs:
     uses: ./.github/workflows/prepare.yml
     with:
       config_file: .github/config/android13-5.10.json
-      feature_set: ${{ inputs.feature_set || 'FULL' }}
-      ksu_branch: ${{ inputs.ksu_branch }}
+      root_solution: ${{ inputs.root_solution }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_kpm: ${{ inputs.enable_kpm }}
+      enable_ds: ${{ inputs.enable_ds }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_net: ${{ inputs.enable_net }}
       susfs_commit: ${{ inputs.susfs_commit_android13-5-10 }}
     secrets: inherit
 
@@ -146,8 +163,12 @@ jobs:
     uses: ./.github/workflows/prepare.yml
     with:
       config_file: .github/config/android13-5.15.json
-      feature_set: ${{ inputs.feature_set || 'FULL' }}
-      ksu_branch: ${{ inputs.ksu_branch }}
+      root_solution: ${{ inputs.root_solution }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_kpm: ${{ inputs.enable_kpm }}
+      enable_ds: ${{ inputs.enable_ds }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_net: ${{ inputs.enable_net }}
       susfs_commit: ${{ inputs.susfs_commit_android13-5-15 }}
     secrets: inherit
 
@@ -157,8 +178,12 @@ jobs:
     uses: ./.github/workflows/prepare.yml
     with:
       config_file: .github/config/android14-5.15.json
-      feature_set: ${{ inputs.feature_set || 'FULL' }}
-      ksu_branch: ${{ inputs.ksu_branch }}
+      root_solution: ${{ inputs.root_solution }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_kpm: ${{ inputs.enable_kpm }}
+      enable_ds: ${{ inputs.enable_ds }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_net: ${{ inputs.enable_net }}
       susfs_commit: ${{ inputs.susfs_commit_android14-5-15 }}
     secrets: inherit
 
@@ -168,8 +193,12 @@ jobs:
     uses: ./.github/workflows/prepare.yml
     with:
       config_file: .github/config/android14-6.1.json
-      feature_set: ${{ inputs.feature_set || 'FULL' }}
-      ksu_branch: ${{ inputs.ksu_branch }}
+      root_solution: ${{ inputs.root_solution }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_kpm: ${{ inputs.enable_kpm }}
+      enable_ds: ${{ inputs.enable_ds }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_net: ${{ inputs.enable_net }}
       susfs_commit: ${{ inputs.susfs_commit_android14-6-1 }}
     secrets: inherit
 
@@ -179,8 +208,12 @@ jobs:
     uses: ./.github/workflows/prepare.yml
     with:
       config_file: .github/config/android15-6.6.json
-      feature_set: ${{ inputs.feature_set || 'FULL' }}
-      ksu_branch: ${{ inputs.ksu_branch }}
+      root_solution: ${{ inputs.root_solution }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_kpm: ${{ inputs.enable_kpm }}
+      enable_ds: ${{ inputs.enable_ds }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_net: ${{ inputs.enable_net }}
       susfs_commit: ${{ inputs.susfs_commit_android15-6-6 }}
     secrets: inherit
 
@@ -190,8 +223,12 @@ jobs:
     uses: ./.github/workflows/prepare.yml
     with:
       config_file: .github/config/android16-6.12.json
-      feature_set: ${{ inputs.feature_set || 'FULL' }}
-      ksu_branch: ${{ inputs.ksu_branch }}
+      root_solution: ${{ inputs.root_solution }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_kpm: ${{ inputs.enable_kpm }}
+      enable_ds: ${{ inputs.enable_ds }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_net: ${{ inputs.enable_net }}
       susfs_commit: ${{ inputs.susfs_commit_android16-6-12 }}
     secrets: inherit
 
@@ -309,8 +346,8 @@ jobs:
         {
           echo "# 📋 Build Summary — $(date -u '+%Y-%m-%d %H:%M UTC')"
           echo
-          echo "**Feature Set:** ${{ inputs.feature_set }}"
-          echo "**KSU Branch:** ${{ inputs.ksu_branch || 'latest dev' }}"
+          echo "**Root Solution:** ${{ inputs.root_solution }}"
+          echo "**Features:** SUSFS=${{ inputs.enable_susfs }}, KPM=${{ inputs.enable_kpm }}, DS=${{ inputs.enable_ds }}, BBG=${{ inputs.enable_bbg }}, NET=${{ inputs.enable_net }}"
           echo
           
           # Count successes and failures
@@ -405,7 +442,7 @@ jobs:
           local job_name="$2"
           local result="$3"
           
-          if [[ "$current_type" == "all" || "$current_type" == "$target" ]]; then
+          if [[ "$current_type" == "All" || "$current_type" == "$target" ]]; then
             if [[ "$result" != "success" ]]; then
               echo "Required job $job_name did not succeed (result: $result)"
               failed=1
@@ -493,11 +530,13 @@ jobs:
       run: |
         set -euo pipefail
 
-        KSU_REPO="https://github.com/pershoot/KernelSU-Next.git"
-        KSU_INPUT="${{ inputs.ksu_branch }}"
-        if [ -z "$KSU_INPUT" ]; then
-          KSU_INPUT="dev-susfs"
-        fi
+        case "${{ inputs.root_solution }}" in
+          KERNELSU) KSU_REPO="https://github.com/tiann/KernelSU.git"; KSU_INPUT="main" ;;
+          SUKISU_ULTRA) KSU_REPO="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"; KSU_INPUT="main" ;;
+          KERNELSU_NEXT) KSU_REPO="https://github.com/KernelSU-Next/KernelSU-Next.git"; KSU_INPUT="dev" ;;
+          KOWSU) KSU_REPO="https://github.com/deepongi-labs/KernelSU-KoWSU.git"; KSU_INPUT="master" ;;
+          NONE) echo "No root solution selected"; exit 0 ;;
+        esac
 
         # Try as branch first, fall back to commit
         if git ls-remote --heads "$KSU_REPO" "$KSU_INPUT" | grep -q .; then
@@ -507,7 +546,7 @@ jobs:
           KSUN_COMMIT=$(git rev-parse HEAD)
         else
           echo "Cloning KernelSU-Next from dev-susfs branch, then checking out commit: $KSU_INPUT"
-          git clone --branch dev-susfs "$KSU_REPO" /tmp/kernelsu-next
+          git clone --branch "$KSU_INPUT" "$KSU_REPO" /tmp/kernelsu-next
           cd /tmp/kernelsu-next
           git fetch --depth=50 origin "$KSU_INPUT"
           git checkout "$KSU_INPUT"
@@ -522,12 +561,7 @@ jobs:
         # Extract git tag
         KSU_GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
 
-        MANAGER_RUN_ID=$(curl -fsSL "https://api.github.com/repos/pershoot/KernelSU-Next/actions/workflows/build-manager-ci.yml/runs?head_sha=${KSUN_COMMIT}" | jq -r '.workflow_runs[0].id // empty')
-        if [[ -n "${MANAGER_RUN_ID:-}" ]]; then
-          KSU_MANAGER="https://github.com/pershoot/KernelSU-Next/actions/runs/${MANAGER_RUN_ID}"
-        else
-          KSU_MANAGER="https://github.com/pershoot/KernelSU-Next/actions/workflows/build-manager-ci.yml"
-        fi
+        KSU_MANAGER="${KSU_REPO%.git}"
 
         echo "Commits count: $COMMITS_COUNT"
         echo "KSU Version: $KSU_VERSION"

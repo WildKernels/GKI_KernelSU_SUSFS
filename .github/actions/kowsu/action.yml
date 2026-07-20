@@ -1,0 +1,18 @@
+name: Setup KoWSU
+description: Install the requested deepongi-labs KoWSU source tree
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        rm -rf KernelSU-KoWSU common/drivers/kernelsu
+        git clone --depth=1 --branch master https://github.com/deepongi-labs/KernelSU-KoWSU.git KernelSU-KoWSU
+        ln -s "$(realpath --relative-to=common/drivers KernelSU-KoWSU/kernel)" common/drivers/kernelsu
+        grep -qF 'obj-$(CONFIG_KSU) += kernelsu/' common/drivers/Makefile || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> common/drivers/Makefile
+        grep -qF 'source "drivers/kernelsu/Kconfig"' common/drivers/Kconfig || sed -i '/^endmenu/i source "drivers/kernelsu/Kconfig"' common/drivers/Kconfig
+    - uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: CONFIG_KSU=y

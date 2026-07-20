@@ -1,0 +1,14 @@
+name: Setup KernelSU-Next
+description: Install KernelSU-Next from its upstream dev branch
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
+    - uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: CONFIG_KSU=y

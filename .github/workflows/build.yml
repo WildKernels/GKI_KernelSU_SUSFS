@@ -24,13 +24,24 @@ on:
       variant:
         required: false
         type: string
-      feature_set:
+      root_solution:
         required: true
         type: string
-      ksu_branch:
-        required: false
-        type: string
-        default: ""
+      enable_susfs:
+        required: true
+        type: boolean
+      enable_kpm:
+        required: true
+        type: boolean
+      enable_ds:
+        required: true
+        type: boolean
+      enable_bbg:
+        required: true
+        type: boolean
+      enable_net:
+        required: true
+        type: boolean
       susfs_commit:
         required: false
         type: string
@@ -138,16 +149,36 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
 
-    - name: Setup KernelSU-Next
-      if: contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL'
-      uses: ./.github/actions/kernelsu
+    - name: Validate root and feature selection
+      uses: ./.github/actions/validate-feature-selection
       with:
-        ksu_branch: ${{ inputs.ksu_branch }}
+        root_solution: ${{ inputs.root_solution }}
+        enable_susfs: ${{ inputs.enable_susfs }}
+        enable_kpm: ${{ inputs.enable_kpm }}
+
+    - name: Setup KernelSU
+      if: inputs.root_solution == 'KERNELSU'
+      uses: ./.github/actions/kernelsu
+
+    - name: Setup SukiSU-Ultra
+      if: inputs.root_solution == 'SUKISU_ULTRA'
+      uses: ./.github/actions/sukisu
+      with:
+        enable_kpm: ${{ inputs.enable_kpm }}
+
+    - name: Setup KernelSU-Next
+      if: inputs.root_solution == 'KERNELSU_NEXT'
+      uses: ./.github/actions/kernelsu-next
+
+    - name: Setup KoWSU
+      if: inputs.root_solution == 'KOWSU'
+      uses: ./.github/actions/kowsu
 
     - name: SUSFS
-      if: contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL'
+      if: inputs.enable_susfs
       uses: ./.github/actions/susfs
       with:
+        root_solution: ${{ inputs.root_solution }}
         susfs_commit: ${{ inputs.susfs_commit }}
         version: ${{ inputs.version }}
         android_version: ${{ inputs.android_version }}
@@ -156,11 +187,11 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: Baseband Guard
-      if: (contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'FULL')
+      if: inputs.enable_bbg
       uses: ./.github/actions/bbg
 
     - name: Setup Networking
-      if: contains(inputs.feature_set, 'NET') || inputs.feature_set == 'FULL'
+      if: inputs.enable_net
       uses: ./.github/actions/networking
       with:
         version: ${{ inputs.version }}
@@ -169,7 +200,7 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: DroidSpaces-OSS Patches
-      if: contains(inputs.feature_set, 'DS') || inputs.feature_set == 'FULL'
+      if: inputs.enable_ds
       uses: ./.github/actions/droidspaces
       with:
         version: ${{ inputs.version }}
@@ -231,6 +262,7 @@ jobs:
       uses: ./.github/actions/apply-kernel-branding
       with:
         variant: ${{ inputs.variant }}
+        root_solution: ${{ inputs.root_solution }}
         kernel_version: ${{ inputs.kernel_version }}
         android_version: ${{ inputs.android_version }}
         version: ${{ inputs.version }}
@@ -339,6 +371,7 @@ jobs:
       with:
         version: ${{ inputs.version }}
         bypass: false
+        apply_kpm_patch: ${{ inputs.enable_kpm }}
 
     - name: Get Cache Stats
       uses: ./.github/actions/cache-stats
@@ -375,6 +408,7 @@ jobs:
       with:
         bypass: true
         version: ${{ inputs.version }}
+        apply_kpm_patch: ${{ inputs.enable_kpm }}
 
     - name: 📋 Consolidated Build Summary
       if: ${{ always() }}
@@ -429,7 +463,8 @@ jobs:
           echo "| **KSU Version** | ${KSU_VER} |"
           echo "| **KSU Tag** | ${KSU_TAG} |"
           echo "| **SUSFS Version** | ${SUSFS_VER} |"
-          echo "| **Feature Set** | ${{ inputs.feature_set }} |"
+          echo "| **Root Solution** | ${{ inputs.root_solution }} |"
+          echo "| **Features** | SUSFS=${{ inputs.enable_susfs }}, KPM=${{ inputs.enable_kpm }}, DS=${{ inputs.enable_ds }}, BBG=${{ inputs.enable_bbg }}, NET=${{ inputs.enable_net }} |"
           echo "| **Variant** | ${{ inputs.variant }} |"
           echo
           

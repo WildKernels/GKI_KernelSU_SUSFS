@@ -1,6 +1,9 @@
 name: Setup SUSFS
 description: Clone and apply SUSFS patches with version-specific fixes
 inputs:
+  root_solution:
+    description: 'Selected root solution'
+    required: true
   susfs_commit:
     description: 'SUSFS commit hash (empty = latest on auto-derived gki-{version} branch)'
     required: false
@@ -25,6 +28,7 @@ runs:
   using: composite
   steps:
     - name: Setup SUSFS Branch
+      if: inputs.root_solution != 'SUKISU_ULTRA'
       shell: bash
       run: |
         set -euo pipefail
@@ -52,6 +56,18 @@ runs:
 
         git cherry-pick "$COMMIT1"
         git cherry-pick "$COMMIT2"
+
+    - name: Setup SukiSU SUSFS Branch
+      if: inputs.root_solution == 'SUKISU_ULTRA'
+      shell: bash
+      run: |
+        set -euo pipefail
+        SUSFS_BRANCH="gki-${{ inputs.version }}"
+        git clone --depth=1 --branch "$SUSFS_BRANCH" https://github.com/ShirkNeko/susfs4ksu.git susfs4ksu
+        if [ -n "${{ inputs.susfs_commit }}" ]; then
+          git -C susfs4ksu fetch --depth=50 origin "${{ inputs.susfs_commit }}"
+          git -C susfs4ksu checkout "${{ inputs.susfs_commit }}"
+        fi
 
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config
@@ -210,6 +226,15 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
+
+    - name: Apply SukiSU SUSFS Companion Patch
+      if: inputs.root_solution == 'SUKISU_ULTRA'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        git clone --depth=1 https://github.com/ShirkNeko/SukiSU_patch.git "${{ runner.temp }}/SukiSU_patch"
+        patch -p1 -F 3 < "${{ runner.temp }}/SukiSU_patch/69_hide_stuff.patch"
 
     - name: Revert Android 12 5.10 Fake Patches
       shell: bash

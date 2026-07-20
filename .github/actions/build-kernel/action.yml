@@ -7,6 +7,9 @@ inputs:
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
     required: true
+  apply_kpm_patch:
+    description: 'Apply the SukiSU KPM Image patch after compilation'
+    required: true
 
 runs:
   using: composite
@@ -55,9 +58,9 @@ runs:
         BUILD_CONFIG=common/build.config.gki.aarch64 \
         build/build.sh -j"$(nproc)" \
         CC="/usr/bin/ccache clang" \
-        CXX="/usr/bin/ccache clang+" \
+        CXX="/usr/bin/ccache clang++" \
         HOSTCC="/usr/bin/ccache clang" \
-        HOSTCXX="/usr/bin/ccache clang+"
+        HOSTCXX="/usr/bin/ccache clang++"
       else
         if [ "${{ inputs.bypass }}" = "false" ]; then
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
@@ -68,6 +71,21 @@ runs:
           --disk_cache=/home/runner/.cache/bazel \
           //common:kernel_aarch64/Image
       fi
+
+  - name: Apply KPM Image Patch
+    if: ${{ inputs.apply_kpm_patch == 'true' && inputs.version != 'android15-6.6' }}
+    shell: bash
+    working-directory: ${{ github.workspace }}/kernel
+    run: |
+      set -euo pipefail
+      IMAGE_DIR="bazel-bin/common/kernel_aarch64"
+      [ -f "$IMAGE_DIR/Image" ] || IMAGE_DIR="/home/runner/out/dist"
+      test -f "$IMAGE_DIR/Image"
+      cd "$IMAGE_DIR"
+      curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o kpm-patch
+      chmod +x kpm-patch && ./kpm-patch
+      test -f oImage && mv oImage Image
+      rm -f kpm-patch
 
   - name: 'Gather Build Artifacts'
     shell: bash

@@ -144,7 +144,7 @@ runs:
           CONFIG_NETWORK_FILESYSTEMS=y
           CONFIG_NETFS_SUPPORT=y
           CONFIG_KEYS=y
-          CONFIG_CIFS_XATTR=ys
+          CONFIG_CIFS_XATTR=y
           CONFIG_CIFS_POSIX=y
 
     - name: Fix CIFS on android16-6.12

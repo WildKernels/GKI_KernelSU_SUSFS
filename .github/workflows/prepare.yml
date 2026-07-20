@@ -7,15 +7,24 @@ on:
         description: "Path to the JSON config file"
         required: true
         type: string
-      feature_set:
-        description: "Feature Set"
-        required: false
+      root_solution:
+        required: true
         type: string
-      ksu_branch:
-        description: "KernelSU branch or commit (empty = latest dev)"
-        required: false
-        type: string
-        default: ""
+      enable_susfs:
+        required: true
+        type: boolean
+      enable_kpm:
+        required: true
+        type: boolean
+      enable_ds:
+        required: true
+        type: boolean
+      enable_bbg:
+        required: true
+        type: boolean
+      enable_net:
+        required: true
+        type: boolean
       susfs_commit:
         description: "SUSFS commit hash (empty = latest on auto-derived branch)"
         required: false
@@ -91,7 +100,11 @@ jobs:
       sublevel: ${{ matrix.sublevel }}
       os_patch_level: ${{ matrix.os_patch_level }}
       variant: ${{ matrix.variant }}
-      feature_set: ${{ inputs.feature_set }}
-      ksu_branch: ${{ inputs.ksu_branch }}
+      root_solution: ${{ inputs.root_solution }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_kpm: ${{ inputs.enable_kpm }}
+      enable_ds: ${{ inputs.enable_ds }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_net: ${{ inputs.enable_net }}
       susfs_commit: ${{ inputs.susfs_commit }}
     secrets: inherit
