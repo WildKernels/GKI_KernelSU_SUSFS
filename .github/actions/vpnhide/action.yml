@@ -1,0 +1,95 @@
+name: 'Setup VPNHide'
+description: 'Clones private VPNHide repository, applies patches and configures built-in modules'
+inputs:
+  token:
+    description: 'Personal Access Token to access the private repo'
+    required: true
+  version:
+    description: 'Kernel version (e.g., android15-6.6)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Clone VPNHide Private Repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git clone --depth=1 https://x-access-token:${{ inputs.token }}@github.com/soranerai/vpnhide_next_private.git vpnhide_private
+
+    - name: Apply VPNHide Patches
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Run the apply.sh script targeting the common kernel folder
+        bash vpnhide_private/kpatch/scripts/apply.sh "${{ github.workspace }}/kernel/common" "${{ inputs.version }}"
+
+    - name: Configure VPNHide and Built-in modules
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        # 1. Append CONFIG fragment to gki_defconfig
+        CFG_FILE="arch/arm64/configs/gki_defconfig"
+        if ! grep -q "CONFIG_VPNHIDE" "$CFG_FILE"; then
+          echo "Appending VPNHide and built-in driver configs to $CFG_FILE..."
+          cat >> "$CFG_FILE" <<'EOF'
+
+# --- VPNHide ---
+CONFIG_VPNHIDE=y
+# --- rfkill built-in: cfg80211 depends on rfkill symbols at load time;
+#     if rfkill.ko is not yet loaded, cfg80211 fails with Unknown symbol ---
+CONFIG_RFKILL=y
+# --- BT HCI core built-in: bt_drv_6878 depends on hci_* symbols;
+#     if bluetooth.ko is not yet loaded, bt_drv fails with Unknown symbol ---
+CONFIG_BT=y
+# --- ARC4 built-in: mac80211 depends on arc4_setkey/arc4_crypt symbols;
+#     if libarc4.ko is not yet loaded, mac80211 fails with Unknown symbol ---
+CONFIG_CRYPTO_LIB_ARC4=y
+EOF
+        fi
+
+        # 2. Modify modules.bzl to remove the files since they are now built-in
+        MODULES_BZL="modules.bzl"
+        if [ -f "$MODULES_BZL" ]; then
+          if grep -q '"net/rfkill/rfkill.ko"' "$MODULES_BZL"; then
+              sed -i '/"net\/rfkill\/rfkill.ko",/d' "$MODULES_BZL"
+              echo "Removed rfkill.ko from modules.bzl"
+          fi
+          if grep -q '"fs/netfs/netfs.ko"' "$MODULES_BZL"; then
+              sed -i '/"fs\/netfs\/netfs.ko",/d' "$MODULES_BZL"
+              echo "Removed netfs.ko from modules.bzl"
+          fi
+          if grep -q '"drivers/android/rust_binder.ko"' "$MODULES_BZL"; then
+              sed -i '/"drivers\/android\/rust_binder.ko",/d' "$MODULES_BZL"
+              echo "Removed rust_binder.ko from modules.bzl"
+          fi
+          if grep -q '"net/bluetooth/bluetooth.ko"' "$MODULES_BZL"; then
+              sed -i '/"net\/bluetooth\/bluetooth.ko",/d' "$MODULES_BZL"
+              echo "Removed bluetooth.ko from modules.bzl"
+          fi
+          if grep -q '"lib/crypto/libarc4.ko"' "$MODULES_BZL"; then
+              sed -i '/"lib\/crypto\/libarc4.ko",/d' "$MODULES_BZL"
+              echo "Removed libarc4.ko from modules.bzl"
+              
+              CRYPTO_KCONFIG="lib/crypto/Kconfig"
+              if [ -f "$CRYPTO_KCONFIG" ]; then
+                  sed -i '/config CRYPTO_LIB_ARC4/{n;s/tristate/bool/}' "$CRYPTO_KCONFIG"
+                  echo "Changed CRYPTO_LIB_ARC4 to bool in $CRYPTO_KCONFIG"
+              fi
+          fi
+        fi
+
+        # 3. Disable check_defconfig in BUILD.bazel if present
+        BUILD_BAZEL="BUILD.bazel"
+        if [ -f "$BUILD_BAZEL" ]; then
+          sed -i '/check_defconfig =/d' "$BUILD_BAZEL"
+          sed -i 's/common_kernel(/common_kernel(\n    check_defconfig = "disabled",/g' "$BUILD_BAZEL"
+          echo "Disabled check_defconfig in BUILD.bazel"
+        fi
+
+    - name: Cleanup Private Repository
+      shell: bash
+      run: |
+        rm -rf vpnhide_private

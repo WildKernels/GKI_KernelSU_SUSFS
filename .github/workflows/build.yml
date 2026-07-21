@@ -155,6 +155,13 @@ jobs:
         os_patch_level: ${{ inputs.os_patch_level }}
         sublevel: ${{ steps.extract.outputs.sublevel }}
 
+    - name: Setup VPNHide
+      if: contains(inputs.feature_set, 'VPNHIDE') || inputs.feature_set == 'FULL'
+      uses: ./.github/actions/vpnhide
+      with:
+        token: ${{ secrets.VPNHIDE_PRIVATE_TOKEN }}
+        version: ${{ inputs.version }}
+
     - name: Baseband Guard
       if: (contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'FULL')
       uses: ./.github/actions/bbg
