@@ -44,8 +44,8 @@ runs:
 
         cd susfs4ksu
         
-        COMMIT1="8d2420be13e43d4cc0d80215d08ed475081a1404"                    # fill in
-        COMMIT2="ee71ca33d08710d686f2bdba27cacefe9e615fb9"                    # fill in
+        COMMIT1="532ae5e7f05bef75011acb378e38f023a6b51b3f"                    # fill in
+        COMMIT2="976de54d311f7369030a242060cade8d8abb7839"                    # fill in
 
         git remote add pershoot https://gitlab.com/pershoot/susfs4ksu.git
         git fetch pershoot gki-android14-6.1-dev
