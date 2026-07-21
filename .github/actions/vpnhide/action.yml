@@ -34,8 +34,7 @@ runs:
         CFG_FILE="arch/arm64/configs/gki_defconfig"
         if ! grep -q "CONFIG_VPNHIDE" "$CFG_FILE"; then
           echo "Appending VPNHide and built-in driver configs to $CFG_FILE..."
-          cat <<'EOF' | sed 's/^[[:space:]]*//' >> "$CFG_FILE"
-
+          echo '
           # --- VPNHide ---
           CONFIG_VPNHIDE=y
           # --- rfkill built-in: cfg80211 depends on rfkill symbols at load time;
@@ -46,8 +45,7 @@ runs:
           CONFIG_BT=y
           # --- ARC4 built-in: mac80211 depends on arc4_setkey/arc4_crypt symbols;
           #     if libarc4.ko is not yet loaded, mac80211 fails with Unknown symbol ---
-          CONFIG_CRYPTO_LIB_ARC4=y
-          EOF
+          CONFIG_CRYPTO_LIB_ARC4=y' | sed 's/^[[:space:]]*//' >> "$CFG_FILE"
         fi
 
         # 2. Modify modules.bzl to remove the files since they are now built-in
