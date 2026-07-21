@@ -20,6 +20,13 @@ class WorkflowContractTests(unittest.TestCase):
 
         self.assertIn('"$kpm" == "true" && "$root" != "SUKISU_ULTRA"', action)
 
+    def test_sukisu_ultra_uses_builtin_branch(self) -> None:
+        action = self.read(".github/actions/sukisu/action.yml")
+        workflow = self.read(".github/workflows/main.yml")
+
+        self.assertIn("bash -s builtin", action)
+        self.assertIn('SUKISU_ULTRA) KSU_REPO="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"; KSU_INPUT="builtin" ;;', workflow)
+
     def test_branding_contains_both_approved_suffixes(self) -> None:
         action = self.read(".github/actions/apply-kernel-branding/action.yml")
 

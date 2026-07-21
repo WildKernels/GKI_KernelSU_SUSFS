@@ -532,7 +532,7 @@ jobs:
 
         case "${{ inputs.root_solution }}" in
           KERNELSU) KSU_REPO="https://github.com/tiann/KernelSU.git"; KSU_INPUT="main" ;;
-          SUKISU_ULTRA) KSU_REPO="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"; KSU_INPUT="main" ;;
+          SUKISU_ULTRA) KSU_REPO="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"; KSU_INPUT="builtin" ;;
           KERNELSU_NEXT) KSU_REPO="https://github.com/KernelSU-Next/KernelSU-Next.git"; KSU_INPUT="dev" ;;
           KOWSU) KSU_REPO="https://github.com/deepongi-labs/KernelSU-KoWSU.git"; KSU_INPUT="master" ;;
           NONE) echo "No root solution selected"; exit 0 ;;
