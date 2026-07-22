@@ -59,17 +59,14 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
       run: |
-        cp ${{ github.workspace }}/kernel_patches/wild/ksun-4c9737a-susfs-v2.1.0-a14-6.1-ef16cbce.patch ./
-        patch -p1 < ksun-4c9737a-susfs-v2.1.0-a14-6.1-ef16cbce.patch
+        SUSFS_PATCH=$(find ${{ github.workspace }}/kernel_patches/wild -name "*susfs*.patch" | head -n 1)
+        if [ -z "$SUSFS_PATCH" ]; then
+          echo "Error: No SUSFS KernelSU patch found"
+          exit 1
+        fi
 
-    - name: Apply Kernel SUSFS Patches
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        # Apply base SUSFS patches
-        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
-        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
-        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
+        cp "$SUSFS_PATCH" ./
+        patch -p1 < "$(basename "$SUSFS_PATCH")"
 
     - name: Apply Android 12 5.10 Fake Patches
       shell: bash
