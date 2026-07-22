@@ -48,12 +48,12 @@ runs:
           CONFIG_CRYPTO_LIB_ARC4=y
           # --- NetFS built-in ---
           CONFIG_NETFS_SUPPORT=y
-          # --- Rust Binder built-in ---
-          CONFIG_ANDROID_BINDER_IPC_RUST=y
-          CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=y' | sed 's/^[[:space:]]*//' >> "$CFG_FILE"
+          # --- Disable Rust Binder module (removed from modules.bzl) ---
+          CONFIG_ANDROID_BINDER_IPC_RUST=n
+          CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=n' | sed 's/^[[:space:]]*//' >> "$CFG_FILE"
 
-          sed -i 's/CONFIG_ANDROID_BINDER_IPC_RUST=m/CONFIG_ANDROID_BINDER_IPC_RUST=y/' "$CFG_FILE"
-          sed -i 's/CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=m/CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=y/' "$CFG_FILE"
+          sed -i 's/CONFIG_ANDROID_BINDER_IPC_RUST=.*/CONFIG_ANDROID_BINDER_IPC_RUST=n/' "$CFG_FILE"
+          sed -i 's/CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=.*/CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=n/' "$CFG_FILE"
         fi
 
         # 2. Modify modules.bzl to remove the files since they are now built-in
