@@ -47,13 +47,7 @@ runs:
           #     if libarc4.ko is not yet loaded, mac80211 fails with Unknown symbol ---
           CONFIG_CRYPTO_LIB_ARC4=y
           # --- NetFS built-in ---
-          CONFIG_NETFS_SUPPORT=y
-          # --- Disable Rust Binder module (removed from modules.bzl) ---
-          CONFIG_ANDROID_BINDER_IPC_RUST=n
-          CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=n' | sed 's/^[[:space:]]*//' >> "$CFG_FILE"
-
-          sed -i 's/CONFIG_ANDROID_BINDER_IPC_RUST=.*/CONFIG_ANDROID_BINDER_IPC_RUST=n/' "$CFG_FILE"
-          sed -i 's/CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=.*/CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=n/' "$CFG_FILE"
+          CONFIG_NETFS_SUPPORT=y' | sed 's/^[[:space:]]*//' >> "$CFG_FILE"
         fi
 
         # 2. Modify modules.bzl to remove the files since they are now built-in
@@ -66,14 +60,6 @@ runs:
           if grep -q '"fs/netfs/netfs.ko"' "$MODULES_BZL"; then
               sed -i '/"fs\/netfs\/netfs.ko",/d' "$MODULES_BZL"
               echo "Removed netfs.ko from modules.bzl"
-          fi
-          if grep -q '"drivers/android/rust_binder.ko"' "$MODULES_BZL"; then
-              sed -i '/"drivers\/android\/rust_binder.ko",/d' "$MODULES_BZL"
-              echo "Removed drivers/android/rust_binder.ko from modules.bzl"
-          fi
-          if grep -q '"drivers/android/binder/rust_binder.ko"' "$MODULES_BZL"; then
-              sed -i '/"drivers\/android\/binder\/rust_binder.ko",/d' "$MODULES_BZL"
-              echo "Removed drivers/android/binder/rust_binder.ko from modules.bzl"
           fi
           if grep -q '"net/bluetooth/bluetooth.ko"' "$MODULES_BZL"; then
               sed -i '/"net\/bluetooth\/bluetooth.ko",/d' "$MODULES_BZL"
