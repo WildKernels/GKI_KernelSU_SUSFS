@@ -69,7 +69,11 @@ runs:
           fi
           if grep -q '"drivers/android/rust_binder.ko"' "$MODULES_BZL"; then
               sed -i '/"drivers\/android\/rust_binder.ko",/d' "$MODULES_BZL"
-              echo "Removed rust_binder.ko from modules.bzl"
+              echo "Removed drivers/android/rust_binder.ko from modules.bzl"
+          fi
+          if grep -q '"drivers/android/binder/rust_binder.ko"' "$MODULES_BZL"; then
+              sed -i '/"drivers\/android\/binder\/rust_binder.ko",/d' "$MODULES_BZL"
+              echo "Removed drivers/android/binder/rust_binder.ko from modules.bzl"
           fi
           if grep -q '"net/bluetooth/bluetooth.ko"' "$MODULES_BZL"; then
               sed -i '/"net\/bluetooth\/bluetooth.ko",/d' "$MODULES_BZL"
