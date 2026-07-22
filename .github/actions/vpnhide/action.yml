@@ -83,7 +83,7 @@ runs:
         BUILD_BAZEL="BUILD.bazel"
         if [ -f "$BUILD_BAZEL" ]; then
           sed -i '/check_defconfig =/d' "$BUILD_BAZEL"
-          sed -i 's/common_kernel(/common_kernel(\n    check_defconfig = "disabled",/g' "$BUILD_BAZEL"
+          sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' "$BUILD_BAZEL"
           echo "Disabled check_defconfig in BUILD.bazel"
         fi
 

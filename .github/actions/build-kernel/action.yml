@@ -60,6 +60,7 @@ runs:
         HOSTCXX="/usr/bin/ccache clang+"
       else
         if [ "${{ inputs.bypass }}" = "false" ]; then
+          sed -i '/check_defconfig =/d' common/BUILD.bazel
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
         fi
         tools/bazel build \
