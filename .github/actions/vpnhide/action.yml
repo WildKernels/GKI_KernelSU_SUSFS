@@ -45,7 +45,11 @@ runs:
           CONFIG_BT=y
           # --- ARC4 built-in: mac80211 depends on arc4_setkey/arc4_crypt symbols;
           #     if libarc4.ko is not yet loaded, mac80211 fails with Unknown symbol ---
-          CONFIG_CRYPTO_LIB_ARC4=y' | sed 's/^[[:space:]]*//' >> "$CFG_FILE"
+          CONFIG_CRYPTO_LIB_ARC4=y
+          # --- NetFS built-in ---
+          CONFIG_NETFS_SUPPORT=y
+          # --- Rust Binder built-in ---
+          CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=y' | sed 's/^[[:space:]]*//' >> "$CFG_FILE"
         fi
 
         # 2. Modify modules.bzl to remove the files since they are now built-in
