@@ -154,3 +154,21 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
+
+        # SUSFS's OPEN_REDIRECT code unconditionally calls VMA_PAD_START(), which
+        # only exists on GKI branches that carry Google's page-size-migration
+        # feature (added to each android version's kernel/common branch at a
+        # different, sometime later, os_patch_level). Older os_patch_levels in
+        # our build matrix predate it, so fall back to a no-padding definition
+        # when the real header/macro isn't present. This is version-agnostic and
+        # a no-op wherever the real header already provides it.
+        if grep -q 'VMA_PAD_START(' fs/proc/task_mmu.c && ! grep -qE '#include <linux/pgsize_migration(_inline)?\.h>|define VMA_PAD_START' fs/proc/task_mmu.c; then
+          sed -i '1a #ifndef VMA_PAD_START\n#define VMA_PAD_START(vma) ((vma)->vm_end)\n#endif' fs/proc/task_mmu.c
+          echo "Added VMA_PAD_START fallback definition to fs/proc/task_mmu.c"
+        fi
+
+        # Same story for __fold_filemap_fixup_entry(), declared in page_size_compat.h.
+        if grep -q '__fold_filemap_fixup_entry' fs/proc/task_mmu.c && ! grep -q '#include <linux/page_size_compat.h>' fs/proc/task_mmu.c; then
+          sed -i '/#include <linux\/pkeys.h>/a #include <linux/page_size_compat.h>' fs/proc/task_mmu.c
+          echo "Added page_size_compat.h include to fs/proc/task_mmu.c"
+        fi
