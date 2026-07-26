@@ -92,7 +92,7 @@ Flashing this kernel will void your warranty, and there is always a risk of bric
 ## 📱 Connect With Us
 
 [![Telegram](https://img.shields.io/badge/Telegram-TheWildJames-blue?logo=telegram)](https://t.me/TheWildJames)
-[![Telegram Group](https://img.shields.io/badge/Telegram-Wild__Kernels-blue?logo=telegram)](https://t.me/WildKernels)
+[![Telegram Group](https://img.shields.io/badge/Telegram-WildKernelsTG-blue?logo=telegram)](https://t.me/WildKernelsTG)
 
 </div>
 
