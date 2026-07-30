@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: ""
+      target_os_patch_level:
+        description: "Build only this OS patch level (e.g. 2024-05); empty = full date matrix"
+        required: false
+        type: string
+        default: ""
 
 jobs:
   generate-matrix:
@@ -44,8 +49,12 @@ jobs:
 
           # Build { "include": [ {android_version:..., kernel_version:..., sublevel:..., os_patch_level:..., variant: ...}, ... ] }
           # Always include Normal, and add any explicit per-item variant from the config.
+          # When target_os_patch_level is set, keep only the matrix entries for that
+          # one date — lets a single run build one specific kernel instead of the
+          # whole monthly matrix, for fast iteration/testing.
           FINAL=$(jq -cn \
-            --argjson cfg "$CONFIG_JSON" '
+            --argjson cfg "$CONFIG_JSON" \
+            --arg target_date "${{ inputs.target_os_patch_level }}" '
             ($cfg.version | split("-")) as $version_parts
             | {
               include: (
@@ -73,8 +82,16 @@ jobs:
                     }
                 ]
                 | unique_by([.android_version, .kernel_version, .sublevel, .os_patch_level, .variant])
+                | if ($target_date | length) > 0 then map(select(.os_patch_level == $target_date)) else . end
               )
             }')
+
+          MATRIX_COUNT=$(echo "$FINAL" | jq '.include | length')
+          if [ "$MATRIX_COUNT" -eq 0 ]; then
+            echo "::error::No matrix entries match target_os_patch_level='${{ inputs.target_os_patch_level }}' for $(echo "$CONFIG_JSON" | jq -r .version) — check ${{ inputs.config_file }} for valid dates."
+            exit 1
+          fi
+          echo "Matrix has $MATRIX_COUNT entries after filtering."
 
           echo "matrix=$FINAL" >> "$GITHUB_OUTPUT"
 

@@ -3,3 +3,7 @@ AIO-REJ/
 kernel-manifests/
 kernels/
 bbr/
+kernel*
+Kernel*
+artifacts
+artifacts/*

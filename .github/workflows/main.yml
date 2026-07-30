@@ -32,6 +32,8 @@ on:
         description: "Feature Set"
         type: choice
         options:
+          - KSUN+SUSFS+VPNHIDE+NET
+          - KSUN+SUSFS+VPNHIDE
           - KSUN+SUSFS+BBG+NET+DS
           - KSUN+SUSFS+BBG
           - KSUN+SUSFS+NET
@@ -46,6 +48,11 @@ on:
         default: FULL
       ksu_branch:
         description: "KernelSU branch or commit (empty = latest dev-susfs branch tip)"
+        type: string
+        required: false
+        default: ""
+      target_os_patch_level:
+        description: "Build only this OS patch level for the selected kernel version (e.g. 2024-05); empty = full date matrix. Pick a specific kernel_build_version (not All) to build just one job."
         type: string
         required: false
         default: ""
@@ -127,6 +134,7 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android12-5-10 }}
+      target_os_patch_level: ${{ inputs.target_os_patch_level }}
     secrets: inherit
 
   build-android13-5-10:
@@ -138,6 +146,7 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android13-5-10 }}
+      target_os_patch_level: ${{ inputs.target_os_patch_level }}
     secrets: inherit
 
   build-android13-5-15:
@@ -149,6 +158,7 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android13-5-15 }}
+      target_os_patch_level: ${{ inputs.target_os_patch_level }}
     secrets: inherit
 
   build-android14-5-15:
@@ -160,6 +170,7 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android14-5-15 }}
+      target_os_patch_level: ${{ inputs.target_os_patch_level }}
     secrets: inherit
 
   build-android14-6-1:
@@ -171,6 +182,7 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android14-6-1 }}
+      target_os_patch_level: ${{ inputs.target_os_patch_level }}
     secrets: inherit
 
   build-android15-6-6:
@@ -182,6 +194,7 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android15-6-6 }}
+      target_os_patch_level: ${{ inputs.target_os_patch_level }}
     secrets: inherit
 
   build-android16-6-12:
@@ -193,6 +206,7 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android16-6-12 }}
+      target_os_patch_level: ${{ inputs.target_os_patch_level }}
     secrets: inherit
 
   rej:
