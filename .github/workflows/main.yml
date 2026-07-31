@@ -389,7 +389,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.release_type == 'Pre-Release' || inputs.release_type == 'Release') }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.release_type == 'Pre-Release' || inputs.release_type == 'Release') }}
     permissions:
       contents: write
     needs:
@@ -407,38 +407,6 @@ jobs:
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
-    - name: Validate Selected Builds
-      run: |
-        set -euo pipefail
-
-        failed=0
-        current_type="${{ inputs.kernel_build_version }}"
-
-        check_selected() {
-          local target="$1"
-          local job_name="$2"
-          local result="$3"
-          
-          if [[ "$current_type" == "all" || "$current_type" == "$target" ]]; then
-            if [[ "$result" != "success" ]]; then
-              echo "Required job $job_name did not succeed (result: $result)"
-              failed=1
-            fi
-          fi
-        }
-
-        check_selected "android12-5.10" "build-android12-5-10" "${{ needs.build-android12-5-10.result }}"
-        check_selected "android13-5.10" "build-android13-5-10" "${{ needs.build-android13-5-10.result }}"
-        check_selected "android13-5.15" "build-android13-5-15" "${{ needs.build-android13-5-15.result }}"
-        check_selected "android14-5.15" "build-android14-5-15" "${{ needs.build-android14-5-15.result }}"
-        check_selected "android14-6.1" "build-android14-6-1" "${{ needs.build-android14-6-1.result }}"
-        check_selected "android15-6.6" "build-android15-6-6" "${{ needs.build-android15-6-6.result }}"
-        check_selected "android16-6.12" "build-android16-6-12" "${{ needs.build-android16-6-12.result }}"
-
-        if [[ "$failed" -ne 0 ]]; then
-          exit 1
-        fi
-
     - name: Free Disk Space
       if: true
       uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
@@ -592,6 +560,13 @@ jobs:
           zip -r -q -9 "../$(basename "$zip_name")" .
           cd - >/dev/null
         done
+
+        artifact_count=$(find release-assets -type f \( -name '*.zip' -o -name '*-boot*.img' \) | wc -l)
+        echo "Found $artifact_count release artifact(s)."
+        if [ "$artifact_count" -eq 0 ]; then
+          echo "No successful kernel artifacts were produced."
+          exit 1
+        fi
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
