@@ -32,11 +32,6 @@ runs:
 
         cd susfs4ksu
 
-        COMMIT1="1addfb5688e6249bb1bedbe5d2e54537a79aed14"
-        COMMIT2="353a0ee1375068d8aa85fb72de0b5c355ec96698"
+        patch -p1 < "${{ github.workspace }}/kernel_patche/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
+        patch -p1 < "${{ github.workspace }}/kernel_patche/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
 
-        git remote add pershoot https://gitlab.com/pershoot/susfs4ksu.git
-        git fetch pershoot gki-android14-6.1-dev
-
-        git cherry-pick "$COMMIT1"
-        git cherry-pick "$COMMIT2"
