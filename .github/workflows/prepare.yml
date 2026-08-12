@@ -114,7 +114,9 @@ jobs:
             }')
 
           SELECTED_PATCH_LEVEL="${{ inputs.os_patch_level }}"
-          if [ "$SELECTED_PATCH_LEVEL" = "latest" ]; then
+          if [ "$SELECTED_PATCH_LEVEL" = "all" ]; then
+            SELECTED_PATCH_LEVEL=""
+          elif [ "$SELECTED_PATCH_LEVEL" = "latest" ]; then
             SELECTED_PATCH_LEVEL=$(jq -r '[.include[] | select(.date != "lts") | .date] | last // empty' "${{ inputs.config_file }}")
           fi
           if [ -n "$SELECTED_PATCH_LEVEL" ]; then

@@ -17,7 +17,7 @@ on:
           - android16-6.12
         default: android14-6.1
       os_patch_level:
-        description: "Patch level in the selected target config, or latest"
+        description: "Patch level in the selected target config, latest, or all"
         required: true
         type: string
         default: latest
