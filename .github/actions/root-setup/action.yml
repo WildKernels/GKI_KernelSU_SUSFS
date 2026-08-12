@@ -1,0 +1,98 @@
+name: Setup pinned root implementation
+description: Clone exactly one supported root implementation at a verified commit
+inputs:
+  flavor:
+    description: 'classic, next, or resukisu'
+    required: true
+  commit:
+    description: 'Full immutable commit SHA'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Clone and integrate selected root
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+
+        flavor="${{ inputs.flavor }}"
+        expected_commit="${{ inputs.commit }}"
+        case "$flavor" in
+          classic)
+            repo="https://github.com/tiann/KernelSU.git"
+            directory="KernelSU"
+            ;;
+          next)
+            repo="https://github.com/KernelSU-Next/KernelSU-Next.git"
+            directory="KernelSU-Next"
+            ;;
+          resukisu)
+            repo="https://github.com/ReSukiSU/ReSukiSU.git"
+            directory="ReSukiSU"
+            ;;
+          *)
+            echo "Unsupported root flavor: $flavor" >&2
+            exit 2
+            ;;
+        esac
+
+        if ! [[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "Root commit must be a full 40-character SHA." >&2
+          exit 2
+        fi
+
+        for candidate in KernelSU KernelSU-Next ReSukiSU; do
+          if [ "$candidate" != "$directory" ] && [ -e "$candidate" ]; then
+            echo "Refusing mixed root implementations: found $candidate." >&2
+            exit 1
+          fi
+        done
+
+        if [ -d common/drivers ]; then
+          drivers_dir="common/drivers"
+        elif [ -d drivers ]; then
+          drivers_dir="drivers"
+        else
+          echo "Kernel drivers directory not found." >&2
+          exit 1
+        fi
+
+        if [ -e "$drivers_dir/kernelsu" ] || [ -L "$drivers_dir/kernelsu" ]; then
+          echo "Refusing to replace an existing kernelsu integration." >&2
+          exit 1
+        fi
+        if [ -e "$directory" ]; then
+          echo "Refusing to reuse an existing root checkout: $directory." >&2
+          exit 1
+        fi
+
+        git clone --no-checkout "$repo" "$directory"
+        git -C "$directory" fetch --depth=1 origin "$expected_commit"
+        git -C "$directory" checkout --detach "$expected_commit"
+        actual_commit="$(git -C "$directory" rev-parse HEAD)"
+        if [ "$actual_commit" != "$expected_commit" ]; then
+          echo "Root commit mismatch: expected $expected_commit, got $actual_commit." >&2
+          exit 1
+        fi
+        if [ ! -f "$directory/kernel/Kconfig" ] || [ ! -f "$directory/kernel/Makefile" ]; then
+          echo "Selected root checkout does not contain a kernel integration." >&2
+          exit 1
+        fi
+
+        relative_kernel="$(realpath --relative-to="$drivers_dir" "$PWD/$directory/kernel")"
+        ln -s "$relative_kernel" "$drivers_dir/kernelsu"
+        grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" ||
+          printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$drivers_dir/Makefile"
+        grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" ||
+          sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig"
+
+        echo "ROOT_IMPLEMENTATION=$flavor" >> "$GITHUB_ENV"
+        echo "ROOT_COMMIT=$actual_commit" >> "$GITHUB_ENV"
+
+    - name: Enable root configuration
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_KSU=y

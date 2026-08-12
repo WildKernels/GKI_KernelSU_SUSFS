@@ -1,0 +1,75 @@
+name: Setup pinned NoMount
+description: Integrate NoMount from a verified immutable commit
+inputs:
+  kernel_version:
+    description: 'Kernel version with a supported upstream patch'
+    required: true
+  commit:
+    description: 'Full immutable NoMount commit SHA'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Clone and apply NoMount
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+
+        expected_commit="${{ inputs.commit }}"
+        kernel_version="${{ inputs.kernel_version }}"
+        if ! [[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "NoMount commit must be a full 40-character SHA." >&2
+          exit 2
+        fi
+        case "$kernel_version" in
+          5.10|5.15|6.1|6.6|6.12) ;;
+          *)
+            echo "NoMount has no approved integration path for kernel $kernel_version." >&2
+            exit 2
+            ;;
+        esac
+        if [ -e nomount ]; then
+          echo "Refusing to reuse an existing NoMount checkout." >&2
+          exit 1
+        fi
+
+        git clone --no-checkout https://github.com/maxsteeel/nomount.git nomount
+        git -C nomount fetch --depth=1 origin "$expected_commit"
+        git -C nomount checkout --detach "$expected_commit"
+        actual_commit="$(git -C nomount rev-parse HEAD)"
+        if [ "$actual_commit" != "$expected_commit" ]; then
+          echo "NoMount commit mismatch: expected $expected_commit, got $actual_commit." >&2
+          exit 1
+        fi
+
+        patch_file="nomount/kernel/patches/nomount_${kernel_version}_kernel_integration.patch"
+        if [ ! -f "$patch_file" ]; then
+          echo "NoMount patch is unavailable for kernel $kernel_version." >&2
+          exit 1
+        fi
+        for source_file in nomount/kernel/src/*; do
+          destination="common/fs/$(basename "$source_file")"
+          if [ -e "$destination" ]; then
+            echo "Refusing to overwrite existing kernel file: $destination." >&2
+            exit 1
+          fi
+          install -m 0644 "$source_file" "$destination"
+        done
+        (
+          cd common
+          patch --dry-run --fuzz=0 -p1 < "../$patch_file"
+          patch --batch --fuzz=0 -p1 < "../$patch_file"
+        )
+        if ! grep -Rqs 'CONFIG_NOMOUNT' common/fs; then
+          echo "NoMount integration patch did not add a CONFIG_NOMOUNT reference." >&2
+          exit 1
+        fi
+        echo "NOMOUNT_COMMIT=$actual_commit" >> "$GITHUB_ENV"
+
+    - name: Enable NoMount configuration
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_NOMOUNT=y

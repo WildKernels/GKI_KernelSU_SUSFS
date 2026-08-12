@@ -35,6 +35,26 @@ on:
         required: false
         type: string
         default: ""
+      root_flavor:
+        required: false
+        type: string
+        default: ""
+      root_commit:
+        required: false
+        type: string
+        default: ""
+      nomount_commit:
+        required: false
+        type: string
+        default: ""
+      preserve_abi:
+        required: false
+        type: boolean
+        default: false
+      build_bypass:
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   build-gki:
@@ -141,8 +161,21 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
 
+    - name: Capture ABI/KMI Safeguards
+      if: ${{ inputs.preserve_abi }}
+      uses: ./.github/actions/abi-kmi-safeguards
+      with:
+        mode: capture
+
+    - name: Setup Selected Root Implementation
+      if: ${{ inputs.root_flavor != '' }}
+      uses: ./.github/actions/root-setup
+      with:
+        flavor: ${{ inputs.root_flavor }}
+        commit: ${{ inputs.root_commit }}
+
     - name: Setup KernelSU-Next
-      if: contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL'
+      if: ${{ inputs.root_flavor == '' && (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') }}
       uses: ./.github/actions/kernelsu
       with:
         ksu_branch: ${{ inputs.ksu_branch }}
@@ -157,6 +190,13 @@ jobs:
         kernel_version: ${{ inputs.kernel_version }}
         os_patch_level: ${{ inputs.os_patch_level }}
         sublevel: ${{ steps.extract.outputs.sublevel }}
+
+    - name: Integrate NoMount
+      if: ${{ inputs.nomount_commit != '' }}
+      uses: ./.github/actions/nomount
+      with:
+        kernel_version: ${{ inputs.kernel_version }}
+        commit: ${{ inputs.nomount_commit }}
 
     - name: Baseband Guard
       if: (contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'FULL')
@@ -247,7 +287,14 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: Remove Protected Exports
+      if: ${{ !inputs.preserve_abi }}
       uses: ./.github/actions/remove-protected-exports
+
+    - name: Verify ABI/KMI Safeguards
+      if: ${{ inputs.preserve_abi }}
+      uses: ./.github/actions/abi-kmi-safeguards
+      with:
+        mode: verify
 
     - name: Clean Kernel Flags
       uses: ./.github/actions/clean-kernel-flags
@@ -381,6 +428,7 @@ jobs:
         github_token: ${{ secrets.MY_GITHUB_TOKEN }}
 
     - name: Build Bypass Kernel
+      if: ${{ inputs.build_bypass }}
       env:
         SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
@@ -413,6 +461,10 @@ jobs:
         # Get KSU version from env (set by kernelsu action)
         KSU_VER="${KSU_VERSION:-N/A}"
         KSU_TAG="${KSU_GIT_TAG:-N/A}"
+        ROOT_IMPL="${ROOT_IMPLEMENTATION:-KernelSU-Next (legacy path)}"
+        ROOT_SHA="${ROOT_COMMIT:-${KSU_COMMIT:-N/A}}"
+        NOMOUNT_SHA="${NOMOUNT_COMMIT:-N/A}"
+        SUSFS_SHA="${SUSFS_COMMIT:-N/A}"
         
         # Get SUSFS version from susfs.h if available
         SUSFS_VER="N/A"
@@ -441,7 +493,11 @@ jobs:
           fi
           echo "| **KSU Version** | ${KSU_VER} |"
           echo "| **KSU Tag** | ${KSU_TAG} |"
+          echo "| **Root Implementation** | ${ROOT_IMPL} |"
+          echo "| **Root Commit** | ${ROOT_SHA} |"
           echo "| **SUSFS Version** | ${SUSFS_VER} |"
+          echo "| **SUSFS Commit** | ${SUSFS_SHA} |"
+          echo "| **NoMount Commit** | ${NOMOUNT_SHA} |"
           echo "| **Feature Set** | ${{ inputs.feature_set }} |"
           echo "| **Variant** | ${{ inputs.variant }} |"
           echo

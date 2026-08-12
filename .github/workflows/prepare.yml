@@ -21,6 +21,41 @@ on:
         required: false
         type: string
         default: ""
+      root_flavor:
+        description: "Mutually exclusive root implementation (classic, next, or resukisu)"
+        required: false
+        type: string
+        default: ""
+      root_commit:
+        description: "Exact root implementation commit"
+        required: false
+        type: string
+        default: ""
+      nomount_commit:
+        description: "Exact NoMount commit"
+        required: false
+        type: string
+        default: ""
+      preserve_abi:
+        description: "Keep ABI/KMI protection files intact and verify their hashes"
+        required: false
+        type: boolean
+        default: false
+      build_bypass:
+        description: "Produce the legacy bypass image"
+        required: false
+        type: boolean
+        default: true
+      os_patch_level:
+        description: "Optional patch level filter; use latest for the latest dated target"
+        required: false
+        type: string
+        default: ""
+      variant:
+        description: "Artifact variant label"
+        required: false
+        type: string
+        default: ""
 
 jobs:
   generate-matrix:
@@ -42,39 +77,55 @@ jobs:
 
           CONFIG_JSON=$(cat "${{ inputs.config_file }}" | jq -c .)
 
-          # Build { "include": [ {android_version:..., kernel_version:..., sublevel:..., os_patch_level:..., variant: ...}, ... ] }
-          # Always include Normal, and add any explicit per-item variant from the config.
+          # Build { "include": [ {android_version:..., kernel_version:..., sublevel:..., os_patch_level:..., variant: ...}, ... ] }.
+          # An explicit patch-level filter keeps manual validation dispatches bounded.
           FINAL=$(jq -cn \
-            --argjson cfg "$CONFIG_JSON" '
+            --argjson cfg "$CONFIG_JSON" \
+            --arg requested_variant "${{ inputs.variant }}" '
             ($cfg.version | split("-")) as $version_parts
+            | ($cfg.include) as $targets
             | {
               include: (
                 [
-                  $cfg.include[] as $item
+                  $targets[] as $item
                   | {
                       version: $cfg.version,
                       android_version: $version_parts[0],
                       kernel_version: $version_parts[1],
                       sublevel: $item.sublevel,
                       os_patch_level: $item.date,
-                      variant: "Normal"
+                      variant: (if $requested_variant == "" then "Normal" else $requested_variant end)
                     }
                 ]
-                + [
-                  $cfg.include[] as $item
-                  | select($item.variant != null)
-                  | {
-                      version: $cfg.version,
-                      android_version: $version_parts[0],
-                      kernel_version: $version_parts[1],
-                      sublevel: $item.sublevel,
-                      os_patch_level: $item.date,
-                      variant: $item.variant
-                    }
-                ]
+                + (if $requested_variant == "" then [
+                    $targets[] as $item
+                    | select($item.variant != null)
+                    | {
+                        version: $cfg.version,
+                        android_version: $version_parts[0],
+                        kernel_version: $version_parts[1],
+                        sublevel: $item.sublevel,
+                        os_patch_level: $item.date,
+                        variant: $item.variant
+                      }
+                  ] else [] end)
                 | unique_by([.android_version, .kernel_version, .sublevel, .os_patch_level, .variant])
               )
             }')
+
+          SELECTED_PATCH_LEVEL="${{ inputs.os_patch_level }}"
+          if [ "$SELECTED_PATCH_LEVEL" = "latest" ]; then
+            SELECTED_PATCH_LEVEL=$(jq -r '[.include[] | select(.date != "lts") | .date] | last // empty' "${{ inputs.config_file }}")
+          fi
+          if [ -n "$SELECTED_PATCH_LEVEL" ]; then
+            FINAL=$(jq -c --arg patch_level "$SELECTED_PATCH_LEVEL" '
+              {include: [.include[] | select(.os_patch_level == $patch_level)]}
+            ' <<< "$FINAL")
+          fi
+          if [ "$(jq '.include | length' <<< "$FINAL")" -eq 0 ]; then
+            echo "Error: no build targets match patch level '${SELECTED_PATCH_LEVEL}'." >&2
+            exit 1
+          fi
 
           echo "matrix=$FINAL" >> "$GITHUB_OUTPUT"
 
@@ -94,4 +145,9 @@ jobs:
       feature_set: ${{ inputs.feature_set }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit }}
+      root_flavor: ${{ inputs.root_flavor }}
+      root_commit: ${{ inputs.root_commit }}
+      nomount_commit: ${{ inputs.nomount_commit }}
+      preserve_abi: ${{ inputs.preserve_abi }}
+      build_bypass: ${{ inputs.build_bypass }}
     secrets: inherit

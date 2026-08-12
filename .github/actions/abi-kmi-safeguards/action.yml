@@ -1,0 +1,53 @@
+name: Verify ABI/KMI safeguards
+description: Capture or verify hashes of source ABI/KMI protection files
+inputs:
+  mode:
+    description: 'capture or verify'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Capture or verify protected files
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        root="${{ github.workspace }}/kernel"
+        manifest="${{ github.workspace }}/.abi-kmi-safeguards.sha256"
+        snapshot="$(mktemp)"
+        while IFS= read -r -d '' path; do
+          sha256sum "$path"
+        done < <(
+          find "$root" -type f \( \
+            -path '*/android/abi_gki_*' -o \
+            -path '*/build/abi/*' \
+          \) -print0 | sort -z
+        ) > "$snapshot"
+
+        if [ ! -s "$snapshot" ]; then
+          echo "No ABI/KMI protection files were found; refusing an unguarded build." >&2
+          exit 1
+        fi
+
+        case "${{ inputs.mode }}" in
+          capture)
+            mv "$snapshot" "$manifest"
+            ;;
+          verify)
+            if [ ! -f "$manifest" ]; then
+              echo "ABI/KMI safeguard manifest is missing." >&2
+              exit 1
+            fi
+            if ! cmp -s "$manifest" "$snapshot"; then
+              echo "ABI/KMI protection files changed during integration." >&2
+              diff -u "$manifest" "$snapshot" >&2 || true
+              exit 1
+            fi
+            rm -f "$snapshot"
+            ;;
+          *)
+            echo "Unsupported safeguard mode: ${{ inputs.mode }}" >&2
+            exit 2
+            ;;
+        esac

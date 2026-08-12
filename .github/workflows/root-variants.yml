@@ -1,0 +1,80 @@
+name: Build pinned root variants
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_build_version:
+        description: "Supported GKI target"
+        required: true
+        type: choice
+        options:
+          - android12-5.10
+          - android13-5.10
+          - android13-5.15
+          - android14-5.15
+          - android14-6.1
+          - android15-6.6
+          - android16-6.12
+        default: android14-6.1
+      os_patch_level:
+        description: "Patch level in the selected target config, or latest"
+        required: true
+        type: string
+        default: latest
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  resolve-pins:
+    runs-on: ubuntu-latest
+    outputs:
+      config_file: ${{ steps.pins.outputs.config_file }}
+      susfs_commit: ${{ steps.pins.outputs.susfs_commit }}
+    steps:
+      - id: pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ inputs.kernel_build_version }}" in
+            android12-5.10) susfs_commit="3c14ad549f826b1f53878ec8c12253efebeed75a" ;;
+            android13-5.10) susfs_commit="f81aaf10e9560282052bb61dd931315c2ca3e617" ;;
+            android13-5.15) susfs_commit="ccb1918684b27644d17a6c842f57b60ae5966025" ;;
+            android14-5.15) susfs_commit="0463ac089308014e8c22cc6a4558e0d6d2a53e08" ;;
+            android14-6.1) susfs_commit="e287d59066380bf6de4396532d4a42edf4408701" ;;
+            android15-6.6) susfs_commit="be7b7ef49a1e1b189c3abf00eacaa7ebdb4168c1" ;;
+            android16-6.12) susfs_commit="f37930f374ef88de990d6abea0c67d0ea28c1edc" ;;
+            *) echo "Unsupported GKI target." >&2; exit 2 ;;
+          esac
+          echo "config_file=.github/config/${{ inputs.kernel_build_version }}.json" >> "$GITHUB_OUTPUT"
+          echo "susfs_commit=$susfs_commit" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve-pins
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: classic
+            commit: da9abf498a77d438989fea0f5f4e348b9a540c07
+            variant: Classic-KernelSU
+          - flavor: next
+            commit: 234f6e040fcbca18b16d2398e1aa225712ec99ad
+            variant: KernelSU-Next
+          - flavor: resukisu
+            commit: 3ef06b0fcb0960dc9563256fe26a58e892663387
+            variant: ReSukiSU
+    uses: ./.github/workflows/prepare.yml
+    with:
+      config_file: ${{ needs.resolve-pins.outputs.config_file }}
+      feature_set: SUSFS
+      susfs_commit: ${{ needs.resolve-pins.outputs.susfs_commit }}
+      root_flavor: ${{ matrix.flavor }}
+      root_commit: ${{ matrix.commit }}
+      nomount_commit: 69a8a5b82c3659ee0fa60a5236ff6fdf76a12e2e
+      preserve_abi: true
+      build_bypass: false
+      os_patch_level: ${{ inputs.os_patch_level }}
+      variant: ${{ matrix.variant }}
+    secrets: inherit
