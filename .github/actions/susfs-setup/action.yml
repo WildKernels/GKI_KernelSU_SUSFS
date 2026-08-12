@@ -38,11 +38,10 @@ runs:
 
         if [ -n "${{ inputs.susfs_commit }}" ]; then
           echo "Checking out SUSFS commit: ${{ inputs.susfs_commit }}"
-          cd ${{ github.workspace }}/susfs4ksu
-          retry git checkout "${{ inputs.susfs_commit }}"
+          retry git -C "${{ github.workspace }}/susfs4ksu" checkout "${{ inputs.susfs_commit }}"
         fi
 
-        cd susfs4ksu
+        cd "${{ github.workspace }}/susfs4ksu"
         SUSFS_COMMIT="$(git rev-parse HEAD)"
         echo "SUSFS_COMMIT=$SUSFS_COMMIT" >> "$GITHUB_ENV"
         echo "Using SUSFS commit: $SUSFS_COMMIT"
