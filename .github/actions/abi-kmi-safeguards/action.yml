@@ -21,7 +21,11 @@ runs:
         done < <(
           find "$root" -type f \( \
             -path '*/android/abi_gki_*' -o \
-            -path '*/build/abi/*' \
+            -path '*/build/abi/*' -o \
+            -path '*/gki/*/abi.stg' -o \
+            -path '*/gki/*/symbols/*' -o \
+            -path '*/modules.bzl' -o \
+            -path '*/BUILD.bazel' \
           \) -print0 | sort -z
         ) > "$snapshot"
 

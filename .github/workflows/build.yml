@@ -161,7 +161,7 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
 
-    - name: Capture ABI/KMI Safeguards
+    - name: Capture source ABI/KMI safeguards
       if: ${{ inputs.preserve_abi }}
       uses: ./.github/actions/abi-kmi-safeguards
       with:
@@ -180,6 +180,12 @@ jobs:
       with:
         ksu_branch: ${{ inputs.ksu_branch }}
 
+    - name: Verify root ABI/KMI safeguards
+      if: ${{ inputs.preserve_abi }}
+      uses: ./.github/actions/abi-kmi-safeguards
+      with:
+        mode: verify
+
     - name: SUSFS
       if: contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL'
       uses: ./.github/actions/susfs
@@ -190,19 +196,6 @@ jobs:
         kernel_version: ${{ inputs.kernel_version }}
         os_patch_level: ${{ inputs.os_patch_level }}
         sublevel: ${{ steps.extract.outputs.sublevel }}
-
-    - name: Integrate NoMount
-      if: ${{ inputs.nomount_commit != '' }}
-      uses: ./.github/actions/nomount
-      with:
-        commit: ${{ inputs.nomount_commit }}
-
-    - name: Build matching NoMount metamodule
-      id: nomount-metamodule
-      if: ${{ inputs.nomount_commit != '' }}
-      uses: ./.github/actions/nomount-metamodule
-      with:
-        commit: ${{ inputs.nomount_commit }}
 
     - name: Baseband Guard
       if: (contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'FULL')
@@ -263,6 +256,25 @@ jobs:
         version: ${{ inputs.version }}
         kernel_version: ${{ inputs.kernel_version }}
 
+    - name: Capture approved feature ABI/KMI baseline
+      if: ${{ inputs.preserve_abi }}
+      uses: ./.github/actions/abi-kmi-safeguards
+      with:
+        mode: capture
+
+    - name: Integrate NoMount
+      if: ${{ inputs.nomount_commit != '' }}
+      uses: ./.github/actions/nomount
+      with:
+        commit: ${{ inputs.nomount_commit }}
+
+    - name: Build matching NoMount metamodule
+      id: nomount-metamodule
+      if: ${{ inputs.nomount_commit != '' }}
+      uses: ./.github/actions/nomount-metamodule
+      with:
+        commit: ${{ inputs.nomount_commit }}
+
     - name: Apply ABI Compare Bypass
       if: false
       working-directory: ${{ github.workspace }}/kernel
@@ -296,7 +308,7 @@ jobs:
       if: ${{ !inputs.preserve_abi }}
       uses: ./.github/actions/remove-protected-exports
 
-    - name: Verify ABI/KMI Safeguards
+    - name: Verify NoMount ABI/KMI safeguards
       if: ${{ inputs.preserve_abi }}
       uses: ./.github/actions/abi-kmi-safeguards
       with:

@@ -26,11 +26,15 @@ All pins were resolved on 2026-08-13 from the named upstream branches. A pin
 is re-verified after checkout; a mismatch, missing upstream `fs/nomount`
 integration, or existing root integration fails the build.
 
-The workflow preserves ABI/KMI protection files by snapshotting their hashes
-before integration and requiring an exact match afterward. It does not remove
-protected exports, bypass ABI checks, build a bypass image, create releases, or
-claim device compatibility. Builds are source-integration checks only; no
-hardware, boot, or runtime testing is represented by a successful artifact.
+The workflow snapshots ABI/KMI controls before root integration and verifies
+them immediately afterward. It then snapshots the approved, target-specific
+SUSFS and device-patch ABI updates before NoMount integration and requires
+NoMount to leave that baseline unchanged. The guard covers legacy ABI symbol
+lists and the Android 16 Bazel ABI/staging/symbol definitions. It does not
+remove protected exports, bypass ABI checks, build a bypass image, create
+releases, or claim device compatibility. Builds are source-integration checks
+only; no hardware, boot, or runtime testing is represented by a successful
+artifact.
 
 ## Verified artifact metadata
 
