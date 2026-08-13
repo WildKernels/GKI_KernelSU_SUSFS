@@ -138,6 +138,9 @@ runs:
 
         COMMIT_DATE=$(git log -1 --format=%cI)
         COMMIT_MSG=$(git log -1 --format=%s)
+        COMMIT_SHA=$(git rev-parse HEAD)
 
+        echo "KERNEL_SOURCE_COMMIT=$COMMIT_SHA" >> "$GITHUB_ENV"
         echo "Kernel common commit date: $COMMIT_DATE"
         echo "Kernel common commit msg: $COMMIT_MSG"
+        echo "Kernel common commit SHA: $COMMIT_SHA"

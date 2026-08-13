@@ -31,3 +31,17 @@ before integration and requiring an exact match afterward. It does not remove
 protected exports, bypass ABI checks, build a bypass image, create releases, or
 claim device compatibility. Builds are source-integration checks only; no
 hardware, boot, or runtime testing is represented by a successful artifact.
+
+## Verified artifact metadata
+
+Successful builds upload a `<target>-Metadata` artifact containing machine-readable
+JSON. Its `status` is `verified` only after the corresponding AnyKernel3 artifact
+is uploaded and its GitHub-issued `sha256` digest and URL are recorded. Each
+record also includes the build method, root implementation/manager/version and
+commit, SUSFS and NoMount revisions, Android branch/KMI, kernel source commit,
+and provenance run URL.
+
+Runs dispatched before this metadata contract was added cannot retroactively
+contain these metadata artifacts. Their artifact digests remain available from
+the GitHub Actions artifact API, but they must not be represented as complete
+metadata-contract records.

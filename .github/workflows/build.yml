@@ -462,6 +462,8 @@ jobs:
         KSU_VER="${KSU_VERSION:-N/A}"
         KSU_TAG="${KSU_GIT_TAG:-N/A}"
         ROOT_IMPL="${ROOT_IMPLEMENTATION:-KernelSU-Next (legacy path)}"
+        ROOT_MANAGER="${ROOT_MANAGER:-KernelSU-Next Manager}"
+        ROOT_VERSION="${ROOT_VERSION:-${KSU_TAG}}"
         ROOT_SHA="${ROOT_COMMIT:-${KSU_COMMIT:-N/A}}"
         NOMOUNT_SHA="${NOMOUNT_COMMIT:-N/A}"
         SUSFS_SHA="${SUSFS_COMMIT:-N/A}"
@@ -494,6 +496,8 @@ jobs:
           echo "| **KSU Version** | ${KSU_VER} |"
           echo "| **KSU Tag** | ${KSU_TAG} |"
           echo "| **Root Implementation** | ${ROOT_IMPL} |"
+          echo "| **Root Manager** | ${ROOT_MANAGER} |"
+          echo "| **Root Version** | ${ROOT_VERSION} |"
           echo "| **Root Commit** | ${ROOT_SHA} |"
           echo "| **SUSFS Version** | ${SUSFS_VER} |"
           echo "| **SUSFS Commit** | ${SUSFS_SHA} |"
@@ -520,9 +524,69 @@ jobs:
         compression-level: 9
 
     - name: Upload Artifacts
+      id: kernel-artifact
       uses: actions/upload-artifact@v7
       with:
         name: ${{ steps.extract.outputs.file_name }}-AnyKernel3
         path: ${{ github.workspace }}/AnyKernel3/**
         if-no-files-found: ignore
+        compression-level: 9
+
+    - name: Write verified artifact metadata
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        metadata_file="${{ github.workspace }}/${{ steps.extract.outputs.file_name }}-metadata.json"
+        jq -n \
+          --arg method "GKI source build with SHA-pinned root implementation, SUSFS, and NoMount" \
+          --arg root_implementation "${ROOT_IMPLEMENTATION:-KernelSU-Next (legacy path)}" \
+          --arg root_manager "${ROOT_MANAGER:-KernelSU-Next Manager}" \
+          --arg root_version "${ROOT_VERSION:-${KSU_GIT_TAG:-N/A}}" \
+          --arg root_commit "${ROOT_COMMIT:-${KSU_COMMIT:-N/A}}" \
+          --arg susfs_commit "${SUSFS_COMMIT:-N/A}" \
+          --arg nomount_commit "${NOMOUNT_COMMIT:-N/A}" \
+          --arg android_branch "${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}" \
+          --arg kmi "${{ inputs.android_version }}-${{ inputs.kernel_version }}" \
+          --arg kernel_source_commit "${KERNEL_SOURCE_COMMIT:-N/A}" \
+          --arg provenance_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          --arg artifact_url "${{ steps.kernel-artifact.outputs.artifact-url }}" \
+          --arg sha256 "${{ steps.kernel-artifact.outputs.artifact-digest }}" \
+          --arg status "verified" \
+          '{
+            method: $method,
+            root: {
+              implementation: $root_implementation,
+              manager: $root_manager,
+              version: $root_version,
+              commit: $root_commit
+            },
+            susfs_revision: $susfs_commit,
+            nomount_commit: $nomount_commit,
+            android_branch: $android_branch,
+            kmi: $kmi,
+            kernel_source_commit: $kernel_source_commit,
+            provenance_url: $provenance_url,
+            artifact_url: $artifact_url,
+            sha256: $sha256,
+            status: $status
+          }' > "$metadata_file"
+
+        jq -e '
+          .status == "verified" and
+          (.root.manager | length > 0) and
+          (.root.version | length > 0) and
+          (.susfs_revision | test("^[0-9a-f]{40}$")) and
+          (.nomount_commit | test("^[0-9a-f]{40}$")) and
+          (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
+          (.artifact_url | startswith("https://")) and
+          (.sha256 | test("^sha256:[0-9a-f]{64}$"))
+        ' "$metadata_file" > /dev/null
+
+    - name: Upload verified artifact metadata
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.extract.outputs.file_name }}-Metadata
+        path: ${{ github.workspace }}/${{ steps.extract.outputs.file_name }}-metadata.json
+        if-no-files-found: error
         compression-level: 9

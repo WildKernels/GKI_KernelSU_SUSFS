@@ -23,14 +23,17 @@ runs:
           classic)
             repo="https://github.com/tiann/KernelSU.git"
             directory="KernelSU"
+            manager="KernelSU Manager"
             ;;
           next)
             repo="https://github.com/KernelSU-Next/KernelSU-Next.git"
             directory="KernelSU-Next"
+            manager="KernelSU Next Manager"
             ;;
           resukisu)
             repo="https://github.com/ReSukiSU/ReSukiSU.git"
             directory="ReSukiSU"
+            manager="ReSukiSU Manager"
             ;;
           *)
             echo "Unsupported root flavor: $flavor" >&2
@@ -80,6 +83,7 @@ runs:
           echo "Selected root checkout does not contain a kernel integration." >&2
           exit 1
         fi
+        root_version="$(git -C "$directory" describe --tags --always --dirty)"
 
         relative_kernel="$(realpath --relative-to="$drivers_dir" "$PWD/$directory/kernel")"
         ln -s "$relative_kernel" "$drivers_dir/kernelsu"
@@ -89,6 +93,8 @@ runs:
           sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig"
 
         echo "ROOT_IMPLEMENTATION=$flavor" >> "$GITHUB_ENV"
+        echo "ROOT_MANAGER=$manager" >> "$GITHUB_ENV"
+        echo "ROOT_VERSION=$root_version" >> "$GITHUB_ENV"
         echo "ROOT_COMMIT=$actual_commit" >> "$GITHUB_ENV"
 
     - name: Enable root configuration
