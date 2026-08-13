@@ -72,7 +72,7 @@ jobs:
       susfs_commit: ${{ needs.resolve-pins.outputs.susfs_commit }}
       root_flavor: ${{ matrix.flavor }}
       root_commit: ${{ matrix.commit }}
-      nomount_commit: 69a8a5b82c3659ee0fa60a5236ff6fdf76a12e2e
+      nomount_commit: c52936b229c25a4b0e41b6627f7d3bc5eaaaf2b5
       preserve_abi: true
       build_bypass: false
       os_patch_level: ${{ inputs.os_patch_level }}

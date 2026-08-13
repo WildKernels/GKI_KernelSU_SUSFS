@@ -1,0 +1,71 @@
+name: Build pinned NoMount metamodule
+description: Package a flashable NoMount metamodule from the exact kernel integration SHA
+inputs:
+  commit:
+    description: 'Full immutable NoMount commit SHA'
+    required: true
+outputs:
+  module_path:
+    description: 'Path to the flashable metamodule ZIP'
+    value: ${{ steps.package.outputs.module_path }}
+  commit:
+    description: 'Verified NoMount source SHA'
+    value: ${{ steps.package.outputs.commit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Zig
+      uses: jetsung/setup-zig@v0.0.4
+      with:
+        version: master
+
+    - name: Build and package matching metamodule
+      id: package
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        expected_commit="${{ inputs.commit }}"
+        if ! [[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "NoMount commit must be a full 40-character SHA." >&2
+          exit 2
+        fi
+
+        source_dir="${RUNNER_TEMP}/nomount-module-source"
+        module_dir="${RUNNER_TEMP}/nomount-metamodule"
+        module_zip="${RUNNER_TEMP}/NoMount-${expected_commit}.zip"
+        git clone --no-checkout https://github.com/maxsteeel/nomount.git "$source_dir"
+        git -C "$source_dir" fetch --depth=1 origin "$expected_commit"
+        git -C "$source_dir" checkout --detach "$expected_commit"
+        actual_commit="$(git -C "$source_dir" rev-parse HEAD)"
+        if [ "$actual_commit" != "$expected_commit" ]; then
+          echo "NoMount module source mismatch: expected $expected_commit, got $actual_commit." >&2
+          exit 1
+        fi
+
+        mkdir -p "$source_dir/bin"
+        (
+          cd "$source_dir/userspace/src"
+          zig cc -target aarch64-linux -Oz -mcmodel=tiny -static -nostdlib \
+            -ffreestanding -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
+            -Wl,--entry=_start nm.c -o ../../bin/nm-arm64
+          zig cc -target arm-linux -Oz -static -nostdlib -ffreestanding \
+            -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
+            -ffunction-sections -fdata-sections -Wl,--gc-sections \
+            -Wl,--entry=_start nm.c -o ../../bin/nm-arm
+        )
+
+        cp -a "$source_dir/module" "$module_dir"
+        mkdir -p "$module_dir/bin"
+        install -m 0755 "$source_dir/bin/nm-arm64" "$module_dir/bin/nm-arm64"
+        install -m 0755 "$source_dir/bin/nm-arm" "$module_dir/bin/nm-arm"
+        sed -i "s/^versionCode=.*/versionCode=1/" "$module_dir/module.prop"
+        printf '%s\n' "$actual_commit" > "$module_dir/NOMOUNT_SOURCE_COMMIT"
+        (
+          cd "$module_dir"
+          zip -qr "$module_zip" .
+        )
+        sha256sum "$module_zip" > "${module_zip}.sha256"
+        echo "module_path=$module_zip" >> "$GITHUB_OUTPUT"
+        echo "commit=$actual_commit" >> "$GITHUB_OUTPUT"

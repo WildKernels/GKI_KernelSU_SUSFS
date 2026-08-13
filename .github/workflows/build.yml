@@ -195,7 +195,13 @@ jobs:
       if: ${{ inputs.nomount_commit != '' }}
       uses: ./.github/actions/nomount
       with:
-        kernel_version: ${{ inputs.kernel_version }}
+        commit: ${{ inputs.nomount_commit }}
+
+    - name: Build matching NoMount metamodule
+      id: nomount-metamodule
+      if: ${{ inputs.nomount_commit != '' }}
+      uses: ./.github/actions/nomount-metamodule
+      with:
         commit: ${{ inputs.nomount_commit }}
 
     - name: Baseband Guard
@@ -532,7 +538,18 @@ jobs:
         if-no-files-found: ignore
         compression-level: 9
 
+    - name: Upload NoMount metamodule
+      id: nomount-metamodule-artifact
+      if: ${{ inputs.nomount_commit != '' }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.extract.outputs.file_name }}-NoMount-Metamodule
+        path: ${{ steps.nomount-metamodule.outputs.module_path }}
+        if-no-files-found: error
+        compression-level: 0
+
     - name: Write verified artifact metadata
+      if: ${{ inputs.root_flavor != '' && inputs.nomount_commit != '' }}
       shell: bash
       run: |
         set -euo pipefail
@@ -552,6 +569,9 @@ jobs:
           --arg provenance_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
           --arg artifact_url "${{ steps.kernel-artifact.outputs.artifact-url }}" \
           --arg sha256 "${{ steps.kernel-artifact.outputs.artifact-digest }}" \
+          --arg nomount_module_commit "${{ steps.nomount-metamodule.outputs.commit }}" \
+          --arg nomount_module_url "${{ steps.nomount-metamodule-artifact.outputs.artifact-url }}" \
+          --arg nomount_module_sha256 "${{ steps.nomount-metamodule-artifact.outputs.artifact-digest }}" \
           --arg status "verified" \
           '{
             method: $method,
@@ -569,6 +589,11 @@ jobs:
             provenance_url: $provenance_url,
             artifact_url: $artifact_url,
             sha256: $sha256,
+            nomount_metamodule: {
+              commit: $nomount_module_commit,
+              artifact_url: $nomount_module_url,
+              sha256: $nomount_module_sha256
+            },
             status: $status
           }' > "$metadata_file"
 
@@ -580,10 +605,14 @@ jobs:
           (.nomount_commit | test("^[0-9a-f]{40}$")) and
           (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
           (.artifact_url | startswith("https://")) and
-          (.sha256 | test("^sha256:[0-9a-f]{64}$"))
+          (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
+          (.nomount_metamodule.commit == .nomount_commit) and
+          (.nomount_metamodule.artifact_url | startswith("https://")) and
+          (.nomount_metamodule.sha256 | test("^sha256:[0-9a-f]{64}$"))
         ' "$metadata_file" > /dev/null
 
     - name: Upload verified artifact metadata
+      if: ${{ inputs.root_flavor != '' && inputs.nomount_commit != '' }}
       uses: actions/upload-artifact@v7
       with:
         name: ${{ steps.extract.outputs.file_name }}-Metadata

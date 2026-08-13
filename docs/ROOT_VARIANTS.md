@@ -8,7 +8,7 @@ three separate source trees and never combines root implementations:
 | Classic KernelSU | `tiann/KernelSU` | `da9abf498a77d438989fea0f5f4e348b9a540c07` |
 | KernelSU Next | `KernelSU-Next/KernelSU-Next` `dev` | `234f6e040fcbca18b16d2398e1aa225712ec99ad` |
 | ReSukiSU | `ReSukiSU/ReSukiSU` | `3ef06b0fcb0960dc9563256fe26a58e892663387` |
-| NoMount | `maxsteeel/nomount` `dev` | `69a8a5b82c3659ee0fa60a5236ff6fdf76a12e2e` |
+| NoMount | `maxsteeel/nomount` `dev` | `c52936b229c25a4b0e41b6627f7d3bc5eaaaf2b5` |
 
 The workflow resolves the selected target to its immutable SUSFS pin:
 
@@ -23,8 +23,8 @@ The workflow resolves the selected target to its immutable SUSFS pin:
 | android16-6.12 | `f37930f374ef88de990d6abea0c67d0ea28c1edc` |
 
 All pins were resolved on 2026-08-13 from the named upstream branches. A pin
-is re-verified after checkout; a mismatch, missing integration patch, existing
-root integration, or NoMount patch fuzz fails the build.
+is re-verified after checkout; a mismatch, missing upstream `fs/nomount`
+integration, or existing root integration fails the build.
 
 The workflow preserves ABI/KMI protection files by snapshotting their hashes
 before integration and requiring an exact match afterward. It does not remove
@@ -40,6 +40,12 @@ is uploaded and its GitHub-issued `sha256` digest and URL are recorded. Each
 record also includes the build method, root implementation/manager/version and
 commit, SUSFS and NoMount revisions, Android branch/KMI, kernel source commit,
 and provenance run URL.
+
+NoMount integration invokes the upstream `kernel/setup.sh` by its full immutable
+commit URL and passes that same SHA as the script argument. Each kernel artifact
+also receives a separately uploaded flashable NoMount metamodule built from the
+same SHA; its artifact URL and SHA-256 digest are included in the metadata
+record. Kernel and metamodule revisions must match exactly.
 
 Runs dispatched before this metadata contract was added cannot retroactively
 contain these metadata artifacts. Their artifact digests remain available from
