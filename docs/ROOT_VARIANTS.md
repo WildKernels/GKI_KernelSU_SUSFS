@@ -40,10 +40,10 @@ artifact.
 
 Successful builds upload a `<target>-Metadata` artifact containing machine-readable
 JSON. Its `status` is `verified` only after the corresponding AnyKernel3 artifact
-is uploaded and its GitHub-issued `sha256` digest and URL are recorded. Each
-record also includes the build method, root implementation/manager/version and
-commit, SUSFS and NoMount revisions, Android branch/KMI, kernel source commit,
-and provenance run URL.
+is uploaded and its GitHub Actions API URL and GitHub-issued `sha256` digest
+are recorded. Each record also includes the build method, root
+implementation/manager/version and commit, SUSFS and NoMount revisions, Android
+branch/KMI, kernel source commit, and provenance run URL.
 
 NoMount integration invokes the upstream `kernel/setup.sh` by its full immutable
 commit URL and passes that same SHA as the script argument. Each kernel artifact

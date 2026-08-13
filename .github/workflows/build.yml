@@ -563,10 +563,38 @@ jobs:
     - name: Write verified artifact metadata
       if: ${{ inputs.root_flavor != '' && inputs.nomount_commit != '' }}
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
 
         metadata_file="${{ github.workspace }}/${{ steps.extract.outputs.file_name }}-metadata.json"
+        artifacts_api="${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100"
+        artifacts_json="$(curl --fail --silent --show-error \
+          --header "Authorization: Bearer ${GH_TOKEN}" \
+          --header "X-GitHub-Api-Version: 2022-11-28" \
+          "$artifacts_api")"
+
+        resolve_artifact() {
+          local artifact_name="$1"
+          local matches
+          matches="$(jq --arg name "$artifact_name" \
+            '[.artifacts[] | select(.name == $name and .expired == false)]' \
+            <<<"$artifacts_json")"
+          if [ "$(jq 'length' <<<"$matches")" -ne 1 ]; then
+            echo "Expected exactly one available artifact named ${artifact_name}." >&2
+            exit 1
+          fi
+          jq -r '.[0] | [.archive_download_url, .digest] | @tsv' <<<"$matches"
+        }
+
+        read -r kernel_artifact_url kernel_artifact_sha256 < <(
+          resolve_artifact "${{ steps.extract.outputs.file_name }}-AnyKernel3"
+        )
+        read -r nomount_module_url nomount_module_sha256 < <(
+          resolve_artifact "${{ steps.extract.outputs.file_name }}-NoMount-Metamodule"
+        )
+
         jq -n \
           --arg method "GKI source build with SHA-pinned root implementation, SUSFS, and NoMount" \
           --arg root_implementation "${ROOT_IMPLEMENTATION:-KernelSU-Next (legacy path)}" \
@@ -579,11 +607,11 @@ jobs:
           --arg kmi "${{ inputs.android_version }}-${{ inputs.kernel_version }}" \
           --arg kernel_source_commit "${KERNEL_SOURCE_COMMIT:-N/A}" \
           --arg provenance_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-          --arg artifact_url "${{ steps.kernel-artifact.outputs.artifact-url }}" \
-          --arg sha256 "${{ steps.kernel-artifact.outputs.artifact-digest }}" \
+          --arg artifact_url "$kernel_artifact_url" \
+          --arg sha256 "$kernel_artifact_sha256" \
           --arg nomount_module_commit "${{ steps.nomount-metamodule.outputs.commit }}" \
-          --arg nomount_module_url "${{ steps.nomount-metamodule-artifact.outputs.artifact-url }}" \
-          --arg nomount_module_sha256 "${{ steps.nomount-metamodule-artifact.outputs.artifact-digest }}" \
+          --arg nomount_module_url "$nomount_module_url" \
+          --arg nomount_module_sha256 "$nomount_module_sha256" \
           --arg status "verified" \
           '{
             method: $method,
