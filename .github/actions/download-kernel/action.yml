@@ -49,31 +49,35 @@ runs:
           echo "deprecated=$DEPRECATED" >> $GITHUB_OUTPUT
         }
 
-        init_repo || { echo "ERROR: init_repo failed" >&2; exit 1; }
-
         MAX_RETRIES=3
         RETRY_DELAY_SHORT=15
         SYNC_TIMEOUT="15m"
         attempt=1
 
         while [ $attempt -le $MAX_RETRIES ]; do
-          echo "Attempt $attempt/$MAX_RETRIES: repo sync (timeout $SYNC_TIMEOUT)..."
-          # Use minimal-shallow variant: current-branch, shallow init done above, reduce files downloaded
-          if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle --no-tags --jobs-checkout=4 -j4; then
-            echo "repo sync succeeded on attempt $attempt."
-            break
-          fi
-          rc=$?
-          if [ $rc -eq 124 ]; then
-            echo "repo sync timed out after $SYNC_TIMEOUT."
+          echo "Attempt $attempt/$MAX_RETRIES: initialize and sync kernel repository (sync timeout $SYNC_TIMEOUT)..."
+          if init_repo; then
+            # Use minimal-shallow variant: current-branch, shallow init done above, reduce files downloaded
+            if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle --no-tags --jobs-checkout=4 -j4; then
+              echo "Kernel repository initialization and sync succeeded on attempt $attempt."
+              break
+            else
+              rc=$?
+              if [ $rc -eq 124 ]; then
+                echo "repo sync timed out after $SYNC_TIMEOUT."
+              else
+                echo "repo sync failed with exit code $rc."
+              fi
+            fi
           else
-            echo "repo sync failed with exit code $rc."
+            rc=$?
+            echo "repo init or branch preflight failed with exit code $rc."
           fi
+
           if [ $attempt -lt $MAX_RETRIES ]; then
             echo "Cleaning workspace and retrying after ${RETRY_DELAY_SHORT}s..."
             rm -rf .repo || true
             sleep $RETRY_DELAY_SHORT
-            init_repo
           else
             echo "All $MAX_RETRIES attempts failed." >&2
             exit $rc
