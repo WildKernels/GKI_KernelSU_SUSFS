@@ -1,0 +1,60 @@
+name: 'Setup NoMount'
+description: 'Integrate NoMount VFS hooks and enable CONFIG_NOMOUNT'
+
+inputs:
+  kernel_version:
+    description: 'Kernel major/minor version (for example, 5.10 or 6.6)'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch and integrate NoMount
+      shell: bash
+      env:
+        KERNEL_VERSION: ${{ inputs.kernel_version }}
+      run: |
+        set -euo pipefail
+
+        KERNEL_DIR="${{ github.workspace }}/kernel/common"
+        NOMOUNT_DIR="${{ github.workspace }}/nomount"
+        NOMOUNT_REPO="https://github.com/maxsteeel/nomount.git"
+
+        case "$KERNEL_VERSION" in
+          5.10|5.15|6.1|6.6|6.12|6.18)
+            NOMOUNT_PATCH="nomount_${KERNEL_VERSION}_kernel_integration.patch"
+            ;;
+          *)
+            echo "Unsupported kernel version for NoMount: $KERNEL_VERSION" >&2
+            exit 1
+            ;;
+        esac
+
+        test -d "$KERNEL_DIR" || {
+          echo "Kernel source directory does not exist: $KERNEL_DIR" >&2
+          exit 1
+        }
+
+        rm -rf "$NOMOUNT_DIR"
+        git clone --depth=1 --branch master "$NOMOUNT_REPO" "$NOMOUNT_DIR"
+
+        test -f "$NOMOUNT_DIR/kernel/patches/$NOMOUNT_PATCH" || {
+          echo "NoMount patch is missing: $NOMOUNT_PATCH" >&2
+          exit 1
+        }
+        test -f "$NOMOUNT_DIR/kernel/src/nomount.c"
+        test -f "$NOMOUNT_DIR/kernel/src/nomount.h"
+
+        cp "$NOMOUNT_DIR/kernel/src/nomount.c" "$KERNEL_DIR/fs/nomount.c"
+        cp "$NOMOUNT_DIR/kernel/src/nomount.h" "$KERNEL_DIR/fs/nomount.h"
+
+        cd "$KERNEL_DIR"
+        patch --forward --batch -p1 < "$NOMOUNT_DIR/kernel/patches/$NOMOUNT_PATCH"
+
+        echo "NoMount integrated: $KERNEL_VERSION ($NOMOUNT_PATCH)"
+
+    - name: Enable NoMount in kernel defconfig
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_NOMOUNT=y
