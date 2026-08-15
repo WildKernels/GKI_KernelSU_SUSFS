@@ -32,24 +32,43 @@ SUSFS and device-patch ABI updates before NoMount integration and requires
 NoMount to leave that baseline unchanged. The guard covers legacy ABI symbol
 lists and the Android 16 Bazel ABI/staging/symbol definitions. It does not
 remove protected exports, bypass ABI checks, build a bypass image, create
-releases, or claim device compatibility. Builds are source-integration checks
-only; no hardware, boot, or runtime testing is represented by a successful
-artifact.
+releases, or claim device compatibility.
 
-## Verified artifact metadata
+## Build-verified only artifact metadata
 
-Successful builds upload a `<target>-Metadata` artifact containing machine-readable
-JSON. Its `status` is `verified` only after the corresponding AnyKernel3 artifact
-is uploaded and its GitHub Actions API URL and GitHub-issued `sha256` digest
-are recorded. Each record also includes the build method, root
-implementation/manager/version and commit, SUSFS and NoMount revisions, Android
-branch/KMI, kernel source commit, and provenance run URL.
+Successful builds upload a `<target>-Metadata` artifact containing
+machine-readable JSON. Its `status` is **`Build-verified only`** only after the
+corresponding AnyKernel3 and NoMount metamodule artifacts are uploaded and their
+GitHub Actions API URLs and GitHub-issued `sha256` digests are recorded. Each
+record also includes the build method, root implementation/manager/version and
+commit, SUSFS and NoMount revisions, Android branch/KMI, kernel source commit,
+and provenance run URL.
 
 NoMount integration invokes the upstream `kernel/setup.sh` by its full immutable
 commit URL and passes that same SHA as the script argument. Each kernel artifact
-also receives a separately uploaded flashable NoMount metamodule built from the
+also receives a separately uploaded NoMount metamodule archive built from the
 same SHA; its artifact URL and SHA-256 digest are included in the metadata
 record. Kernel and metamodule revisions must match exactly.
+
+The metadata `catalog` object makes publication eligibility explicit:
+
+| Field | Required value |
+| --- | --- |
+| `availability` | `eligible-with-provenance-and-checksums` |
+| `device_compatibility` | `not-validated` |
+| `flashability` | `not-guaranteed` |
+| `boot` | `not-guaranteed` |
+
+This status means that CI completed the source build and artifact integrity
+metadata is available. It is not device validation and does not claim device
+compatibility, flashability, or a successful boot. A catalog or release
+publisher may expose a successful build artifact only with its provenance URL
+and both kernel and matching NoMount metamodule checksums. It must mark an
+unbuilt, failed, or metadata-incomplete entry unavailable and provide no
+download.
+
+This workflow remains artifact-only: it does not create releases or publish a
+catalog. Any separate publisher must enforce this metadata contract.
 
 Runs dispatched before this metadata contract was added cannot retroactively
 contain these metadata artifacts. Their artifact digests remain available from

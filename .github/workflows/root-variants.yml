@@ -1,4 +1,4 @@
-name: Build pinned root variants
+name: Build-verified only GKI root variants
 
 on:
   workflow_dispatch:

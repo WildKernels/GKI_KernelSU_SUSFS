@@ -560,8 +560,8 @@ jobs:
         if-no-files-found: error
         compression-level: 0
 
-    - name: Write verified artifact metadata
-      if: ${{ inputs.root_flavor != '' && inputs.nomount_commit != '' }}
+    - name: Write Build-verified only artifact metadata
+      if: ${{ success() && inputs.root_flavor != '' && inputs.nomount_commit != '' }}
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -612,7 +612,11 @@ jobs:
           --arg nomount_module_commit "${{ steps.nomount-metamodule.outputs.commit }}" \
           --arg nomount_module_url "$nomount_module_url" \
           --arg nomount_module_sha256 "$nomount_module_sha256" \
-          --arg status "verified" \
+          --arg status "Build-verified only" \
+          --arg catalog_availability "eligible-with-provenance-and-checksums" \
+          --arg device_compatibility "not-validated" \
+          --arg flashability "not-guaranteed" \
+          --arg boot "not-guaranteed" \
           '{
             method: $method,
             root: {
@@ -634,11 +638,17 @@ jobs:
               artifact_url: $nomount_module_url,
               sha256: $nomount_module_sha256
             },
+            catalog: {
+              availability: $catalog_availability,
+              device_compatibility: $device_compatibility,
+              flashability: $flashability,
+              boot: $boot
+            },
             status: $status
           }' > "$metadata_file"
 
         jq -e '
-          .status == "verified" and
+          .status == "Build-verified only" and
           (.root.manager | length > 0) and
           (.root.version | length > 0) and
           (.susfs_revision | test("^[0-9a-f]{40}$")) and
@@ -648,11 +658,15 @@ jobs:
           (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
           (.nomount_metamodule.commit == .nomount_commit) and
           (.nomount_metamodule.artifact_url | startswith("https://")) and
-          (.nomount_metamodule.sha256 | test("^sha256:[0-9a-f]{64}$"))
+          (.nomount_metamodule.sha256 | test("^sha256:[0-9a-f]{64}$")) and
+          .catalog.availability == "eligible-with-provenance-and-checksums" and
+          .catalog.device_compatibility == "not-validated" and
+          .catalog.flashability == "not-guaranteed" and
+          .catalog.boot == "not-guaranteed"
         ' "$metadata_file" > /dev/null
 
-    - name: Upload verified artifact metadata
-      if: ${{ inputs.root_flavor != '' && inputs.nomount_commit != '' }}
+    - name: Upload Build-verified only artifact metadata
+      if: ${{ success() && inputs.root_flavor != '' && inputs.nomount_commit != '' }}
       uses: actions/upload-artifact@v7
       with:
         name: ${{ steps.extract.outputs.file_name }}-Metadata
