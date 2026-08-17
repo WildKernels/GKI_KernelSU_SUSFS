@@ -120,8 +120,52 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
+  resolve-nomount:
+    runs-on: ubuntu-latest
+    outputs:
+      nomount_commit: ${{ steps.resolve.outputs.nomount_commit }}
+    steps:
+      - name: Resolve latest NoMount dev commit
+        id: resolve
+        if: ${{ contains(inputs.feature_set, 'NOMOUNT') || inputs.feature_set == 'FULL' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git ls-remote https://github.com/maxsteeel/nomount.git refs/heads/dev | awk '{print $1}')"
+          if [ -z "$sha" ] || ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Failed to resolve NoMount dev branch tip." >&2
+            exit 1
+          fi
+          echo "nomount_commit=$sha" >> "$GITHUB_OUTPUT"
+          echo "Resolved NoMount dev commit: $sha"
+
+  build-nomount-module:
+    needs: resolve-nomount
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        if: ${{ contains(inputs.feature_set, 'NOMOUNT') || inputs.feature_set == 'FULL' }}
+
+      - name: Build NoMount metamodule
+        id: nomount-metamodule
+        if: ${{ contains(inputs.feature_set, 'NOMOUNT') || inputs.feature_set == 'FULL' }}
+        uses: ./.github/actions/nomount-metamodule
+        with:
+          commit: ${{ needs.resolve-nomount.outputs.nomount_commit }}
+
+      - name: Upload NoMount metamodule
+        if: ${{ contains(inputs.feature_set, 'NOMOUNT') || inputs.feature_set == 'FULL' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: NoMount-Metamodule
+          path: ${{ steps.nomount-metamodule.outputs.module_path }}
+          if-no-files-found: error
+          compression-level: 0
+
   build-android12-5-10:
-    needs: prepare-ccache
+    needs:
+    - prepare-ccache
+    - resolve-nomount
     if: ${{ !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == 'android12-5.10') }}
     uses: ./.github/workflows/prepare.yml
     with:
@@ -129,10 +173,13 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android12-5-10 }}
+      nomount_commit: ${{ needs.resolve-nomount.outputs.nomount_commit }}
     secrets: inherit
 
   build-android13-5-10:
-    needs: prepare-ccache
+    needs:
+    - prepare-ccache
+    - resolve-nomount
     if: ${{ !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == 'android13-5.10') }}
     uses: ./.github/workflows/prepare.yml
     with:
@@ -140,10 +187,13 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android13-5-10 }}
+      nomount_commit: ${{ needs.resolve-nomount.outputs.nomount_commit }}
     secrets: inherit
 
   build-android13-5-15:
-    needs: prepare-ccache
+    needs:
+    - prepare-ccache
+    - resolve-nomount
     if: ${{ !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == 'android13-5.15') }}
     uses: ./.github/workflows/prepare.yml
     with:
@@ -151,10 +201,13 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android13-5-15 }}
+      nomount_commit: ${{ needs.resolve-nomount.outputs.nomount_commit }}
     secrets: inherit
 
   build-android14-5-15:
-    needs: prepare-ccache
+    needs:
+    - prepare-ccache
+    - resolve-nomount
     if: ${{ !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == 'android14-5.15') }}
     uses: ./.github/workflows/prepare.yml
     with:
@@ -162,10 +215,13 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android14-5-15 }}
+      nomount_commit: ${{ needs.resolve-nomount.outputs.nomount_commit }}
     secrets: inherit
 
   build-android14-6-1:
-    needs: prepare-ccache
+    needs:
+    - prepare-ccache
+    - resolve-nomount
     if: ${{ !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == 'android14-6.1') }}
     uses: ./.github/workflows/prepare.yml
     with:
@@ -173,10 +229,13 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android14-6-1 }}
+      nomount_commit: ${{ needs.resolve-nomount.outputs.nomount_commit }}
     secrets: inherit
 
   build-android15-6-6:
-    needs: prepare-ccache
+    needs:
+    - prepare-ccache
+    - resolve-nomount
     if: ${{ !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == 'android15-6.6') }}
     uses: ./.github/workflows/prepare.yml
     with:
@@ -184,10 +243,13 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android15-6-6 }}
+      nomount_commit: ${{ needs.resolve-nomount.outputs.nomount_commit }}
     secrets: inherit
 
   build-android16-6-12:
-    needs: prepare-ccache
+    needs:
+    - prepare-ccache
+    - resolve-nomount
     if: ${{ !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == 'android16-6.12') }}
     uses: ./.github/workflows/prepare.yml
     with:
@@ -195,6 +257,7 @@ jobs:
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit_android16-6-12 }}
+      nomount_commit: ${{ needs.resolve-nomount.outputs.nomount_commit }}
     secrets: inherit
 
   rej:
@@ -388,6 +451,7 @@ jobs:
     - build-android14-6-1
     - build-android15-6-6
     - build-android16-6-12
+    - build-nomount-module
 
     env:
       GH_TOKEN: ${{ github.token }}
@@ -567,6 +631,14 @@ jobs:
         path: release-assets
         pattern: '*-AnyKernel3'
         merge-multiple: false
+
+    - name: Download NoMount metamodule
+      uses: actions/download-artifact@v7
+      with:
+        path: release-assets
+        pattern: '*NoMount-Metamodule'
+        merge-multiple: false
+        if-no-files-found: ignore
 
     - name: Zip AnyKernel3 for Release
       run: |

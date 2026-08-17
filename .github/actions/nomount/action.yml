@@ -1,52 +1,83 @@
-name: Setup pinned NoMount
-description: Integrate NoMount with its upstream SHA-pinned setup script
+name: 'Setup NoMount'
+description: 'Integrate NoMount VFS hooks (pinned SHA or latest dev) and enable CONFIG_NOMOUNT'
+
 inputs:
   commit:
-    description: 'Full immutable NoMount commit SHA'
-    required: true
+    description: 'Full immutable NoMount commit SHA (empty = latest dev branch tip)'
+    required: false
+    default: ''
+  kernel_version:
+    description: 'Kernel major/minor version (for example, 5.10 or 6.6)'
+    required: false
+    default: ''
+
+outputs:
+  commit:
+    description: 'NoMount commit SHA actually integrated'
+    value: ${{ steps.integrate.outputs.commit }}
 
 runs:
   using: composite
   steps:
-    - name: Run upstream setup script at the pinned revision
+    - name: Integrate NoMount
+      id: integrate
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
+      env:
+        KERNEL_VERSION: ${{ inputs.kernel_version }}
       run: |
         set -euo pipefail
 
-        expected_commit="${{ inputs.commit }}"
-        if ! [[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]]; then
-          echo "NoMount commit must be a full 40-character SHA." >&2
-          exit 2
+        KERNEL_DIR="${{ github.workspace }}/kernel/common"
+        test -d "$KERNEL_DIR/fs" || {
+          echo "Kernel source directory does not exist: $KERNEL_DIR" >&2
+          exit 1
+        }
+
+        requested_commit="${{ inputs.commit }}"
+
+        if [ -z "$requested_commit" ]; then
+          # Float mode: latest dev branch tip, captured at run time
+          echo "NoMount: no commit pinned, using latest dev branch tip"
+          (
+            cd "$KERNEL_DIR"
+            curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+              https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s dev
+          )
+          actual_commit="$(git -C "$KERNEL_DIR/NoMount" rev-parse HEAD)"
+        else
+          # Pin mode: fetch the setup script at the exact SHA and verify it landed
+          if ! [[ "$requested_commit" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "NoMount commit must be a full 40-character SHA." >&2
+            exit 2
+          fi
+          setup_script="${RUNNER_TEMP}/nomount-setup-${requested_commit}.sh"
+          curl --fail --location --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
+            "https://raw.githubusercontent.com/maxsteeel/nomount/${requested_commit}/kernel/setup.sh" \
+            --output "$setup_script"
+          test -s "$setup_script"
+          chmod 0755 "$setup_script"
+          (
+            cd "$KERNEL_DIR"
+            "$setup_script" "$requested_commit"
+          )
+          actual_commit="$(git -C "$KERNEL_DIR/NoMount" rev-parse HEAD)"
+          if [ "$actual_commit" != "$requested_commit" ]; then
+            echo "NoMount commit mismatch: expected $requested_commit, got $actual_commit." >&2
+            exit 1
+          fi
         fi
-        if [ -e common/NoMount ] || [ -e common/fs/nomount ]; then
-          echo "Refusing to reuse an existing NoMount integration." >&2
+
+        if [ ! -L "$KERNEL_DIR/fs/nomount" ]; then
+          echo "NoMount integration failed: fs/nomount symlink missing" >&2
           exit 1
         fi
 
-        setup_script="${RUNNER_TEMP}/nomount-setup-${expected_commit}.sh"
-        curl --fail --location --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
-          "https://raw.githubusercontent.com/maxsteeel/nomount/${expected_commit}/kernel/setup.sh" \
-          --output "$setup_script"
-        test -s "$setup_script"
-        chmod 0755 "$setup_script"
-        (
-          cd common
-          "$setup_script" "$expected_commit"
-        )
-
-        actual_commit="$(git -C common/NoMount rev-parse HEAD)"
-        if [ "$actual_commit" != "$expected_commit" ]; then
-          echo "NoMount commit mismatch: expected $expected_commit, got $actual_commit." >&2
-          exit 1
-        fi
-        if [ ! -L common/fs/nomount ] || [ ! -f common/fs/nomount/Kconfig ]; then
-          echo "Upstream NoMount setup did not create the expected fs/nomount integration." >&2
-          exit 1
-        fi
+        echo "commit=$actual_commit" >> "$GITHUB_OUTPUT"
         echo "NOMOUNT_COMMIT=$actual_commit" >> "$GITHUB_ENV"
+        echo "NoMount integrated (kernel $KERNEL_VERSION, commit $actual_commit)"
 
-    - name: Enable NoMount configuration
+    - name: Enable NoMount in kernel defconfig
       uses: ./.github/actions/set-kernel-config
       with:
         config_list: |
