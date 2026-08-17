@@ -32,6 +32,7 @@ on:
         description: "Feature Set"
         type: choice
         options:
+          - KSUN+SUSFS+NOMOUNT
           - KSUN+SUSFS+BBG+NET+DS
           - KSUN+SUSFS+BBG
           - KSUN+SUSFS+NET
@@ -41,6 +42,7 @@ on:
           - KSUN+NET
           - KSUN+DS
           - KSUN
+          - NOMOUNT
           - NONE
           - FULL
         default: FULL
@@ -580,19 +582,44 @@ jobs:
           KSUN_COMMIT="$KSU_INPUT"
         fi
 
-        # Extract version info
-        COMMITS_COUNT=$(git rev-list --count HEAD)
+        # The manager is built on the OFFICIAL KernelSU-Next repo
+        # (pershoot's workflows are all disabled). Find the official dev
+        # commit this fork's branch is synced with (merge-base of our
+        # branch vs official dev), then link the manager build run for
+        # that commit. pershoot's own dev branch is intentionally ignored.
+        retry() {
+          local n=0
+          until [ "$n" -ge 5 ]; do
+            "$@" && return 0
+            n=$((n+1))
+            echo "retry $n/5 failed for: $*" >&2
+            sleep 5
+          done
+          return 1
+        }
+
+        OFFICIAL_KSU_REPO="https://github.com/KernelSU-Next/KernelSU-Next.git"
+        retry git fetch "$OFFICIAL_KSU_REPO" dev
+        STOCK_COMMIT=$(git merge-base HEAD FETCH_HEAD)
+        echo "KSU Stock Commit (official sync point): $STOCK_COMMIT"
+
+        # Extract version info — anchored to the official sync point
+        # (STOCK_COMMIT), i.e. the commit the linked manager is built from.
+        # Mirrors pershoot c0a2c5fd: count the merge-base with origin, not
+        # the fork's extra commits, so the version shown in the release
+        # notes matches what the kernel reports and the manager displays.
+        COMMITS_COUNT=$(git rev-list --count "$STOCK_COMMIT")
         BASE_VERSION=30000
         KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
 
-        # Extract git tag
-        KSU_GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
+        # Extract git tag at the sync point
+        KSU_GIT_TAG=$(git describe --tags --abbrev=0 "$STOCK_COMMIT" 2>/dev/null || echo "no-tag")
 
-        MANAGER_RUN_ID=$(curl -fsSL "https://api.github.com/repos/pershoot/KernelSU-Next/actions/workflows/build-manager-ci.yml/runs?head_sha=${KSUN_COMMIT}" | jq -r '.workflow_runs[0].id // empty')
+        MANAGER_RUN_ID=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/KernelSU-Next/KernelSU-Next/actions/workflows/build-manager-ci.yml/runs?head_sha=${STOCK_COMMIT}" | jq -r '.workflow_runs[0].id // empty')
         if [[ -n "${MANAGER_RUN_ID:-}" ]]; then
-          KSU_MANAGER="https://github.com/pershoot/KernelSU-Next/actions/runs/${MANAGER_RUN_ID}"
+          KSU_MANAGER="https://github.com/KernelSU-Next/KernelSU-Next/actions/runs/${MANAGER_RUN_ID}"
         else
-          KSU_MANAGER="https://github.com/pershoot/KernelSU-Next/actions/workflows/build-manager-ci.yml"
+          KSU_MANAGER="https://github.com/KernelSU-Next/KernelSU-Next/actions/workflows/build-manager-ci.yml"
         fi
 
         echo "Commits count: $COMMITS_COUNT"

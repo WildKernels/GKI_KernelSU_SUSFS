@@ -48,13 +48,20 @@ runs:
         fi
 
         cd KernelSU-Next/kernel
-        
-        COMMITS_COUNT=$(/usr/bin/git rev-list --count HEAD)
+
+        # Anchor the version to the upstream sync point (merge-base with
+        # origin/<base-branch>) exactly like the official manager's
+        # versionCode and pershoot's Kbuild (c0a2c5fd), so the kernel's
+        # KSU_VERSION_FALLBACK matches the manager version the kernel
+        # reports at runtime. Fall back to origin/main, then HEAD.
+        BASE_BRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's:-.*::' 2>/dev/null)
+        BASE_COMMIT=$(git merge-base HEAD refs/remotes/origin/$BASE_BRANCH 2>/dev/null || git merge-base HEAD refs/remotes/origin/main 2>/dev/null || echo HEAD)
+        COMMITS_COUNT=$(/usr/bin/git rev-list --count $BASE_COMMIT)
         BASE_VERSION=30000
         KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
         sed -i "s/^KSU_VERSION_FALLBACK := 1$/KSU_VERSION_FALLBACK := ${KSU_VERSION}/" Kbuild
 
-        KSU_GIT_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.1")"
+        KSU_GIT_TAG="$(git describe --tags --abbrev=0 $BASE_COMMIT 2>/dev/null || echo "v0.0.1")"
         sed -i "s/^KSU_VERSION_TAG_FALLBACK := v0.0.1$/KSU_VERSION_TAG_FALLBACK := ${KSU_GIT_TAG}/" Kbuild
     
     - name: Extract KSU Version Info
