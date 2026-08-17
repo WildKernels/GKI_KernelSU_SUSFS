@@ -9,7 +9,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Fetch and integrate NoMount
+    - name: Fetch and integrate NoMount (dev method)
       shell: bash
       env:
         KERNEL_VERSION: ${{ inputs.kernel_version }}
@@ -17,41 +17,20 @@ runs:
         set -euo pipefail
 
         KERNEL_DIR="${{ github.workspace }}/kernel/common"
-        NOMOUNT_DIR="${{ github.workspace }}/nomount"
-        NOMOUNT_REPO="https://github.com/maxsteeel/nomount.git"
-
-        case "$KERNEL_VERSION" in
-          5.10|5.15|6.1|6.6|6.12|6.18)
-            NOMOUNT_PATCH="nomount_${KERNEL_VERSION}_kernel_integration.patch"
-            ;;
-          *)
-            echo "Unsupported kernel version for NoMount: $KERNEL_VERSION" >&2
-            exit 1
-            ;;
-        esac
-
-        test -d "$KERNEL_DIR" || {
+        test -d "$KERNEL_DIR/fs" || {
           echo "Kernel source directory does not exist: $KERNEL_DIR" >&2
           exit 1
         }
 
-        rm -rf "$NOMOUNT_DIR"
-        git clone --depth=1 --branch master "$NOMOUNT_REPO" "$NOMOUNT_DIR"
+        cd "$KERNEL_DIR"
+        curl -fsSL https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s dev
 
-        test -f "$NOMOUNT_DIR/kernel/patches/$NOMOUNT_PATCH" || {
-          echo "NoMount patch is missing: $NOMOUNT_PATCH" >&2
+        test -L "fs/nomount" || {
+          echo "NoMount integration failed: fs/nomount symlink missing" >&2
           exit 1
         }
-        test -f "$NOMOUNT_DIR/kernel/src/nomount.c"
-        test -f "$NOMOUNT_DIR/kernel/src/nomount.h"
 
-        cp "$NOMOUNT_DIR/kernel/src/nomount.c" "$KERNEL_DIR/fs/nomount.c"
-        cp "$NOMOUNT_DIR/kernel/src/nomount.h" "$KERNEL_DIR/fs/nomount.h"
-
-        cd "$KERNEL_DIR"
-        patch --forward --batch -p1 < "$NOMOUNT_DIR/kernel/patches/$NOMOUNT_PATCH"
-
-        echo "NoMount integrated: $KERNEL_VERSION ($NOMOUNT_PATCH)"
+        echo "NoMount integrated (dev method, kernel $KERNEL_VERSION)"
 
     - name: Enable NoMount in kernel defconfig
       uses: ./.github/actions/set-kernel-config
