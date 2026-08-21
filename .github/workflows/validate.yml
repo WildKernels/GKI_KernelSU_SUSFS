@@ -1,0 +1,33 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate workflows, shell scripts, and Python syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate GitHub workflows
+        run: python3 .github/scripts/validate_workflows.py
+
+      - name: Validate shell scripts
+        run: python3 .github/scripts/validate_shell.py
+
+      - name: Validate Python syntax
+        run: python3 .github/scripts/validate_python.py
