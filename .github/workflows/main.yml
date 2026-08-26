@@ -923,7 +923,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.release_type == 'Pre-Release' || inputs.release_type == 'Release') }}
+    if: always() && github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.release_type == 'Pre-Release' || inputs.release_type == 'Release')
     permissions:
       contents: write
     needs:
