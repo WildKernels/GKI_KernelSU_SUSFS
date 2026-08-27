@@ -72,6 +72,14 @@ runs:
           echo "NoMount integration failed: fs/nomount symlink missing" >&2
           exit 1
         fi
+        if ! grep -qxF 'obj-$(CONFIG_NOMOUNT) += nomount/' "$KERNEL_DIR/fs/Makefile"; then
+          echo "NoMount integration failed: fs/Makefile entry missing" >&2
+          exit 1
+        fi
+        if ! grep -qxF 'source "fs/nomount/Kconfig"' "$KERNEL_DIR/fs/Kconfig"; then
+          echo "NoMount integration failed: fs/Kconfig entry missing" >&2
+          exit 1
+        fi
 
         echo "commit=$actual_commit" >> "$GITHUB_OUTPUT"
         echo "NOMOUNT_COMMIT=$actual_commit" >> "$GITHUB_ENV"
