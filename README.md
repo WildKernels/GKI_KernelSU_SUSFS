@@ -7,17 +7,17 @@
 
 </div>
 
-## Your warranty is no longer valid!
+> [!CAUTION]
+> **Your warranty is no longer valid!**
+>
+> I am **not responsible** for bricked devices, damaged hardware, or any issues that arise from using this kernel.
+>
+> **Please** do thorough research and fully understand the features included in this kernel before flashing it!
+>
+> By flashing this kernel, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame me**!
 
-I am **not responsible** for bricked devices, damaged hardware, or any issues that arise from using this kernel.
-
-**Please** do thorough research and fully understand the features included in this kernel before flashing it!
-
-By flashing this kernel, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame me**!
-
----
-
-### Proceed at your own risk!
+> [!WARNING]
+> **Proceed at your own risk!**
 
 ---
 
@@ -85,11 +85,12 @@ If you encounter any issues or need help, feel free to:
 
 ## Disclaimer
 
-Flashing this kernel will void your warranty, and there is always a risk of bricking your device. Please make sure to:
-- Back up your data
-- Understand the risks before proceeding
-
-**Proceed at your own risk!**
+> [!CAUTION]
+> **Your warranty is no longer valid!** Flashing this kernel will void your warranty, and there is always a risk of bricking your device. Please make sure to:
+> - Back up your data
+> - Understand the risks before proceeding
+>
+> **Proceed at your own risk!**
 
 ---
 
