@@ -86,23 +86,10 @@ jobs:
         testing: false
 
     - name: Setup more Swap (for LTO)
-      shell: bash
-      run: |
-        set -euo pipefail
-        SWAP_FILE=/mnt/swapfile
-        SWAP_SIZE_GB=16
-
-        if sudo swapon --show=NAME --noheadings | grep -Fxq "$SWAP_FILE"; then
-          echo "Swap file already active: $SWAP_FILE"
-        else
-          echo "Creating ${SWAP_SIZE_GB}G swap file at $SWAP_FILE"
-          sudo fallocate -l "${SWAP_SIZE_GB}G" "$SWAP_FILE"
-          sudo chmod 600 "$SWAP_FILE"
-          sudo mkswap "$SWAP_FILE"
-          sudo swapon "$SWAP_FILE"
-        fi
-
-        free -h
+      uses: thejerrybao/setup-swap-space@v1   # or pierotofy/set-swap-space
+      with:
+        swap-size-gb: 16          # 10-24 GB is common for heavy LTO
+        # swap-space-path: /mnt/swapfile   # optional
 
     - name: Setup Build Environment
       uses: ./.github/actions/setup-build-environment
