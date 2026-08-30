@@ -1,0 +1,44 @@
+name: Update Org Contributors
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"  # Mondays 03:00 UTC
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/org-contributors.yml"
+      - ".github/scripts/update-org-contributors.py"
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Update org-wide contributors grid
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG: WildKernels
+          README_PATH: README.md
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/update-org-contributors.py
+          echo "--- diff ---"
+          git diff -- README.md || true
+
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- README.md; then
+            echo "No changes to README.md"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: update org-wide contributors grid [skip ci]"
+          git push
