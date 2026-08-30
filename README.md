@@ -21,7 +21,7 @@ By flashing this kernel, **YOU** are choosing to make these modifications. If so
 
 ---
 
-## Available Devices
+## Our Kernels
 
 | Device | Repository |
 |--------|------------|
