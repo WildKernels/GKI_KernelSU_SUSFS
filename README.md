@@ -14,7 +14,7 @@
 >
 > **Please** do thorough research and fully understand the features included in this kernel before flashing it!
 >
-> By flashing this kernel, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame me**!
+> By flashing this kernel, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame the Wild Kernels Team**!
 >
 > **Proceed at your own risk!**
 
