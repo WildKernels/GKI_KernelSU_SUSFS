@@ -21,7 +21,7 @@ By flashing this kernel, **YOU** are choosing to make these modifications. If so
 
 ---
 
-## Our Kernels
+## Our Projects
 
 | Device | Repository |
 |--------|------------|
