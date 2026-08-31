@@ -11,7 +11,7 @@ After flashing a WildKernels GKI kernel, do these checks to make sure everything
 ## 2. SUSFS
 
 - In the manager, install the [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module) (recommended module for SUSFS).
-- Reboot after installing the module if prompted.
+- Reboot after installing the module.
 
 ## 3. Verify root
 
