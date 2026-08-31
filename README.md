@@ -101,13 +101,6 @@ If you encounter any issues or need help, feel free to:
 
 [![Contributors](https://contrib.rocks/image?repo=WildKernels/GKI_KernelSU_SUSFS)](https://github.com/WildKernels/GKI_KernelSU_SUSFS/graphs/contributors)
 
-| Contributor | Contribution |
-|-------------|-------------|
-| [simonpunk](https://gitlab.com/simonpunk/susfs4ksu.git) | Created SUSFS! |
-| [sidex15](https://github.com/sidex15) | Created module! |
-
-*If you have contributed and are not listed here, please remind me!* 
-
 ---
 
 ## Donations
