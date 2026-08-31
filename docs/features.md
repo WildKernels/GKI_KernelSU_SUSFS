@@ -29,7 +29,8 @@ Kernel-based su and root access management for Android.
 | NoMount | Metamodule providing mount-related functionality alongside root implementations. | [maxsteeel/nomount](https://github.com/maxsteeel/nomount) |
 | Mountify | Globally mounted modules via OverlayFS. | [backslashxx/mountify](https://github.com/backslashxx/mountify) |
 
-*Only one is required if mounting modules.*
+> [!NOTE]
+> Only one is required if mounting modules.
 
 ## Security
 
