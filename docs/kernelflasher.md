@@ -27,7 +27,7 @@ This requires the flashing app to have root permissions. On first install from s
 
 - [Kernel Flasher](https://github.com/fatalcoder524/KernelFlasher) - recommended, actively maintained
 
-Requires root to flash a kernel from within Android. See also [PixelFlasher](pixelflasher.md) - alternative with advanced options.
+Requires root to flash a kernel from within Android.
 
 ## After flashing
 
