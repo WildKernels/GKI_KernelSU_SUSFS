@@ -8,9 +8,6 @@ After flashing a WildKernels GKI kernel, do these checks to make sure everything
 - Install / update it over any existing manager.
 - Open the manager — it should show the kernel version you just flashed (e.g. `6.1.157-android14`).
 
-> [!NOTE]
-> Match by the full kernel version (`6.1.x-androidXX`), not just your device's Android version. The `android14` in the kernel string is the KMI, not necessarily your ROM's version.
-
 ## 2. SUSFS (if you flashed a SUSFS build)
 
 - In the manager, install the [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module) (recommended module for SUSFS).
