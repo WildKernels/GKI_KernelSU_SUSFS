@@ -17,8 +17,8 @@ After flashing a WildKernels GKI kernel, do these checks to make sure everything
 ## 3. Meta Module (if mounting modules)
 
 If you need to mount modules, install one of:
-- [NoMount](https://github.com/maxsteeel/nomount) — find matching build from the same [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases) page you got the kernel from
-- [Mountify](https://github.com/backslashxx/mountify) (Recommended) — you can always use the latest module if compatible with SUSFS at time of building
+- [NoMount](https://github.com/maxsteeel/nomount) (Recommended) — Download the `NoMount-metamodule-*commit*.zip` from the same [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases) page you got the kernel from
+- [Mountify](https://github.com/backslashxx/mountify) — you can always use the latest module if compatible with SUSFS at time of building
 
 > [!NOTE]
 > Only one is required if mounting modules. Compatibility with SUSFS shifts due to constant changes and it is not always compatible.
