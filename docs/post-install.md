@@ -35,4 +35,4 @@ If you need to mount modules, install one of:
 
 ---
 
-Related: [Installation Overview](installation.md) · [Install with Kernel Flasher](kernelflasher.md) · [Install with PixelFlasher](pixelflasher.md) · [Patch boot.img Manually](magiskboot.md)
+Related: [Installation Overview](installation.md) · [Install with Kernel Flasher](kernelflasher.md) · [Patch boot.img Manually](magiskboot.md)
