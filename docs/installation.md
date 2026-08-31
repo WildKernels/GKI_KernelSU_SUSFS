@@ -24,6 +24,6 @@ See [Post-Install — Verify & Finish Setup](post-install.md) for manager instal
 ---
 
 > [!NOTE]
-> Portions of this documentation are adapted from the official [KernelSU documentation](https://kernelsu.org/). Please refer there for authoritative details and confirmation.
+> Portions of this documentation are adapted from the official [KernelSU documentation](https://kernelsu.org/).
 
 See also: [Kernel Features Documentation](features.md)
