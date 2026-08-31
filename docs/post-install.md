@@ -2,7 +2,7 @@
 
 After flashing a WildKernels GKI kernel, do these checks to make sure everything is working.
 
-## 1. Install the matching manager
+## 1. Download matching manager — KernelSU / KernelSU-Next / ReSukiSU
 
 - Download the `manager-apk-*` from the same [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases) page you got the kernel from.
 - Install / update it over any existing manager.
