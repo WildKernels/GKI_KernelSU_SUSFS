@@ -36,7 +36,7 @@ See [Post-Install — Verify & Finish Setup](post-install.md) for manager instal
 ## Troubleshooting
 
 - **Bootloop** - restore a stock boot.img via fastboot/recovery.
-- **Manager shows old version** - ensure you installed the latest kernel and manager linked in the release and rebooted fully.
+- **Manager and kernel version do not match (e.g. 31000 != 32000)** — for best compatibility ensure both match. Install the latest kernel and manager linked in the release and reboot fully.
 
 ---
 
