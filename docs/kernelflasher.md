@@ -19,7 +19,7 @@
 4. **Reboot** when prompted and verify KernelSU manager shows the expected version.
 
 > [!NOTE]
-> Match by the full kernel version (e.g., `6.1.x-androidXX`) - your device's Android version and the `androidXX` in the kernel version are not necessarily the same. For example, as of writing, a Google Pixel 8 is on `6.1.157-android14` while the system Android is 16.
+> Match by the full kernel version (e.g., `6.1.x-androidXX`) - your device's Android version and the `androidXX` in the kernel version are not necessarily the same. For example, as of writing, a Google Pixel 8 is on `6.1.157-android14` while the system Android is 17.
 
 This requires the flashing app to have root permissions. On first install from stock (no root yet), flash via recovery or fastboot instead, then use this method for subsequent upgrades.
 
