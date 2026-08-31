@@ -35,8 +35,7 @@ See [Post-Install — Verify & Finish Setup](post-install.md) for manager instal
 
 ## Troubleshooting
 
-- **Bootloop** - restore your boot backup via fastboot/recovery.
-- **Wrong KMI** - re-flash with the correct KMI variant; KMI mismatch is the most common failure.
+- **Bootloop** - restore a stock boot.img via fastboot/recovery.
 - **Manager shows old version** - ensure you flashed the intended variant and rebooted fully.
 
 ---

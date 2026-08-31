@@ -20,8 +20,7 @@ After flashing a WildKernels GKI kernel, do these checks to make sure everything
 
 ## 4. Troubleshooting
 
-- **Bootloop** — restore your boot backup via fastboot (`fastboot flash boot boot.img`) or recovery.
-- **Wrong KMI / won't boot** — you flashed the wrong `androidXX` KMI variant. Re-flash the correct one matching `uname -r` / your running KMI.
+- **Bootloop** — restore a stock boot.img via fastboot/recovery.
 - **Manager shows old version** — you flashed the wrong variant or didn't reboot fully. Re-flash the intended ZIP and reboot.
 - **Root not working** — ensure you installed the manager matching the flashed flavor (KernelSU / KernelSU-Next / ReSukiSU).
 
