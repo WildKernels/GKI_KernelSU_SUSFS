@@ -59,7 +59,7 @@ Kernel-based su and root access management for Android.
 
 | Feature | Description | Source |
 |---------|-------------|--------|
-| NTSync | High-performance synchronization primitives compatible with Windows NT kernel API. | `CONFIG_NTSYNC` · [kernel_patches/common/ntsync](https://github.com/WildKernels/kernel_patches/tree/main/common/ntsync) |
+| NTSync | High-performance synchronization primitives compatible with Windows NT kernel API. | [kernel_patches/common/ntsync](https://github.com/WildKernels/kernel_patches/tree/main/common/ntsync) |
 | Performance Tuning | Kernel configuration and tuning options | [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches/tree/main/common) |
 
 ## Container Runtime
