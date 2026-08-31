@@ -71,5 +71,3 @@ Kernel-based su and root access management for Android.
 ---
 
 **Installation** - see [Installation Guide](installation.md).
-
-**Release Notes** - for build-specific version/commit info, see the [release workflow](https://github.com/WildKernels/GKI_KernelSU_SUSFS/actions/workflows/main.yml) or the releases page.
