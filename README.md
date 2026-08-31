@@ -67,7 +67,7 @@ See **[Installation Guide](docs/installation.md)**.
 - **DroidSpaces-OSS**: Developed by [ravindu644](https://github.com/ravindu644/Droidspaces-OSS)
 - **Baseband-guard (BBG)**: Developed by [vc-teahouse](https://github.com/vc-teahouse/Baseband-guard)
 - **Kernel Patches**: Maintained by [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches)
-- **AnyKernel3**: Maintained by [WildKernels/AnyKernel3](https://github.com/WildKernels/AnyKernel3)
+- **AnyKernel3**: Developed by [osm0sis](https://github.com/osm0sis/AnyKernel3)
 - **Sultan Kernels (Pixel)**: Developed by [kerneltoast](https://github.com/kerneltoast)
 - **Device Boot Fix**: [Boot fix commit](https://github.com/Anything-at-25-00/android_kernel_common_android12-5.10/commit/2476d262b597fe8af82cfb7aaf96676f51c6b4ed) for fixing some devices not booting
 
