@@ -10,7 +10,7 @@ Kernel-based su and root access management for Android.
 |-------------|-------------|----------|
 | KernelSU | Original implementation by [tiann](https://github.com/tiann) — the foundation from which all other variants are derived. | [tiann/KernelSU](https://github.com/tiann/KernelSU) |
 | KernelSU-Next | Created by [rifsxd](https://github.com/rifsxd). SUSFS-enabled builds sourced from pershoot fork. | [KernelSU-Next/KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) · [pershoot/KernelSU-Next](https://github.com/pershoot/KernelSU-Next) |
-| ReSukiSU | ReSukiSU root fork, pinned to verified commit. Own SUSFS pins per flavor. | [ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) |
+| ReSukiSU | Fork of SukiSU, also has its own SUSFS-integrated branch. | [ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) |
 
 ## Root Hiding
 
