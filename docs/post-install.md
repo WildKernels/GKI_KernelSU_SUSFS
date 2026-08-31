@@ -13,11 +13,20 @@ After flashing a WildKernels GKI kernel, do these checks to make sure everything
 - In the manager, install the [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module) (recommended module for SUSFS).
 - Reboot after installing the module.
 
-## 3. Verify root
+## 3. Meta Module (if mounting modules)
+
+If you need to mount modules, install one of:
+- [NoMount](https://github.com/maxsteeel/nomount) — metamodule for mount-related functionality
+- [Mountify](https://github.com/backslashxx/mountify) — globally mounted modules via OverlayFS
+
+> [!NOTE]
+> Only one is required if mounting modules.
+
+## 4. Verify root
 
 - Open the manager and check it reports "Working" / shows the correct version.
 
-## 4. Troubleshooting
+## 5. Troubleshooting
 
 - **Bootloop** — restore a stock boot.img via fastboot/recovery.
 - **Manager and kernel version do not match (e.g. 31000 != 32000)** — for best compatibility ensure both match. Install the latest kernel and manager linked in the release and reboot fully.
