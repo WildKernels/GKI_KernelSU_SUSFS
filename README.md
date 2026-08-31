@@ -8,9 +8,7 @@
 </div>
 
 > [!CAUTION]
-> **Your warranty is no longer valid!** Flashing this kernel will void your warranty, and there is always a risk of bricking your device.
->
-> I am **not responsible** for bricked devices, damaged hardware, or any issues that arise from using this kernel.
+> The Wild Kernels Team are **not responsible** for bricked devices, damaged hardware, or any issues that arise from using this kernel.
 >
 > **Please** do thorough research and fully understand the features included in this kernel before flashing it!
 >
@@ -18,7 +16,7 @@
 >
 > Please make sure to:
 > - Back up your data
-> - Understand the risks before proceeding
+> - Understand the risks involved
 >
 > **Proceed at your own risk!**
 
