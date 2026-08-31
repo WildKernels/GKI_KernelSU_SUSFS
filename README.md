@@ -8,11 +8,11 @@
 </div>
 
 > [!CAUTION]
-> Wild Kernels is **not responsible** for bricked devices, damaged hardware, or any issues that arise from using this kernel.
+> Wild Kernels is **not responsible** for bricked devices, damaged hardware, or any issues that arise from using these kernels.
 >
-> **Please** do thorough research and fully understand the features included in this kernel before flashing it!
+> **Please** do thorough research and fully understand the features included in these kernels before flashing!
 >
-> By flashing this kernel, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame Wild Kernels**!
+> By flashing these kernels, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame Wild Kernels**!
 >
 > Please make sure to:
 > - Back up your data
