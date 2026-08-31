@@ -21,7 +21,7 @@ After flashing a WildKernels GKI kernel, do these checks to make sure everything
 ## 4. Troubleshooting
 
 - **Bootloop** — restore a stock boot.img via fastboot/recovery.
-- **Manager shows old version** — you flashed the wrong variant or didn't reboot fully. Re-flash the intended ZIP and reboot.
+- **Manager shows old version** — ensure you installed the latest kernel and manager linked in the release and rebooted fully.
 - **Root not working** — ensure you installed the manager matching the flashed flavor (KernelSU / KernelSU-Next / ReSukiSU).
 
 ---

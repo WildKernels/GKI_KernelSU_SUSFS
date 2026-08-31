@@ -36,7 +36,7 @@ See [Post-Install — Verify & Finish Setup](post-install.md) for manager instal
 ## Troubleshooting
 
 - **Bootloop** - restore a stock boot.img via fastboot/recovery.
-- **Manager shows old version** - ensure you flashed the intended variant and rebooted fully.
+- **Manager shows old version** - ensure you installed the latest kernel and manager linked in the release and rebooted fully.
 
 ---
 
