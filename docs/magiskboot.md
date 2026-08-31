@@ -141,4 +141,4 @@ Folder structure on PC:
 
 ---
 
-Related: [Installation Overview](installation.md) · [Install with Kernel Flasher](kernelflasher.md) · [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
+Related: [Installation Overview](installation.md) · [Install with Kernel Flasher](kernelflasher.md)

@@ -17,4 +17,4 @@ See [Post-Install — Verify & Finish Setup](post-install.md) for manager instal
 
 ---
 
-See also: [Kernel Features Documentation](features.md) · [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
+See also: [Kernel Features Documentation](features.md)

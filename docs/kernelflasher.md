@@ -41,4 +41,4 @@ See [Post-Install — Verify & Finish Setup](post-install.md) for manager instal
 
 ---
 
-Related: [Installation Overview](installation.md) · [Patch boot.img Manually](magiskboot.md) · [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
+Related: [Installation Overview](installation.md) · [Patch boot.img Manually](magiskboot.md)

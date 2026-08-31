@@ -39,4 +39,4 @@ Alternative flashing app with advanced options.
 
 ---
 
-Related: [Installation Overview](installation.md) · [Install with Kernel Flasher](kernelflasher.md) · [Patch boot.img Manually](magiskboot.md) · [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
+Related: [Installation Overview](installation.md) · [Install with Kernel Flasher](kernelflasher.md) · [Patch boot.img Manually](magiskboot.md)
