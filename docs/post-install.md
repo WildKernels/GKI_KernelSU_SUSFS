@@ -6,7 +6,7 @@ After flashing a WildKernels GKI kernel, do these checks to make sure everything
 
 - Download the `manager-apk-*` from the same [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases) page you got the kernel from.
 - Install / update it over any existing manager.
-- Open the manager — it should show the kernel version you just flashed (e.g. `6.1.157-android14-Wild`).
+- Open the manager — it should show the kernel version you just flashed (e.g. `6.1.x-androidXX-Wild`).
 
 ## 2. SUSFS
 

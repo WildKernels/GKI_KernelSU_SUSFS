@@ -13,13 +13,13 @@
 
 ## Steps
 
-1. **Download the AnyKernel3 ZIP** that matches your kernel version (e.g., `6.1.157-android14`) from the latest [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases) page.
+1. **Download the AnyKernel3 ZIP** that matches your kernel version (e.g., `6.1.x-androidXX`) from the latest [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases) page.
 2. **Open the Kernel Flasher app**, grant necessary root permissions when prompted.
 3. **Select the AnyKernel3 ZIP** you downloaded and flash. Do not interrupt the process.
 4. **Reboot** when prompted and verify KernelSU manager shows the expected version.
 
 > [!NOTE]
-> Match by the full kernel version (e.g., `6.1.157-android14`) - your device's Android version and the `android14` in the kernel version are not necessarily the same.
+> Match by the full kernel version (e.g., `6.1.x-androidXX`) - your device's Android version and the `androidXX` in the kernel version are not necessarily the same.
 
 This requires the flashing app to have root permissions. On first install from stock (no root yet), flash via recovery or fastboot instead, then use this method for subsequent upgrades.
 
