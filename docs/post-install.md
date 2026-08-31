@@ -16,7 +16,6 @@ After flashing a WildKernels GKI kernel, do these checks to make sure everything
 ## 3. Verify root
 
 - Open the manager and check it reports "Working" / shows the correct version.
-- Or via ADB/shell: `su` should grant root, `uname -r` should show the new kernel version.
 
 ## 4. Troubleshooting
 
