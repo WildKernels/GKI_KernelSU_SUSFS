@@ -33,7 +33,7 @@ If you need to mount modules, install one of:
 - **Bootloop** — restore a stock boot.img via fastboot/recovery.
 - **Manager and kernel version do not match (e.g. 31000 != 32000)** — for best compatibility ensure both match. Install the latest kernel and manager linked in the release and reboot fully.
 - **Root not working** — ensure you installed the manager matching the flashed flavor (KernelSU / KernelSU-Next / ReSukiSU).
-- **Nuclear option** — delete all files and folders in the `/data/adb` folder. This will remove all modules and superusers. If files don't delete or give an error, reboot and repeat these steps, then do one final reboot making sure no modules or leftover module files remain.
+- **Nuclear option** — delete all files and folders in the `/data/adb` folder. This will remove all modules and superuser data. If any files fail to delete or you get an error, reboot and try again, then do one final reboot to confirm no modules or leftover files remain.
 
 ---
 
