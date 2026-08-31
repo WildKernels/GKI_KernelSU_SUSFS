@@ -5,24 +5,24 @@
 
 ## Google
 
-| Device | Codename | GKI Kernel | Firmware | Last Updated | Status |
-|--------|----------|------------|----------|--------------|--------|
-| Pixel 6 | oriole | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 6 Pro | raven | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 6a | bluejay | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 7 | panther | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 7 Pro | cheetah | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 7a | lynx | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel Fold | felix | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel Tablet | tangorpro | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 8 | shiba | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 8 Pro | husky | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 8a | akita | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 9 | tokay | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 9 Pro | caiman | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 9 Pro XL | komodo | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 9 Pro Fold | comet | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
-| Pixel 9a | tegu | android14-6.1 | stock | 2026-08-30 | ✅ Supported |
+| Device | Codename | GKI Kernel | Firmware | Status |
+|--------|----------|------------|----------|--------|
+| Pixel 6 | oriole | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 6 Pro | raven | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 6a | bluejay | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 7 | panther | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 7 Pro | cheetah | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 7a | lynx | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel Fold | felix | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel Tablet | tangorpro | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 8 | shiba | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 8 Pro | husky | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 8a | akita | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 9 | tokay | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 9 Pro | caiman | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 9 Pro XL | komodo | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 9 Pro Fold | comet | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
+| Pixel 9a | tegu | android14-6.1 | stock | ✅ Supported · 2026-08-30 |
 
 *Last updated: 2026-08-30 — covers Pixel 6 through Pixel 9a (latest available). Pixel 10/11 will be added as they release.*
 
