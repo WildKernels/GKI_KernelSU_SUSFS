@@ -2,9 +2,6 @@
 
 # Wild Kernels for Android
 
-[![KernelSU](https://img.shields.io/badge/KernelSU-Supported-green)](https://kernelsu.org/)
-[![susfs4ksu](https://img.shields.io/badge/susfs4ksu-Integrated-orange)](https://gitlab.com/simonpunk/susfs4ksu)
-
 </div>
 
 > [!CAUTION]
