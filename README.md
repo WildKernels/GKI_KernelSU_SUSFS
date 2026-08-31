@@ -1,6 +1,8 @@
 <div align="center">
 
-# Wild Kernels for Android
+# Wild Kernels for Android devices running GKI 2.0 (5.10+)
+
+*Built on Google's GKI sources, these kernels are made to be **Generic** — designed to work across a wide range of devices. While they aim for broad compatibility, not every device is guaranteed to be supported.*
 
 </div>
 
