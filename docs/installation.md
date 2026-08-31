@@ -11,11 +11,9 @@ Choose the method that fits your situation:
 | **magiskboot** | When you want to flash a pre-patched `boot.img` directly (no pre-rooted setup required) | No | [magiskboot.md](magiskboot.md) |
 | **PixelFlasher** | If you have zero flashing experience, a PC and a Pixel - other devices can work but are not officially supported | No | [pixelflasher.md](pixelflasher.md) |
 
-## After flashing (both methods)
+## After flashing
 
-- Install / update the matching KernelSU manager APK (`manager-apk-*`).
-- If using SUSFS, install the SUSFS module.
-- Verify root with `su` or manager app.
+See [Post-Install — Verify & Finish Setup](post-install.md) for manager install, SUSFS module, and verification steps.
 
 ---
 

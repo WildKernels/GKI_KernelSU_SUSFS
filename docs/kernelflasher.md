@@ -31,9 +31,7 @@ Requires root to flash a kernel from within Android.
 
 ## After flashing
 
-- Install / update the matching KernelSU manager APK (see release assets `manager-apk-*`).
-- If using SUSFS, install the SUSFS module via the manager.
-- Verify with `su` or manager app that root is working.
+See [Post-Install — Verify & Finish Setup](post-install.md) for manager install, SUSFS module, and verification.
 
 ## Troubleshooting
 
