@@ -29,9 +29,11 @@ If you need to mount modules, install one of:
 
 ## 5. Troubleshooting
 
+- **General issues** — try restarting your device.
 - **Bootloop** — restore a stock boot.img via fastboot/recovery.
 - **Manager and kernel version do not match (e.g. 31000 != 32000)** — for best compatibility ensure both match. Install the latest kernel and manager linked in the release and reboot fully.
 - **Root not working** — ensure you installed the manager matching the flashed flavor (KernelSU / KernelSU-Next / ReSukiSU).
+- **Nuclear option** — delete all files and folders in the `/data/adb` folder.
 
 ---
 
