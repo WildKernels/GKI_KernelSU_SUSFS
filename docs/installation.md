@@ -19,6 +19,7 @@ See [Post-Install — Verify & Finish Setup](post-install.md) for manager instal
 ## Other methods
 
 - [PixelFlasher](https://github.com/badabing2005/PixelFlasher)
+- [Franco Kernel Manager](https://play.google.com/store/apps/details?id=com.franco.kernel&hl=en_CA&pli=1)
 
 ---
 
