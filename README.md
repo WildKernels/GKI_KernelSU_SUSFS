@@ -101,6 +101,8 @@ If you encounter any issues or need help, feel free to:
 
 [![Contributors](https://contrib.rocks/image?repo=WildKernels/GKI_KernelSU_SUSFS)](https://github.com/WildKernels/GKI_KernelSU_SUSFS/graphs/contributors)
 
+Have an idea or improvement in mind? Contributions are always welcome — feel free to open a pull request or share your thoughts!
+
 ---
 
 ## Donations
