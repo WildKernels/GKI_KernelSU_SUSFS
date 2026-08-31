@@ -4,7 +4,7 @@ Per-feature documentation for the GKI2 kernels built from this repository.
 
 ## Root Implementations
 
-Kernel-based `su` and root access management — kernel-based root solutions for Android.
+Kernel-based `su` and root access management.
 
 | Root Flavor | Description | Source |
 |-------------|-------------|----------|
