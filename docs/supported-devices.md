@@ -10,8 +10,7 @@
 
 *Last updated: 2026-08-30 — covers Pixel 6 through Pixel 9a (latest available). Pixel 10/11 will be added as they release.*
 
-<details open>
-<summary><b>Pixel 9 family</b> — tokay / caiman / komodo / comet / tegu</summary>
+### Pixel 9 family
 
 | Device | Codename | GKI Kernel | Firmware | Status |
 |--------|----------|------------|----------|--------|
@@ -21,10 +20,7 @@
 | Pixel 9 Pro Fold | comet | android14-6.1 | stock | Supported · 2026-08-30 |
 | Pixel 9a | tegu | android14-6.1 | stock | Supported · 2026-08-30 |
 
-</details>
-
-<details>
-<summary><b>Pixel 8 family</b> — shiba / husky / akita</summary>
+### Pixel 8 family
 
 | Device | Codename | GKI Kernel | Firmware | Status |
 |--------|----------|------------|----------|--------|
@@ -32,10 +28,7 @@
 | Pixel 8 Pro | husky | android14-6.1 | stock | Supported · 2026-08-30 |
 | Pixel 8a | akita | android14-6.1 | stock | Supported · 2026-08-30 |
 
-</details>
-
-<details>
-<summary><b>Pixel 7 family + Fold/Tablet</b> — panther / cheetah / lynx / felix / tangorpro</summary>
+### Pixel 7 family + Fold/Tablet
 
 | Device | Codename | GKI Kernel | Firmware | Status |
 |--------|----------|------------|----------|--------|
@@ -45,17 +38,12 @@
 | Pixel Fold | felix | android14-6.1 | stock | Supported · 2026-08-30 |
 | Pixel Tablet | tangorpro | android14-6.1 | stock | Supported · 2026-08-30 |
 
-</details>
-
-<details>
-<summary><b>Pixel 6 family</b> — oriole / raven / bluejay</summary>
+### Pixel 6 family
 
 | Device | Codename | GKI Kernel | Firmware | Status |
 |--------|----------|------------|----------|--------|
 | Pixel 6 | oriole | android14-6.1 | stock | Supported · 2026-08-30 |
 | Pixel 6 Pro | raven | android14-6.1 | stock | Supported · 2026-08-30 |
 | Pixel 6a | bluejay | android14-6.1 | stock | Supported · 2026-08-30 |
-
-</details>
 
 Source: [Build Pixel kernels — GKI supported Pixel kernel branches](https://source.android.com/docs/setup/build/building-pixel-kernels)
