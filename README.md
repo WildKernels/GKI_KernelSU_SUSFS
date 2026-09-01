@@ -1,7 +1,6 @@
 <div align="center">
 
 # Wild Kernels for Android devices running GKI 2.0 (5.10+)
-*Built on [Google's GKI sources](https://android.googlesource.com/kernel/common/), these kernels are made to be **Generic** — designed to work across a wide range of devices. While they aim for broad compatibility, not every device is guaranteed to be supported.*
 
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Third-Party Notices](https://img.shields.io/badge/notices-THIRD__PARTY_NOTICES-lightgrey.svg)](THIRD_PARTY_NOTICES.md)
@@ -24,6 +23,7 @@
 <details>
 <summary><b> Table of Contents</b></summary>
 
+- [About](#about)
 - [Features](#features)
 - [Installation](#installation)
 - [Our Projects](#our-projects)
@@ -32,6 +32,12 @@
 - [Donations](#donations)
 
 </details>
+
+---
+
+## About
+
+Built on [Google's GKI sources](https://android.googlesource.com/kernel/common/), these kernels are made to be **generic** — designed to work across a wide range of devices. While they aim for broad compatibility, not every device is guaranteed to be supported.
 
 ---
 
