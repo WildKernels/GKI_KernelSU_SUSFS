@@ -10,9 +10,6 @@
 | **Kernel Flasher** | Upgrading with root already available, no PC needed | Yes | [kernelflasher.md](kernelflasher.md) |
 | **magiskboot** | When you want to flash a pre-patched `boot.img` directly (no pre-rooted setup required) | No | [magiskboot.md](magiskboot.md) |
 
-> [!TIP]
-> Not sure? **Kernel Flasher** is easiest if you already have root. Otherwise use **magiskboot** from a PC.
-
 ## Prerequisites
 
 - [ ] Unlocked bootloader, GKI 2.0 device (5.10+)
