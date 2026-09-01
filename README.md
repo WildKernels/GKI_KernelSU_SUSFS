@@ -31,13 +31,13 @@ Generic kernels built on [Google's GKI sources](https://android.googlesource.com
 
 | Version | Kernel |
 |---------|--------|
-| android12-5.10 | 5.10 |
-| android13-5.10 | 5.10 |
-| android13-5.15 | 5.15 |
-| android14-5.15 | 5.15 |
-| android14-6.1 | 6.1 |
-| android15-6.6 | 6.6 |
-| android16-6.12 | 6.12 |
+| 5.10.x-android12 | 5.10 |
+| 5.10.x-android13 | 5.10 |
+| 5.15.x-android13 | 5.15 |
+| 5.15.x-android14 | 5.15 |
+| 6.1.x-android14 | 6.1 |
+| 6.6.x-android15 | 6.6 |
+| 6.12.x-android16 | 6.12 |
 
 ---
 
