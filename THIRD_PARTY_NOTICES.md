@@ -5,7 +5,7 @@ Each component keeps its own license. Used at = where in my code it is cloned/ap
 
 | Component | Upstream / link | License | Used at (where in my code) |
 |-----------|-----------------|---------|-----------------------------|
-| Linux GKI (kernel/common, android12-5.10+ via manifest) | https://android.googlesource.com/kernel/common — manifest https://android.googlesource.com/kernel/manifest | GPL-2.0-only | `.github/actions/download-kernel` (fetched at build, not vendored) + `kernels/sync_kernel.sh` (local helper) → `kernel/common/` |
+| Linux GKI | https://android.googlesource.com/kernel/common | GPL-2.0-only | `.github/actions/download-kernel` (fetched at build) |
 | KernelSU | https://github.com/tiann/KernelSU | GPL-3.0 | `.github/actions/root-setup` (flavor `kernelsu`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
 | KernelSU-Next | https://github.com/KernelSU-Next/KernelSU-Next | GPL-3.0 | `.github/actions/root-setup` (flavor `next`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
 | ReSukiSU | https://github.com/ReSukiSU/ReSukiSU | GPL-3.0 | `.github/actions/root-setup` (flavor `resukisu`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
