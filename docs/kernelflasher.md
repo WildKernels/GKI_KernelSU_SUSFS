@@ -4,7 +4,7 @@
 > This method is more convenient when upgrading KernelSU and can be done without a computer. Make a backup first.
 
 > [!CAUTION]
-> Flashing a kernel can brick your device and will void your warranty. Make a full backup (boot partition at minimum) before proceeding.
+> Wild Kernels is not responsible for bricked devices or damage. By flashing, you assume all risk. Back up your data and understand the risks before flashing.
 
 ## Prerequisites
 
