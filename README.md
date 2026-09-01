@@ -1,7 +1,6 @@
 <div align="center">
 
 # Wild Kernels for Android devices running GKI 2.0 (5.10+)
-
 *Built on [Google's GKI sources](https://android.googlesource.com/kernel/common/), these kernels are made to be **Generic** — designed to work across a wide range of devices. While they aim for broad compatibility, not every device is guaranteed to be supported.*
 
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
@@ -25,26 +24,14 @@
 <details>
 <summary><b> Table of Contents</b></summary>
 
-- [Our Projects](#our-projects)
 - [Features](#features)
 - [Installation](#installation)
-- [Credits](#credits)
-- [Community](#community)
+- [Our Projects](#our-projects)
 - [Special Thanks](#special-thanks)
+- [Community](#community)
 - [Donations](#donations)
 
 </details>
-
----
-
-## Our Projects
-
-| Device | Repository |
-|--------|------------|
-| **Generic** | [GKI_KernelSU_SUSFS](https://github.com/WildKernels/GKI_KernelSU_SUSFS) |
-| **Pixel** | [Sultan_KernelSU_SUSFS](https://github.com/WildKernels/Sultan_KernelSU_SUSFS) |
-| **Samsung** | [Samsung_KernelSU_SUSFS](https://github.com/WildKernels/Samsung_KernelSU_SUSFS) |
-| **OnePlus** | [OnePlus_KernelSU_SUSFS](https://github.com/WildKernels/OnePlus_KernelSU_SUSFS) |
 
 ---
 
@@ -71,24 +58,41 @@ See **[Installation Guide](docs/installation.md)**.
 
 ---
 
-## Credits
+## Our Projects
 
-| Component | Author |
-|-----------|--------|
-| **KernelSU** | [tiann](https://github.com/tiann/KernelSU) |
-| **KernelSU-Next** | [rifsxd](https://github.com/KernelSU-Next/KernelSU-Next) |
-| **KernelSU-Next SUSFS Fork** | [pershoot](https://github.com/pershoot/KernelSU-Next) |
-| **ReSukiSU** | [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) |
-| **Magic-KSU** | [5ec1cff](https://github.com/5ec1cff/KernelSU) |
-| **SUSFS** | [simonpunk](https://gitlab.com/simonpunk/susfs4ksu) |
-| **SUSFS Module** | [sidex15](https://github.com/sidex15) |
-| **NoMount** | [maxsteeel](https://github.com/maxsteeel/nomount) |
-| **DroidSpaces-OSS** | [ravindu644](https://github.com/ravindu644/Droidspaces-OSS) |
-| **Baseband-guard (BBG)** | [vc-teahouse](https://github.com/vc-teahouse/Baseband-guard) |
-| **Kernel Patches** | [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches) |
-| **AnyKernel3** | [osm0sis](https://github.com/osm0sis/AnyKernel3) |
-| **Sultan Kernels (Pixel)** | [kerneltoast](https://github.com/kerneltoast) |
-| **Device Boot Fix** | [Boot fix commit](https://github.com/Anything-at-25-00/android_kernel_common_android12-5.10/commit/2476d262b597fe8af82cfb7aaf96676f51c6b4ed) |
+| Device | Repository |
+|--------|------------|
+| **Generic** | [GKI_KernelSU_SUSFS](https://github.com/WildKernels/GKI_KernelSU_SUSFS) |
+| **Pixel** | [Sultan_KernelSU_SUSFS](https://github.com/WildKernels/Sultan_KernelSU_SUSFS) |
+| **Samsung** | [Samsung_KernelSU_SUSFS](https://github.com/WildKernels/Samsung_KernelSU_SUSFS) |
+| **OnePlus** | [OnePlus_KernelSU_SUSFS](https://github.com/WildKernels/OnePlus_KernelSU_SUSFS) |
+
+---
+
+## Special Thanks
+
+**These amazing people and projects make this possible:**
+
+- **KernelSU** — [tiann](https://github.com/tiann/KernelSU)
+- **KernelSU-Next** — [rifsxd](https://github.com/KernelSU-Next/KernelSU-Next)
+- **KernelSU-Next SUSFS Fork** — [pershoot](https://github.com/pershoot/KernelSU-Next)
+- **ReSukiSU** — [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU)
+- **Magic-KSU** — [5ec1cff](https://github.com/5ec1cff/KernelSU)
+- **SUSFS** — [simonpunk](https://gitlab.com/simonpunk/susfs4ksu)
+- **SUSFS Module** — [sidex15](https://github.com/sidex15)
+- **NoMount** — [maxsteeel](https://github.com/maxsteeel/nomount)
+- **DroidSpaces-OSS** — [ravindu644](https://github.com/ravindu644/Droidspaces-OSS)
+- **Baseband-guard (BBG)** — [vc-teahouse](https://github.com/vc-teahouse/Baseband-guard)
+- **Kernel Patches** — [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches)
+- **AnyKernel3** — [osm0sis](https://github.com/osm0sis/AnyKernel3)
+- **Sultan Kernels (Pixel)** — [kerneltoast](https://github.com/kerneltoast)
+- **Device Boot Fix** — [Boot fix commit](https://github.com/Anything-at-25-00/android_kernel_common_android12-5.10/commit/2476d262b597fe8af82cfb7aaf96676f51c6b4ed)
+
+**Contributors to this repository:**
+
+[![Contributors](https://contrib.rocks/image?repo=WildKernels/GKI_KernelSU_SUSFS)](https://github.com/WildKernels/GKI_KernelSU_SUSFS/graphs/contributors)
+
+Have an idea or improvement in mind? Contributions are always welcome — feel free to open a pull request or share your thoughts!
 
 ---
 
@@ -102,16 +106,6 @@ See **[Installation Guide](docs/installation.md)**.
 </div>
 
 Need help? Open an issue in this repository or reach out on Telegram. Please ask in the [WildKernelsTG group](https://t.me/WildKernelsTG) first for general issues. DMs to [@TheWildJames](https://t.me/TheWildJames) are always open — use for priority / very important, or if you just want to talk and learn.
-
----
-
-## Special Thanks
-
-**These amazing people help make this project possible!**
-
-[![Contributors](https://contrib.rocks/image?repo=WildKernels/GKI_KernelSU_SUSFS)](https://github.com/WildKernels/GKI_KernelSU_SUSFS/graphs/contributors)
-
-Have an idea or improvement in mind? Contributions are always welcome — feel free to open a pull request or share your thoughts!
 
 ---
 
