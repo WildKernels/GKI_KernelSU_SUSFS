@@ -71,18 +71,6 @@
 
 See **[Installation Guide](docs/installation.md)**.
 
-<details>
-<summary>Quick method picker</summary>
-
-| Method | When to use | Requires root |
-|--------|-------------|---------------|
-| [**Kernel Flasher**](docs/kernelflasher.md) | Upgrading with root already available, no PC needed | Yes |
-| [**magiskboot**](docs/magiskboot.md) | Flash a pre-patched `boot.img` directly (no pre-rooted setup) | No |
-
-After flashing → [Post-Install — Verify & Finish Setup](docs/post-install.md)
-
-</details>
-
 ---
 
 ## Credits
