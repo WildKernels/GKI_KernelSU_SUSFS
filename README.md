@@ -91,7 +91,7 @@ After flashing → [Post-Install — Verify & Finish Setup](docs/post-install.md
 |-----------|--------|
 | **KernelSU** | [tiann](https://github.com/tiann/KernelSU) |
 | **KernelSU-Next** | [rifsxd](https://github.com/KernelSU-Next/KernelSU-Next) |
-| **KernelSU-Next SUSFS Fork** | [pershoot](https://github.com/pershoot/KernelSU-Next) (`dev-susfs`) |
+| **KernelSU-Next SUSFS Fork** | [pershoot](https://github.com/pershoot/KernelSU-Next) |
 | **ReSukiSU** | [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) |
 | **Magic-KSU** | [5ec1cff](https://github.com/5ec1cff/KernelSU) |
 | **SUSFS** | [simonpunk](https://gitlab.com/simonpunk/susfs4ksu) |
