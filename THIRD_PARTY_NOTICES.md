@@ -1,23 +1,23 @@
 # Third-Party Notices — GKI_KernelSU_SUSFS
 
-This file lists Linux GKI and all code cloned/patched at build and shipped in boot.img/AnyKernel3.zip.
-Each component keeps its own license. Used at = where in my code it is cloned/applied (not vendored — fetched in CI via .github/actions/* with pinned commits per release).
+This file lists Linux GKI and all code cloned at build and shipped in boot.img/AnyKernel3.zip.
+Each keeps its own license. Not vendored — fetched in CI via `.github/actions/*` (pins per release).
 
-| Component | Upstream / link | License | Used at (where in my code) |
-|-----------|-----------------|---------|-----------------------------|
-| Linux GKI | https://android.googlesource.com/kernel/common | GPL-2.0-only | `.github/actions/download-kernel` (fetched at build) |
-| KernelSU | https://github.com/tiann/KernelSU | GPL-3.0 | `.github/actions/root-setup` (flavor `kernelsu`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
-| KernelSU-Next | https://github.com/KernelSU-Next/KernelSU-Next | GPL-3.0 | `.github/actions/root-setup` (flavor `next`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
-| ReSukiSU | https://github.com/ReSukiSU/ReSukiSU | GPL-3.0 | `.github/actions/root-setup` (flavor `resukisu`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
-| KernelSU-Next SUSFS fork (pershoot) | https://github.com/pershoot/KernelSU-Next (branch `dev-susfs`) | GPL-3.0 | `.github/actions/root-setup` + `.github/actions/susfs` when building Next+SUSFS (same path as above) |
-| susfs4ksu | https://gitlab.com/simonpunk/susfs4ksu | GPL-3.0-or-later | `.github/actions/susfs-setup` + `.github/actions/susfs` (clones `gki-<version>` branch, pinned `susfs_commit`) → patches under `kernel/` |
-| NoMount | https://github.com/maxsteeel/nomount | GPL-3.0 | `.github/actions/nomount-metamodule` (pinned `nomount_commit`) → built metamodule `NoMount-*.zip` |
-| kernel_patches (ptrace fix, unicode fix, NTSync, perf, bbg, etc) | https://github.com/WildKernels/kernel_patches | GPL-2.0 (patches to GPL-2.0 kernel; includes ack to https://github.com/backslashxx/msm8953-kernel for maphide) | `.github/actions/setup-build-environment` (pinned `kernel_patches_commit`) → `kernel_patches/` + applied via `.github/actions/{ptrace,unicode-fix,ntsync,performance,bbg,networking,btf}` |
-| Baseband Guard (inside kernel_patches) | https://github.com/vc-teahouse/Baseband-guard | GPL-2.0 | `kernel_patches/common/bbg/` → applied via `.github/actions/bbg` |
-| AnyKernel3 | https://github.com/WildKernels/AnyKernel3 (fork of https://github.com/osm0sis/AnyKernel3, branch `gki-2.0`) | BSD-3-like (AnyKernel license, Copyright 2019 Chris Renshaw) | `.github/actions/setup-build-environment` (pinned `anykernel3_commit`) → `AnyKernel3/` → shipped as `AnyKernel3.zip` |
-| AnyKernel3 — magiskboot / magiskpolicy binaries | https://github.com/topjohnwu/Magisk (via AnyKernel3) | GPL-3.0 | `AnyKernel3/tools/` / `AnyKernel3/bin/` (included binaries only; note in AnyKernel3/LICENSE: "Included Binary Licenses: magiskboot, magiskpolicy (Magisk): GPLv3+") |
-| DroidSpaces-OSS | https://github.com/ravindu644/Droidspaces-OSS | GPL-3.0 | `.github/actions/droidspaces` (pinned `droidspaces_commit`) → patches `kernel/common/ipc/*` + Kconfig |
+| Component | Upstream | License | Used at |
+|-----------|----------|---------|---------|
+| Linux GKI | [kernel/common](https://android.googlesource.com/kernel/common) | GPL-2.0 | `download-kernel` |
+| KernelSU | [tiann/KernelSU](https://github.com/tiann/KernelSU) | GPL-3.0 | `root-setup` (kernelsu) |
+| KernelSU-Next | [KernelSU-Next/KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) | GPL-3.0 | `root-setup` (next) |
+| ReSukiSU | [ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | GPL-3.0 | `root-setup` (resukisu) |
+| KSU-Next SUSFS | [pershoot/KernelSU-Next](https://github.com/pershoot/KernelSU-Next) `dev-susfs` | GPL-3.0 | `root-setup` + `susfs` |
+| susfs4ksu | [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu) | GPL-3.0+ | `susfs` (`susfs_commit`) |
+| NoMount | [maxsteeel/nomount](https://github.com/maxsteeel/nomount) | GPL-3.0 | `nomount-metamodule` |
+| kernel_patches | [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches) | GPL-2.0 | `setup-build-environment` |
+| Baseband Guard | [vc-teahouse/Baseband-guard](https://github.com/vc-teahouse/Baseband-guard) | GPL-2.0 | `bbg` (`kernel_patches/common/bbg`) |
+| AnyKernel3 | [WildKernels/AnyKernel3](https://github.com/WildKernels/AnyKernel3) | BSD | `setup-build-environment` → `AnyKernel3.zip` |
+| magiskboot | [topjohnwu/Magisk](https://github.com/topjohnwu/Magisk) via AnyKernel3 | GPL-3.0 | `AnyKernel3/tools` (binaries only) |
+| DroidSpaces | [ravindu644/Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) | GPL-3.0 | `droidspaces` |
 
-Notes not shipped in the binary (so not in this table): `sidex15/susfs4ksu-module` (AGPL-3.0, user installs post-flash, see docs/post-install.md), `backslashxx/mountify` (Unlicense, docs only), `5ec1cff/KernelSU` / Sultan / boot-fix (other repos), doc attribution `kernelsu.org` (see `docs/installation.md`).
+Not shipped (not in table): `sidex15/susfs4ksu-module` (AGPL, post-flash), `backslashxx/mountify` (Unlicense, docs), `kernelsu.org` docs.
 
-Source per release: see release body for pinned commits (root_commit, susfs_commit, kernel_patches_commit, anykernel3_commit, nomount_commit, droidspaces_commit) + KERNEL_SOURCE_COMMIT from .github/actions/download-kernel.
+Source per release: see release body for `root_commit`, `susfs_commit`, `kernel_patches_commit`, `anykernel3_commit`, `nomount_commit`, `droidspaces_commit` + `KERNEL_SOURCE_COMMIT`.
