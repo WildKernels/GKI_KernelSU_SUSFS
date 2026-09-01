@@ -8,17 +8,10 @@
 </div>
 
 > [!CAUTION]
-> Wild Kernels is **not responsible** for bricked devices, damaged hardware, or any issues that arise from using Wild Kernels.
+> Wild Kernels is **not responsible** for bricked devices or damage. By flashing, **you** assume all risk — please research features before flashing and proceed at your own risk.
 >
-> **Please** do thorough research and fully understand the features included in Wild Kernels before flashing!
->
-> By flashing Wild Kernels, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame Wild Kernels**!
->
-> Please make sure to:
 > - [x] Back up your data
-> - [x] Understand the risks involved
->
-> **Proceed at your own risk!**
+> - [x] Understand the risks
 
 <details>
 <summary><b> Table of Contents</b></summary>
