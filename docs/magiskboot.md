@@ -55,7 +55,8 @@ Folder structure on device (`/data/local/tmp/`):
   ./magiskboot unpack boot.img
   ```
   You will get a `kernel` file — this is your stock kernel.
-7. Replace kernel with the KernelSU Image:
+
+7. Replace the kernel with the KernelSU `Image`:
   ```sh
   mv -f Image kernel
   ```
@@ -94,7 +95,8 @@ Official `magiskboot` can run in Linux normally — use the [official build](htt
   ./magiskboot unpack boot.img
   ```
   You will get a `kernel` file — this is your stock kernel.
-4. Replace kernel:
+
+4. Replace the kernel:
   ```sh
   mv -f Image kernel
   ```
@@ -132,7 +134,8 @@ Folder structure on PC:
   ./magiskboot unpack boot.img
   ```
   You will get a `kernel` file — this is your stock kernel.
-5. Replace kernel:
+
+5. Replace the kernel:
   ```sh
   mv -f Image kernel
   ```
