@@ -31,6 +31,17 @@
 | 6.6.x-android15 |
 | 6.12.x-android16 |
 
+Linux version by GKI generation — only GKI 2.0 is supported by this project:
+
+| Pre-GKI | GKI 1.0 | GKI 2.0 |
+|---------|---------|---------|
+| 3.10 | 5.4 | 5.10 |
+| 3.18 | | 5.15 |
+| 4.4 | | 6.1 |
+| 4.9 | | 6.6 |
+| 4.14 | | 6.12 |
+| 4.19 | | |
+
 ## After flashing
 
 See [Post-Install — Verify & Finish Setup](post-install.md) for manager install, SUSFS module, and verification steps.
