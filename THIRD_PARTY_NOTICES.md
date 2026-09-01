@@ -1,7 +1,7 @@
 # Third-Party Notices — GKI_KernelSU_SUSFS
 
 This file lists all code cloned at build and shipped in AnyKernel3.zip.
-Each keeps its own license. Not vendored — fetched in CI via `.github/actions/*` (pins per release).
+Each keeps its own license. Not vendored — fetched in CI.
 
 | Component | Upstream | License |
 |-----------|----------|---------|
