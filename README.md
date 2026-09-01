@@ -87,8 +87,6 @@ After flashing → [Post-Install — Verify & Finish Setup](docs/post-install.md
 
 ## Credits
 
-Special thanks to the open-source community for their contributions!
-
 | Component | Author |
 |-----------|--------|
 | **KernelSU** | [tiann](https://github.com/tiann/KernelSU) |
