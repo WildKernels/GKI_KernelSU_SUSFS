@@ -19,8 +19,8 @@
 > By flashing Wild Kernels, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame Wild Kernels**!
 >
 > Please make sure to:
-> - [ ] Back up your data
-> - [ ] Understand the risks involved
+> - [x] Back up your data
+> - [x] Understand the risks involved
 >
 > **Proceed at your own risk!**
 
