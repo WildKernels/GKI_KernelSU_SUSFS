@@ -17,5 +17,3 @@ Each keeps its own license. Not vendored — fetched in CI via `.github/actions/
 | AnyKernel3 | [WildKernels/AnyKernel3](https://github.com/WildKernels/AnyKernel3) | BSD | `setup-build-environment` → `AnyKernel3.zip` |
 | magiskboot | [topjohnwu/Magisk](https://github.com/topjohnwu/Magisk) via AnyKernel3 | GPL-3.0 | `AnyKernel3/tools` (binaries only) |
 | DroidSpaces | [ravindu644/Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) | GPL-3.0 | `droidspaces` |
-
-Source per release: see release body for `root_commit`, `susfs_commit`, `kernel_patches_commit`, `anykernel3_commit`, `nomount_commit`, `droidspaces_commit` + `KERNEL_SOURCE_COMMIT`.
