@@ -18,6 +18,4 @@ Each keeps its own license. Not vendored — fetched in CI via `.github/actions/
 | magiskboot | [topjohnwu/Magisk](https://github.com/topjohnwu/Magisk) via AnyKernel3 | GPL-3.0 | `AnyKernel3/tools` (binaries only) |
 | DroidSpaces | [ravindu644/Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) | GPL-3.0 | `droidspaces` |
 
-Not shipped (not in table): `sidex15/susfs4ksu-module` (AGPL, post-flash), `backslashxx/mountify` (Unlicense, docs), `kernelsu.org` docs.
-
 Source per release: see release body for `root_commit`, `susfs_commit`, `kernel_patches_commit`, `anykernel3_commit`, `nomount_commit`, `droidspaces_commit` + `KERNEL_SOURCE_COMMIT`.
