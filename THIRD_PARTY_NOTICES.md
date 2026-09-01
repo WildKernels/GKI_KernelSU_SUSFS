@@ -5,7 +5,7 @@ Each keeps its own license. Not vendored — fetched in CI via `.github/actions/
 
 | Component | Upstream | License | Used at |
 |-----------|----------|---------|---------|
-| Linux GKI | [kernel/common](https://android.googlesource.com/kernel/common) | GPL-2.0 | `download-kernel` |
+| Kernel Source | [kernel/common](https://android.googlesource.com/kernel/common) | GPL-2.0 | `download-kernel` |
 | KernelSU | [tiann/KernelSU](https://github.com/tiann/KernelSU) | GPL-3.0 | `root-setup` (kernelsu) |
 | KernelSU-Next | [KernelSU-Next/KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) | GPL-3.0 | `root-setup` (next) |
 | ReSukiSU | [ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | GPL-3.0 | `root-setup` (resukisu) |
