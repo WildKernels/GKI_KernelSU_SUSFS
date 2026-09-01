@@ -27,7 +27,7 @@
 
 ## About
 
-Generic kernels built on [Google's GKI sources](https://android.googlesource.com/kernel/common/) with [KernelSU](https://github.com/tiann/KernelSU) and [susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu) for root hiding and detection evasion — broad compatibility, not guaranteed for every device.
+Generic kernels built on Google's GKI sources with KernelSU and SUSFS for root hiding and detection evasion — broad compatibility, not guaranteed for every device.
 
 ---
 
