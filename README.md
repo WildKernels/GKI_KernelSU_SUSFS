@@ -62,7 +62,7 @@ See **[Installation Guide](docs/installation.md)**.
 
 | Device | Description | Repository |
 |--------|-------------|------------|
-| **Generic** | Google GKI sources — built to be generic and work across many devices | [GKI_KernelSU_SUSFS](https://github.com/WildKernels/GKI_KernelSU_SUSFS) |
+| **Multi** | Google GKI sources — built to be generic and work across many devices | [GKI_KernelSU_SUSFS](https://github.com/WildKernels/GKI_KernelSU_SUSFS) |
 | **Pixel** | Custom Sultan kernel by [kerneltoast](https://github.com/kerneltoast) for specific Pixel devices | [Sultan_KernelSU_SUSFS](https://github.com/WildKernels/Sultan_KernelSU_SUSFS) |
 | **Samsung** | Built from Samsung sources and manifest | [Samsung_KernelSU_SUSFS](https://github.com/WildKernels/Samsung_KernelSU_SUSFS) |
 | **OnePlus** | Built from OnePlus sources and manifest | [OnePlus_KernelSU_SUSFS](https://github.com/WildKernels/OnePlus_KernelSU_SUSFS) |
