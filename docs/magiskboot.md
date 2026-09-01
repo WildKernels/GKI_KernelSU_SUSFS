@@ -4,11 +4,9 @@
 > Wild Kernels is not responsible for bricked devices or damage. By flashing, you assume all risk. Back up your data and understand the risks before flashing.
 
 > [!TIP]
-> It's always recommended to use `magiskboot` to patch images. There are two builds:
-> - [magiskboot (official)](https://github.com/topjohnwu/Magisk/releases) — runs on Android devices (and Linux)
-> - [WildKernels/Magisk (W.I.P.)](https://github.com/WildKernels/Magisk) — cross-built binaries for Windows/macOS/Linux PCs (W.I.P.)
+> It's always recommended to use `magiskboot` to patch images — use the [official build](https://github.com/topjohnwu/Magisk/releases), which runs on Android devices and Linux.
 
-**Platforms:** [Android](#-android) · [Linux](#-linux) · [Windows](#-windows--other)
+**Platforms:** [Android](#-android) · [Linux](#-linux)
 
 ## Preparation
 
@@ -83,7 +81,7 @@ Folder structure on PC:
 └── Image
 ```
 
-Official `magiskboot` can run in Linux normally — use the [official build](https://github.com/topjohnwu/Magisk/releases). If you prefer, you can also use [WildKernels/Magisk (W.I.P.)](https://github.com/WildKernels/Magisk).
+Official `magiskboot` can run in Linux normally — use the [official build](https://github.com/topjohnwu/Magisk/releases).
 
 1. Prepare stock `boot.img` and `Image` in your PC.
 2. Make it executable:
@@ -101,45 +99,6 @@ Official `magiskboot` can run in Linux normally — use the [official build](htt
   mv -f Image kernel
   ```
 5. Repack:
-  ```sh
-  ./magiskboot repack boot.img
-  ```
-  You will get a `new-boot.img` file. Flash it by fastboot:
-  ```sh
-  fastboot flash boot new-boot.img
-  ```
-
-</details>
-
-<details>
-<summary><b> Windows / Other</b> — cross-built binary</summary>
-
-Folder structure on PC:
-
-```
-.
-├── magiskboot.exe
-├── boot.img
-└── Image
-```
-
-1. Download the corresponding `magiskboot` binary for your OS from [WildKernels/Magisk (W.I.P.)](https://github.com/WildKernels/Magisk).
-2. Prepare stock `boot.img` and `Image` in your PC.
-3. Make it executable:
-  ```sh
-  chmod +x magiskboot
-  ```
-4. Unpack `boot.img`:
-  ```sh
-  ./magiskboot unpack boot.img
-  ```
-  You will get a `kernel` file — this is your stock kernel.
-
-5. Replace the kernel:
-  ```sh
-  mv -f Image kernel
-  ```
-6. Repack:
   ```sh
   ./magiskboot repack boot.img
   ```
