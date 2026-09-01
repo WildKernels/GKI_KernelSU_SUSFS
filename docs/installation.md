@@ -34,6 +34,9 @@ Only GKI 2.0 is supported — check marks show builds provided by this project:
 
 For Pre-GKI or GKI 1.0 kernels, contact [@TheWildJames](https://t.me/TheWildJames) to discuss availability.
 
+> [!IMPORTANT]
+> The Android version in the kernel name (e.g. `android12-5.10`) is the GKI baseline it was built from — it is **not** your device's Android OS version. A `5.10` kernel can run on devices well beyond Android 12, and a `6.1` kernel does not require Android 14 on the device. Match by **kernel version** (`5.10` / `5.15` / `6.1` / `6.6` / `6.12`), not by the Android number in the name.
+
 ## After flashing
 
 See [Post-Install — Verify & Finish Setup](post-install.md) for manager install, SUSFS module, and verification steps.
