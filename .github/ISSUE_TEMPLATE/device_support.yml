@@ -1,0 +1,92 @@
+name: Device Support Update
+description: Add or update a device in Supported Devices
+labels: [device-support]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this to add your device to `docs/supported-devices.md`. A PR will be opened automatically after you submit — maintainers just need to approve it.
+
+  - type: dropdown
+    id: manufacturer
+    attributes:
+      label: Manufacturer
+      description: Pick the table to update
+      options:
+        - Google Pixel
+        - Samsung
+        - OnePlus
+        - OPPO
+        - Realme
+        - Xiaomi
+        - POCO
+        - Redmi
+        - Nothing
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: Market name
+      placeholder: "e.g., Pixel 8 or Galaxy S23"
+    validations:
+      required: true
+
+  - type: input
+    id: codename
+    attributes:
+      label: Codename
+      description: Device codename
+      placeholder: "e.g., shiba or dm3q"
+    validations:
+      required: true
+
+  - type: input
+    id: gki_kernel
+    attributes:
+      label: GKI Kernel
+      description: Kernel version you flashed
+      placeholder: "e.g., android14-6.1 or 6.1.x-android14"
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware
+      description: Firmware / ROM
+      placeholder: "e.g., stock or lineage-22.1"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options:
+        - Supported
+        - Tested / Working
+        - Not working
+      default: 0
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: tested
+    attributes:
+      label: Confirmation
+      options:
+        - label: I tested this kernel on the device above and it boots
+          required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else (optional)
+      placeholder: Extra context
+    validations:
+      required: false

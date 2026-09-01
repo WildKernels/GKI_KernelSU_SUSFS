@@ -1,0 +1,42 @@
+name: Device Support Update
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  pr:
+    if: contains(github.event.issue.labels.*.name, 'device-support')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update table from issue
+        run: |
+          gh issue view ${{ github.event.issue.number }} --json body -q .body > /tmp/issue_body.txt
+          cat /tmp/issue_body.txt
+          python3 .github/scripts/update-supported-devices.py /tmp/issue_body.txt
+          git diff -- docs/supported-devices.md || echo "no diff"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs: add ${{ github.event.issue.title }} to supported devices"
+          branch: device-support/issue-${{ github.event.issue.number }}
+          title: "docs: add ${{ github.event.issue.title }} to supported devices (fixes #${{ github.event.issue.number }})"
+          body: |
+            Auto-generated from #${{ github.event.issue.number }}.
+
+            Please review the row added to `docs/supported-devices.md` and merge if correct.
+
+            Closes #${{ github.event.issue.number }}.
+          labels: device-support
+          delete-branch: true
