@@ -6,8 +6,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Third-Party Notices](https://img.shields.io/badge/notices-THIRD__PARTY_NOTICES-lightgrey.svg)](THIRD_PARTY_NOTICES.md)
-[![Releases](https://img.shields.io/github/v/release/WildKernels/GKI_KernelSU_SUSFS?label=releases)](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
-[![Docs](https://img.shields.io/badge/docs-features%20%7C%20install-blueviolet)](docs/features.md)
+[![Pre-release](https://img.shields.io/github/v/release/WildKernels/GKI_KernelSU_SUSFS?include_prereleases&label=pre--release)](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
 
 </div>
 
