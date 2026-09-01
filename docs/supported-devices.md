@@ -5,6 +5,9 @@
 
 ## Google Pixel
 
+> [!NOTE]
+> WildKernels GKI builds are **Generic** (GKI 2.0, 5.10+). This table lists Pixel devices commonly tested / expected to work. Being GKI-based, many other GKI 2.0 devices may work — Pixel entries are just the primary tested matrix.
+
 *Last updated: 2026-08-30 — covers Pixel 6 through Pixel 9a (latest available). Pixel 10/11 will be added as they release.*
 
 | Device | Codename | GKI Kernel | Firmware | Status |
@@ -25,8 +28,5 @@
 | Pixel 9 Pro XL | komodo | android14-6.1 | stock | Supported · 2026-08-30 |
 | Pixel 9 Pro Fold | comet | android14-6.1 | stock | Supported · 2026-08-30 |
 | Pixel 9a | tegu | android14-6.1 | stock | Supported · 2026-08-30 |
-
-> [!NOTE]
-> WildKernels GKI builds are **Generic** (GKI 2.0, 5.10+). This table lists Pixel devices commonly tested / expected to work. Being GKI-based, many other GKI 2.0 devices may work — Pixel entries are just the primary tested matrix.
 
 Source: [Build Pixel kernels — GKI supported Pixel kernel branches](https://source.android.com/docs/setup/build/building-pixel-kernels)
