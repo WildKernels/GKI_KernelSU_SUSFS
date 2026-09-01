@@ -23,7 +23,7 @@ For some devices, the `boot.img` format isn't as common as `lz4`, `gz`, and unco
 
 ---
 
-<details open>
+<details>
 <summary><b> Android</b> — via adb + <code>libmagiskboot.so</code></summary>
 
 Folder structure on device (`/data/local/tmp/`):
