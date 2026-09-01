@@ -67,6 +67,8 @@ Folder structure on device (`/data/local/tmp/`):
   fastboot flash boot new-boot.img
   ```
 
+  To temporarily test you can run `fastboot boot new-boot.img`.
+
 </details>
 
 <details>
@@ -106,6 +108,8 @@ Official `magiskboot` can run in Linux normally — use the [official build](htt
   ```sh
   fastboot flash boot new-boot.img
   ```
+
+  To temporarily test you can run `fastboot boot new-boot.img`.
 
 </details>
 
