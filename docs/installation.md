@@ -22,12 +22,12 @@ Only GKI 2.0 is supported — check marks show builds provided by this project:
 
 | Pre-GKI | GKI 1.0 | GKI 2.0 |
 |---------|---------|---------|
-| 3.10 x | 5.4 x | 5.10.x-android12 ✓ |
-| 3.18 x | | 5.10.x-android13 ✓ |
-| 4.4 x | | 5.15.x-android13 ✓ |
-| 4.9 x | | 5.15.x-android14 ✓ |
-| 4.14 x | | 6.1.x-android14 ✓ |
-| 4.19 x | | 6.6.x-android15 ✓ |
+| 3.10.x x | 5.4.x x | 5.10.x-android12 ✓ |
+| 3.18.x x | | 5.10.x-android13 ✓ |
+| 4.4.x x | | 5.15.x-android13 ✓ |
+| 4.9.x x | | 5.15.x-android14 ✓ |
+| 4.14.x x | | 6.1.x-android14 ✓ |
+| 4.19.x x | | 6.6.x-android15 ✓ |
 | | | 6.12.x-android16 ✓ |
 
 For Pre-GKI or GKI 1.0 kernels, contact [@TheWildJames](https://t.me/TheWildJames) to discuss possiblities.
