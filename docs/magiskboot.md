@@ -62,7 +62,11 @@ Folder structure on device (`/data/local/tmp/`):
   ```sh
   ./magiskboot repack boot.img
   ```
-  You will get a `new-boot.img` file. To temporarily test you can run `fastboot boot new-boot.img`. Flash it by fastboot:
+  You will get a `new-boot.img` file.
+
+9. To temporarily test you can run `fastboot boot new-boot.img`.
+
+10. Flash it by fastboot:
   ```sh
   fastboot flash boot new-boot.img
   ```
@@ -102,7 +106,11 @@ Official `magiskboot` can run in Linux normally — use the [official build](htt
   ```sh
   ./magiskboot repack boot.img
   ```
-  You will get a `new-boot.img` file. To temporarily test you can run `fastboot boot new-boot.img`. Flash it by fastboot:
+  You will get a `new-boot.img` file.
+
+6. To temporarily test you can run `fastboot boot new-boot.img`.
+
+7. Flash it by fastboot:
   ```sh
   fastboot flash boot new-boot.img
   ```
