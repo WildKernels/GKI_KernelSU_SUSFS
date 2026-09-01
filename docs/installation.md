@@ -19,6 +19,18 @@
 - [ ] Full backup (at least `boot` partition)
 - [ ] Correct AnyKernel3 ZIP for your kernel version from [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
 
+### Supported versions
+
+| Version |
+|---------|
+| 5.10.x-android12 |
+| 5.10.x-android13 |
+| 5.15.x-android13 |
+| 5.15.x-android14 |
+| 6.1.x-android14 |
+| 6.6.x-android15 |
+| 6.12.x-android16 |
+
 ## After flashing
 
 See [Post-Install — Verify & Finish Setup](post-install.md) for manager install, SUSFS module, and verification steps.

@@ -29,16 +29,6 @@
 
 Generic kernels built on [Google's GKI sources](https://android.googlesource.com/kernel/common/) with KernelSU and SUSFS for root hiding and detection evasion — broad compatibility, not guaranteed for every device.
 
-| Version |
-|---------|
-| 5.10.x-android12 |
-| 5.10.x-android13 |
-| 5.15.x-android13 |
-| 5.15.x-android14 |
-| 6.1.x-android14 |
-| 6.6.x-android15 |
-| 6.12.x-android16 |
-
 ---
 
 ## Features
