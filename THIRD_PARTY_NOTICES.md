@@ -1,10 +1,11 @@
 # Third-Party Notices — GKI_KernelSU_SUSFS
 
-This file lists only code cloned/patched at build and shipped in boot.img/AnyKernel3.zip.
+This file lists Linux GKI and all code cloned/patched at build and shipped in boot.img/AnyKernel3.zip.
 Each component keeps its own license. Used at = where in my code it is cloned/applied (not vendored — fetched in CI via .github/actions/* with pinned commits per release).
 
 | Component | Upstream / link | License | Used at (where in my code) |
 |-----------|-----------------|---------|-----------------------------|
+| Linux GKI (kernel/common, android12-5.10+ via manifest) | https://android.googlesource.com/kernel/common — manifest https://android.googlesource.com/kernel/manifest | GPL-2.0-only | `.github/actions/download-kernel` (fetched at build, not vendored) + `kernels/sync_kernel.sh` (local helper) → `kernel/common/` |
 | KernelSU | https://github.com/tiann/KernelSU | GPL-3.0 | `.github/actions/root-setup` (flavor `kernelsu`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
 | KernelSU-Next | https://github.com/KernelSU-Next/KernelSU-Next | GPL-3.0 | `.github/actions/root-setup` (flavor `next`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
 | ReSukiSU | https://github.com/ReSukiSU/ReSukiSU | GPL-3.0 | `.github/actions/root-setup` (flavor `resukisu`, pinned `root_commit`) → `kernel/drivers/kernelsu` |
