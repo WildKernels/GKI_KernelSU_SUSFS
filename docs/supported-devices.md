@@ -38,7 +38,19 @@
 |--------|----------|------------|----------|--------|
 | — | — | — | — | Placeholder — add entries |
 
-## OnePlus / OPPO / Realme
+## OnePlus
+
+| Device | Codename | GKI Kernel | Firmware | Status |
+|--------|----------|------------|----------|--------|
+| — | — | — | — | Placeholder — add entries |
+
+## OPPO
+
+| Device | Codename | GKI Kernel | Firmware | Status |
+|--------|----------|------------|----------|--------|
+| — | — | — | — | Placeholder — add entries |
+
+## Realme
 
 | Device | Codename | GKI Kernel | Firmware | Status |
 |--------|----------|------------|----------|--------|
