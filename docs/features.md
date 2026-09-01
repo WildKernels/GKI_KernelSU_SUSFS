@@ -5,22 +5,22 @@ Per-feature documentation for the GKI2 kernels built from this repository.
 *Last updated: 2026-08-30*
 
 <details>
-<summary><b>📑 Table of Contents</b></summary>
+<summary><b> Table of Contents</b></summary>
 
-- [🔐 Root Implementations](#-root-implementations)
-- [🫧 Root Hiding](#-root-hiding)
-- [📦 Meta Module](#-meta-module)
-- [🛡️ Security](#️-security)
-- [🌐 Networking](#-networking)
-- [🔍 Debugging, Tracing & BPF](#-debugging-tracing--bpf)
-- [⚡ Performance](#-performance)
-- [📦 Container Runtime](#-container-runtime)
+- [ Root Implementations](#-root-implementations)
+- [ Root Hiding](#-root-hiding)
+- [ Meta Module](#-meta-module)
+- [ Security](#-security)
+- [ Networking](#-networking)
+- [ Debugging, Tracing & BPF](#-debugging-tracing--bpf)
+- [ Performance](#-performance)
+- [ Container Runtime](#-container-runtime)
 
 </details>
 
 ---
 
-## 🔐 Root Implementations
+## Root Implementations
 
 Kernel-based su and root access management for Android.
 
@@ -32,7 +32,7 @@ Kernel-based su and root access management for Android.
 
 ---
 
-## 🫧 Root Hiding
+## Root Hiding
 
 | Feature | Description | Source |
 |---------|-------------|--------|
@@ -42,7 +42,7 @@ Kernel-based su and root access management for Android.
 
 ---
 
-## 📦 Meta Module
+## Meta Module
 
 | Module | Description | Source |
 |--------|-------------|--------|
@@ -62,7 +62,7 @@ Kernel-based su and root access management for Android.
 
 ---
 
-## 🛡️ Security
+## Security
 
 | Feature | Description | Source |
 |---------|-------------|--------|
@@ -70,7 +70,7 @@ Kernel-based su and root access management for Android.
 
 ---
 
-## 🌐 Networking
+## Networking
 
 | Feature | Description | Source |
 |---------|-------------|--------|
@@ -83,7 +83,7 @@ Kernel-based su and root access management for Android.
 
 ---
 
-## 🔍 Debugging, Tracing & BPF
+## Debugging, Tracing & BPF
 
 | Feature | Description | Source |
 |---------|-------------|--------|
@@ -91,7 +91,7 @@ Kernel-based su and root access management for Android.
 
 ---
 
-## ⚡ Performance
+## Performance
 
 | Feature | Description | Source |
 |---------|-------------|--------|
@@ -100,7 +100,7 @@ Kernel-based su and root access management for Android.
 
 ---
 
-## 📦 Container Runtime
+## Container Runtime
 
 | Feature | Description | Source |
 |---------|-------------|--------|

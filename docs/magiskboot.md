@@ -24,7 +24,7 @@ For some devices, the `boot.img` format isn't as common as `lz4`, `gz`, and unco
 ---
 
 <details open>
-<summary><b>📱 Android</b> — via adb + <code>libmagiskboot.so</code></summary>
+<summary><b> Android</b> — via adb + <code>libmagiskboot.so</code></summary>
 
 Folder structure on device (`/data/local/tmp/`):
 
@@ -38,42 +38,42 @@ Folder structure on device (`/data/local/tmp/`):
 1. Download latest Magisk from [GitHub Releases](https://github.com/topjohnwu/Magisk/releases).
 2. Rename `Magisk-*(version).apk` to `Magisk-*.zip` and unzip it.
 3. Push `libmagiskboot.so` to your device by ADB:
-   ```sh
-   adb push Magisk-*/lib/arm64-v8a/libmagiskboot.so /data/local/tmp/magiskboot
-   ```
+  ```sh
+  adb push Magisk-*/lib/arm64-v8a/libmagiskboot.so /data/local/tmp/magiskboot
+  ```
 4. Push stock `boot.img` and `Image` from AnyKernel3 to your device:
-   ```sh
-   adb push boot.img /data/local/tmp/
-   adb push Image /data/local/tmp/
-   ```
+  ```sh
+  adb push boot.img /data/local/tmp/
+  adb push Image /data/local/tmp/
+  ```
 5. Enter ADB shell and make it executable:
-   ```sh
-   adb shell
-   cd /data/local/tmp/
-   chmod +x magiskboot
-   ```
+  ```sh
+  adb shell
+  cd /data/local/tmp/
+  chmod +x magiskboot
+  ```
 6. Unpack `boot.img`:
-   ```sh
-   ./magiskboot unpack boot.img
-   ```
-   You will get a `kernel` file — this is your stock kernel.
+  ```sh
+  ./magiskboot unpack boot.img
+  ```
+  You will get a `kernel` file — this is your stock kernel.
 7. Replace kernel with the KernelSU Image:
-   ```sh
-   mv -f Image kernel
-   ```
+  ```sh
+  mv -f Image kernel
+  ```
 8. Repack the boot image:
-   ```sh
-   ./magiskboot repack boot.img
-   ```
-   You will get a `new-boot.img` file. Flash this file to your device by fastboot:
-   ```sh
-   fastboot flash boot new-boot.img
-   ```
+  ```sh
+  ./magiskboot repack boot.img
+  ```
+  You will get a `new-boot.img` file. Flash this file to your device by fastboot:
+  ```sh
+  fastboot flash boot new-boot.img
+  ```
 
 </details>
 
 <details>
-<summary><b>🐧 Linux</b> — official magiskboot</summary>
+<summary><b> Linux</b> — official magiskboot</summary>
 
 Folder structure on PC:
 
@@ -88,31 +88,31 @@ Official `magiskboot` can run in Linux normally — use the [official build](htt
 
 1. Prepare stock `boot.img` and `Image` in your PC.
 2. Make it executable:
-   ```sh
-   chmod +x magiskboot
-   ```
+  ```sh
+  chmod +x magiskboot
+  ```
 3. Unpack `boot.img`:
-   ```sh
-   ./magiskboot unpack boot.img
-   ```
-   You will get a `kernel` file — this is your stock kernel.
+  ```sh
+  ./magiskboot unpack boot.img
+  ```
+  You will get a `kernel` file — this is your stock kernel.
 4. Replace kernel:
-   ```sh
-   mv -f Image kernel
-   ```
+  ```sh
+  mv -f Image kernel
+  ```
 5. Repack:
-   ```sh
-   ./magiskboot repack boot.img
-   ```
-   You will get a `new-boot.img` file. Flash it by fastboot:
-   ```sh
-   fastboot flash boot new-boot.img
-   ```
+  ```sh
+  ./magiskboot repack boot.img
+  ```
+  You will get a `new-boot.img` file. Flash it by fastboot:
+  ```sh
+  fastboot flash boot new-boot.img
+  ```
 
 </details>
 
 <details>
-<summary><b>🪟 Windows / Other</b> — cross-built binary</summary>
+<summary><b> Windows / Other</b> — cross-built binary</summary>
 
 Folder structure on PC:
 
@@ -126,26 +126,26 @@ Folder structure on PC:
 1. Download the corresponding `magiskboot` binary for your OS from [WildKernels/Magisk (W.I.P.)](https://github.com/WildKernels/Magisk).
 2. Prepare stock `boot.img` and `Image` in your PC.
 3. Make it executable:
-   ```sh
-   chmod +x magiskboot
-   ```
+  ```sh
+  chmod +x magiskboot
+  ```
 4. Unpack `boot.img`:
-   ```sh
-   ./magiskboot unpack boot.img
-   ```
-   You will get a `kernel` file — this is your stock kernel.
+  ```sh
+  ./magiskboot unpack boot.img
+  ```
+  You will get a `kernel` file — this is your stock kernel.
 5. Replace kernel:
-   ```sh
-   mv -f Image kernel
-   ```
+  ```sh
+  mv -f Image kernel
+  ```
 6. Repack:
-   ```sh
-   ./magiskboot repack boot.img
-   ```
-   You will get a `new-boot.img` file. Flash it by fastboot:
-   ```sh
-   fastboot flash boot new-boot.img
-   ```
+  ```sh
+  ./magiskboot repack boot.img
+  ```
+  You will get a `new-boot.img` file. Flash it by fastboot:
+  ```sh
+  fastboot flash boot new-boot.img
+  ```
 
 </details>
 

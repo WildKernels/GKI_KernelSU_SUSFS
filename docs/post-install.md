@@ -34,7 +34,7 @@ If you need to mount modules, install one of:
 ## 5. Troubleshooting
 
 <details>
-<summary><b>🔧 Common issues</b></summary>
+<summary><b> Common issues</b></summary>
 
 - **General issues** — try restarting your device.
 - **Bootloop** — restore a stock boot.img via fastboot/recovery.
@@ -44,7 +44,7 @@ If you need to mount modules, install one of:
 </details>
 
 <details>
-<summary><b>☢️ Nuclear option</b></summary>
+<summary><b> Nuclear option</b></summary>
 
 Uninstall all modules and reboot, then delete all files and folders in the `/data/adb` folder. Reboot again and confirm no leftover files remain.
 

@@ -6,7 +6,7 @@
 > [!CAUTION]
 > Flashing a kernel can brick your device and will void your warranty. Make a full backup (boot partition at minimum) before proceeding.
 
-## ✅ Prerequisites
+## Prerequisites
 
 - [ ] Device with unlocked bootloader running a GKI2 kernel 5.10+
 - [ ] Root access already granted to the flashing app
@@ -28,7 +28,7 @@
 
 | App | Notes |
 |-----|-------|
-| [Kernel Flasher](https://github.com/fatalcoder524/KernelFlasher) | ✅ Recommended, actively maintained |
+| [Kernel Flasher](https://github.com/fatalcoder524/KernelFlasher) | Recommended, actively maintained |
 
 > [!WARNING]
 > Requires root to flash a kernel from within Android.

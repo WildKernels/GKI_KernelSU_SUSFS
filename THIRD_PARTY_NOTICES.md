@@ -19,7 +19,7 @@
 | DroidSpaces | [ravindu644/Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) | GPL-3.0 |
 
 <details>
-<summary>ℹ️ About magiskboot binaries</summary>
+<summary> About magiskboot binaries</summary>
 
 `magiskboot` / `magiskpolicy` are prebuilt binaries bundled inside `AnyKernel3/tools/`. Source at [topjohnwu/Magisk](https://github.com/topjohnwu/Magisk) (GPL-3.0). They are not separate clones — shipped only via AnyKernel3.
 

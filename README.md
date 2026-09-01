@@ -25,7 +25,7 @@
 > **Proceed at your own risk!**
 
 <details>
-<summary><b>📑 Table of Contents</b></summary>
+<summary><b> Table of Contents</b></summary>
 
 - [Our Projects](#our-projects)
 - [Features](#features)
@@ -50,24 +50,24 @@
 
 ---
 
-## ✨ Features
+## Features
 
-- 🔐 **KernelSU / KernelSU-Next / ReSukiSU** — root implementations
-- 🫧 **susfs4ksu** — root hiding (incl. Ptrace Leak Fix, Unicode Fix)
-- 📦 **NoMount / Mountify** — mount metamodules
-- 🛡️ **Baseband Guard** — partition protection
-- 🌐 **Networking** — WireGuard, BBR, IPSet, CIFS
-- 📁 **TMPFS** — xattr / POSIX ACLs
-- 🔍 **BPF** — BTF / eBPF / FUSE-BPF
-- ⚡ **Performance** — incl. NTSync
-- 📦 **DroidSpaces** — container runtime
+- **KernelSU / KernelSU-Next / ReSukiSU** — root implementations
+- **susfs4ksu** — root hiding (incl. Ptrace Leak Fix, Unicode Fix)
+- **NoMount / Mountify** — mount metamodules
+- **Baseband Guard** — partition protection
+- **Networking** — WireGuard, BBR, IPSet, CIFS
+- **TMPFS** — xattr / POSIX ACLs
+- **BPF** — BTF / eBPF / FUSE-BPF
+- **Performance** — incl. NTSync
+- **DroidSpaces** — container runtime
 
 > [!TIP]
 > Full documentation: [docs/features.md](docs/features.md) · [Supported Devices](docs/supported-devices.md)
 
 ---
 
-## 📲 Installation
+## Installation
 
 See **[Installation Guide](docs/installation.md)**.
 
@@ -85,7 +85,7 @@ After flashing → [Post-Install — Verify & Finish Setup](docs/post-install.md
 
 ---
 
-## 🙏 Credits
+## Credits
 
 | Component | Author |
 |-----------|--------|
@@ -109,7 +109,7 @@ After flashing → [Post-Install — Verify & Finish Setup](docs/post-install.md
 
 ---
 
-## 💬 Community
+## Community
 
 <div align="center">
 
@@ -125,7 +125,7 @@ Need help? Open an issue in this repository or reach out on Telegram.
 
 ---
 
-## 🌟 Special Thanks
+## Special Thanks
 
 **These amazing people help make this project possible!**
 
@@ -135,7 +135,7 @@ Have an idea or improvement in mind? Contributions are always welcome — feel f
 
 ---
 
-## 💝 Donations
+## Donations
 
 > [!IMPORTANT]
 > **Kind note:** A donation is truly just a gift — not a payment for support, features, or priority. It doesn't unlock anything extra on our side and doesn't change how we help you; everyone gets the same community support whether you donate or not. Think of it as a kind “thank you” to help keep development going — not a transaction. If you do choose to give, we're genuinely grateful, but please never feel obligated.

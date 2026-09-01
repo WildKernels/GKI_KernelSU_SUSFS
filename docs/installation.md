@@ -13,7 +13,7 @@
 > [!TIP]
 > Not sure? **Kernel Flasher** is easiest if you already have root. Otherwise use **magiskboot** from a PC.
 
-## ✅ Prerequisites
+## Prerequisites
 
 - [ ] Unlocked bootloader, GKI 2.0 device (5.10+)
 - [ ] Full backup (at least `boot` partition)
