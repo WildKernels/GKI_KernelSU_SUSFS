@@ -3,6 +3,9 @@
 > [!TIP]
 > Looking for your device? Use `Ctrl+F` / `+F` to search this page. GKI 2.0 devices not listed may still work — try matching your kernel version (`6.1.x-androidXX`).
 
+> [!NOTE]
+> These lists are maintained by the community — please update as needed!
+
 ## Google Pixel
 
 > [!NOTE]
@@ -29,4 +32,32 @@
 | Pixel 9 Pro Fold | comet | android14-6.1 | stock | Supported · 2026-08-30 |
 | Pixel 9a | tegu | android14-6.1 | stock | Supported · 2026-08-30 |
 
-Source: [Build Pixel kernels — GKI supported Pixel kernel branches](https://source.android.com/docs/setup/build/building-pixel-kernels)
+## Samsung
+
+| Device | Codename | GKI Kernel | Firmware | Status |
+|--------|----------|------------|----------|--------|
+| — | — | — | — | Placeholder — add entries |
+
+## OnePlus / OPPO / Realme
+
+| Device | Codename | GKI Kernel | Firmware | Status |
+|--------|----------|------------|----------|--------|
+| — | — | — | — | Placeholder — add entries |
+
+## Xiaomi / POCO / Redmi
+
+| Device | Codename | GKI Kernel | Firmware | Status |
+|--------|----------|------------|----------|--------|
+| — | — | — | — | Placeholder — add entries |
+
+## Nothing
+
+| Device | Codename | GKI Kernel | Firmware | Status |
+|--------|----------|------------|----------|--------|
+| — | — | — | — | Placeholder — add entries |
+
+## Other
+
+| Device | Codename | GKI Kernel | Firmware | Status |
+|--------|----------|------------|----------|--------|
+| — | — | — | — | Placeholder — add entries |
