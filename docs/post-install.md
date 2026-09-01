@@ -1,6 +1,6 @@
 # Post-Install — Verify & Finish Setup
 
-After flashing a WildKernels GKI kernel, do these checks to make sure everything is working.
+After flashing a Wild Kernels GKI kernel, do these checks to make sure everything is working.
 
 > [!TIP]
 > Follow in order — each step depends on the previous one.

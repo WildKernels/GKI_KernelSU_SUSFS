@@ -6,7 +6,7 @@
 ## Google Pixel
 
 > [!NOTE]
-> WildKernels GKI builds are **Generic** (GKI 2.0, 5.10+). This table lists Pixel devices commonly tested / expected to work. Being GKI-based, many other GKI 2.0 devices may work — Pixel entries are just the primary tested matrix.
+> Wild Kernels GKI builds are **Generic** (GKI 2.0, 5.10+). This table lists Pixel devices commonly tested / expected to work. Being GKI-based, many other GKI 2.0 devices may work — Pixel entries are just the primary tested matrix.
 
 *Last updated: 2026-08-30 — covers Pixel 6 through Pixel 9a (latest available). Pixel 10/11 will be added as they release.*
 
