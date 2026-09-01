@@ -87,6 +87,8 @@ After flashing → [Post-Install — Verify & Finish Setup](docs/post-install.md
 
 ## Credits
 
+Special thanks to the open-source community for their contributions!
+
 | Component | Author |
 |-----------|--------|
 | **KernelSU** | [tiann](https://github.com/tiann/KernelSU) |
@@ -103,9 +105,6 @@ After flashing → [Post-Install — Verify & Finish Setup](docs/post-install.md
 | **AnyKernel3** | [osm0sis](https://github.com/osm0sis/AnyKernel3) |
 | **Sultan Kernels (Pixel)** | [kerneltoast](https://github.com/kerneltoast) |
 | **Device Boot Fix** | [Boot fix commit](https://github.com/Anything-at-25-00/android_kernel_common_android12-5.10/commit/2476d262b597fe8af82cfb7aaf96676f51c6b4ed) |
-
-> [!NOTE]
-> Special thanks to the open-source community for their contributions!
 
 ---
 
