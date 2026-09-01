@@ -8,7 +8,7 @@
 </div>
 
 > [!CAUTION]
-> Wild Kernels is **not responsible** for bricked devices or damage. By flashing, **you** assume all risk — do not blame Wild Kernels if something goes wrong. Back up your data and understand the risks before flashing.
+> Wild Kernels is **not responsible** for bricked devices or damage. By flashing, **you** assume all risk. Back up your data and understand the risks before flashing.
 
 <details>
 <summary><b> Table of Contents</b></summary>
