@@ -103,10 +103,7 @@ See **[Installation Guide](docs/installation.md)**.
 
 </div>
 
-Need help? Open an issue in this repository or reach out on Telegram.
-
-> [!TIP]
-> Please ask in the [WildKernelsTG group](https://t.me/WildKernelsTG) first for general issues. DMs to [@TheWildJames](https://t.me/TheWildJames) are always open — use for priority / very important, or if you just want to talk and learn.
+Need help? Open an issue in this repository or reach out on Telegram. Please ask in the [WildKernelsTG group](https://t.me/WildKernelsTG) first for general issues. DMs to [@TheWildJames](https://t.me/TheWildJames) are always open — use for priority / very important, or if you just want to talk and learn.
 
 ---
 
