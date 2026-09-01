@@ -21,26 +21,17 @@
 
 ### Supported versions
 
-| Version |
-|---------|
-| 5.10.x-android12 |
-| 5.10.x-android13 |
-| 5.15.x-android13 |
-| 5.15.x-android14 |
-| 6.1.x-android14 |
-| 6.6.x-android15 |
-| 6.12.x-android16 |
-
-Linux version by GKI generation — only GKI 2.0 is supported by this project:
+Only GKI 2.0 is supported — check marks show builds provided by this project:
 
 | Pre-GKI | GKI 1.0 | GKI 2.0 |
 |---------|---------|---------|
-| 3.10 | 5.4 | 5.10 |
-| 3.18 | | 5.15 |
-| 4.4 | | 6.1 |
-| 4.9 | | 6.6 |
-| 4.14 | | 6.12 |
-| 4.19 | | |
+| 3.10 | 5.4 | 5.10.x-android12 ✓ |
+| 3.18 | | 5.10.x-android13 ✓ |
+| 4.4 | | 5.15.x-android13 ✓ |
+| 4.9 | | 5.15.x-android14 ✓ |
+| 4.14 | | 6.1.x-android14 ✓ |
+| 4.19 | | 6.6.x-android15 ✓ |
+| | | 6.12.x-android16 ✓ |
 
 ## After flashing
 
