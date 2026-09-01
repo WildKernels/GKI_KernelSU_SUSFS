@@ -6,10 +6,10 @@
 > [!CAUTION]
 > Flashing a kernel can brick your device and will void your warranty. Make a full backup (boot partition at minimum) before proceeding.
 
-## Prerequisites
+## ✅ Prerequisites
 
-- Device with unlocked bootloader running a GKI2 kernel 5.10+
-- Root access already granted to the flashing app
+- [ ] Device with unlocked bootloader running a GKI2 kernel 5.10+
+- [ ] Root access already granted to the flashing app
 
 ## Steps
 
@@ -19,15 +19,19 @@
 4. **Reboot** when prompted and verify KernelSU manager shows the expected version.
 
 > [!NOTE]
-> Match by the full kernel version (e.g., `6.1.x-androidXX`) - your device's Android version and the `androidXX` in the kernel version are not necessarily the same. For example, as of writing, a Google Pixel 8 is on `6.1.157-android14` while the system Android is 17.
+> Match by the full kernel version (e.g., `6.1.x-androidXX`) — your device's Android version and the `androidXX` in the kernel version are not necessarily the same. For example, as of writing, a Google Pixel 8 is on `6.1.157-android14` while the system Android is 17.
 
-This requires the flashing app to have root permissions. On first install from stock (no root yet), flash via recovery or fastboot instead, then use this method for subsequent upgrades.
+> [!TIP]
+> This requires the flashing app to have root permissions. On first install from stock (no root yet), flash via recovery or fastboot instead, then use this method for subsequent upgrades.
 
 ## Supported flashing apps
 
-- [Kernel Flasher](https://github.com/fatalcoder524/KernelFlasher) - recommended, actively maintained
+| App | Notes |
+|-----|-------|
+| [Kernel Flasher](https://github.com/fatalcoder524/KernelFlasher) | ✅ Recommended, actively maintained |
 
-Requires root to flash a kernel from within Android.
+> [!WARNING]
+> Requires root to flash a kernel from within Android.
 
 ## After flashing
 
@@ -35,8 +39,13 @@ See [Post-Install — Verify & Finish Setup](post-install.md) for manager instal
 
 ## Troubleshooting
 
-- **Bootloop** - restore a stock boot.img via fastboot/recovery.
+<details>
+<summary>Common issues</summary>
+
+- **Bootloop** — restore a stock boot.img via fastboot/recovery.
 - **Manager and kernel version do not match (e.g. 31000 != 32000)** — for best compatibility ensure both match. Install the latest kernel and manager linked in the release and reboot fully.
+
+</details>
 
 ---
 

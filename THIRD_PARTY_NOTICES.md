@@ -1,6 +1,7 @@
 # Third-Party Notices — GKI_KernelSU_SUSFS
 
-This file lists third-party code fetched during CI and included in the build's output zip(s). None of it is vendored in this repo — each dependency is pulled fresh at build time and retains its own original license.
+> [!NOTE]
+> This file lists third-party code fetched during CI and included in the build's output zip(s). None of it is vendored in this repo — each dependency is pulled fresh at build time and retains its own original license.
 
 | Component | Upstream | License |
 |-----------|----------|---------|
@@ -17,6 +18,12 @@ This file lists third-party code fetched during CI and included in the build's o
 | magiskboot | [topjohnwu/Magisk](https://github.com/topjohnwu/Magisk) via AnyKernel3 | GPL-3.0 |
 | DroidSpaces | [ravindu644/Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) | GPL-3.0 |
 
----
+<details>
+<summary>ℹ️ About magiskboot binaries</summary>
 
-If we have used your code and not credited you correctly, or have listed the wrong license, please let us know — open an issue or reach out and we'll fix it promptly. No omission is intentional; we want to credit everyone properly.
+`magiskboot` / `magiskpolicy` are prebuilt binaries bundled inside `AnyKernel3/tools/`. Source at [topjohnwu/Magisk](https://github.com/topjohnwu/Magisk) (GPL-3.0). They are not separate clones — shipped only via AnyKernel3.
+
+</details>
+
+> [!IMPORTANT]
+> If we have used your code and not credited you correctly, or have listed the wrong license, please let us know — open an issue or reach out and we'll fix it promptly. No omission is intentional; we want to credit everyone properly.

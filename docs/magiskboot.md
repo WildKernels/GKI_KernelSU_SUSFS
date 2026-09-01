@@ -6,12 +6,11 @@ For some devices, the `boot.img` format isn't as common as `lz4`, `gz`, and unco
 > Flashing a kernel can brick your device and will void your warranty. Make a full backup (boot partition at minimum) before proceeding.
 
 > [!TIP]
-> It's always recommended to use `magiskboot` to patch images. There are two ways:
-> - [magiskboot (official)](https://github.com/topjohnwu/Magisk/releases) - runs on Android devices (and Linux)
-> - [WildKernels/Magisk (W.I.P.)](https://github.com/WildKernels/Magisk) - cross-built binaries for Windows/macOS/Linux PCs (W.I.P.)
->
+> It's always recommended to use `magiskboot` to patch images. There are two builds:
+> - [magiskboot (official)](https://github.com/topjohnwu/Magisk/releases) — runs on Android devices (and Linux)
+> - [WildKernels/Magisk (W.I.P.)](https://github.com/WildKernels/Magisk) — cross-built binaries for Windows/macOS/Linux PCs (W.I.P.)
 
-**Platforms:** [Android](#using-magiskboot-on-android-devices) · [Linux](#using-magiskboot-on-linux) · [Windows / Other](#using-magiskboot-on-windows--other)
+**Platforms:** [Android](#-android) · [Linux](#-linux) · [Windows](#-windows--other)
 
 ## Preparation
 
@@ -20,9 +19,12 @@ For some devices, the `boot.img` format isn't as common as `lz4`, `gz`, and unco
 3. Unpack the AnyKernel3 package and get the `Image` file, which is the kernel file of KernelSU.
 
 > [!NOTE]
-> Match by the full kernel version (e.g., `6.1.x-androidXX`) - your device's Android version and the `androidXX` in the kernel version are not necessarily the same. For example, as of writing, a Google Pixel 8 is on `6.1.157-android14` while the system Android is 17.
+> Match by the full kernel version (e.g., `6.1.x-androidXX`) — your device's Android version and the `androidXX` in the kernel version are not necessarily the same. For example, as of writing, a Google Pixel 8 is on `6.1.157-android14` while the system Android is 17.
 
-## Using magiskboot on Android devices
+---
+
+<details open>
+<summary><b>📱 Android</b> — via adb + <code>libmagiskboot.so</code></summary>
 
 Folder structure on device (`/data/local/tmp/`):
 
@@ -54,7 +56,7 @@ Folder structure on device (`/data/local/tmp/`):
    ```sh
    ./magiskboot unpack boot.img
    ```
-   You will get a `kernel` file - this is your stock kernel.
+   You will get a `kernel` file — this is your stock kernel.
 7. Replace kernel with the KernelSU Image:
    ```sh
    mv -f Image kernel
@@ -68,7 +70,10 @@ Folder structure on device (`/data/local/tmp/`):
    fastboot flash boot new-boot.img
    ```
 
-## Using magiskboot on Linux
+</details>
+
+<details>
+<summary><b>🐧 Linux</b> — official magiskboot</summary>
 
 Folder structure on PC:
 
@@ -79,7 +84,7 @@ Folder structure on PC:
 └── Image
 ```
 
-Official `magiskboot` can run in Linux normally - use the [official build](https://github.com/topjohnwu/Magisk/releases). If you prefer, you can also use [WildKernels/Magisk (W.I.P.)](https://github.com/WildKernels/Magisk).
+Official `magiskboot` can run in Linux normally — use the [official build](https://github.com/topjohnwu/Magisk/releases). If you prefer, you can also use [WildKernels/Magisk (W.I.P.)](https://github.com/WildKernels/Magisk).
 
 1. Prepare stock `boot.img` and `Image` in your PC.
 2. Make it executable:
@@ -90,7 +95,7 @@ Official `magiskboot` can run in Linux normally - use the [official build](https
    ```sh
    ./magiskboot unpack boot.img
    ```
-   You will get a `kernel` file - this is your stock kernel.
+   You will get a `kernel` file — this is your stock kernel.
 4. Replace kernel:
    ```sh
    mv -f Image kernel
@@ -104,7 +109,10 @@ Official `magiskboot` can run in Linux normally - use the [official build](https
    fastboot flash boot new-boot.img
    ```
 
-## Using magiskboot on Windows / Other
+</details>
+
+<details>
+<summary><b>🪟 Windows / Other</b> — cross-built binary</summary>
 
 Folder structure on PC:
 
@@ -125,7 +133,7 @@ Folder structure on PC:
    ```sh
    ./magiskboot unpack boot.img
    ```
-   You will get a `kernel` file - this is your stock kernel.
+   You will get a `kernel` file — this is your stock kernel.
 5. Replace kernel:
    ```sh
    mv -f Image kernel
@@ -138,6 +146,8 @@ Folder structure on PC:
    ```sh
    fastboot flash boot new-boot.img
    ```
+
+</details>
 
 ---
 
