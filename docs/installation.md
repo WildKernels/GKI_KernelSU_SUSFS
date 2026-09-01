@@ -12,7 +12,7 @@
 
 ## Prerequisites
 
-- [ ] Unlocked bootloader, GKI 2.0 device (5.10+)
+- [ ] GKI 2.0 device with an unlocked bootloader
 - [ ] Full backup (at least `boot` partition)
 - [ ] Correct AnyKernel3 ZIP for your kernel version from [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
 
