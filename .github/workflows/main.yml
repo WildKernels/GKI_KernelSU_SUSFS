@@ -816,6 +816,10 @@ jobs:
     secrets: inherit
 
   update-verified-pins:
+    concurrency:
+      group: update-verified-pins-${{ github.repository }}
+      queue: max
+      cancel-in-progress: false
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.commit_mode == 'update'"
     runs-on: ubuntu-latest
     permissions:

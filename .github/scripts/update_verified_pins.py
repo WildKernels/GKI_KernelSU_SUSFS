@@ -12,6 +12,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from uuid import uuid4
 
 REPO = os.environ.get("GITHUB_WORKSPACE", ".")
 MAIN = os.path.join(REPO, ".github/workflows/main.yml")
@@ -35,12 +36,21 @@ def approved(env):
 
 def read_pins():
     """Return dict {var_name: sha} from the current PIN_* block in main.yml."""
-    with open(MAIN, "r", encoding="utf-8") as fh:
+    with open(MAIN, "r", encoding="utf-8", newline="") as fh:
         text = fh.read()
     pins = {}
     for var, _, _ in PINS:
-        m = re.search(r"%s=\"([0-9a-f]{40})\"" % re.escape(var), text)
-        pins[var] = m.group(1) if m else None
+        pattern = re.compile(
+            rf'^[ \t]*{re.escape(var)}(?P<assignment>[ \t]*=[^\r\n]*)?[ \t]*(?=\r?$)',
+            re.MULTILINE,
+        )
+        matches = list(pattern.finditer(text))
+        if len(matches) != 1:
+            raise ValueError(f"expected exactly one {var} assignment, found {len(matches)}")
+        value = re.fullmatch(r'="([0-9a-f]{40})"[ \t]*', matches[0].group("assignment") or "")
+        if value is None:
+            raise ValueError(f"invalid {var} assignment")
+        pins[var] = value.group(1)
     return pins
 
 
@@ -68,7 +78,7 @@ def history_path():
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
     d = os.path.join(REPO, ".github/pins/history")
     os.makedirs(d, exist_ok=True)
-    return os.path.join(d, f"{ts}.json")
+    return os.path.join(d, f"{ts}-{uuid4().hex[:8]}.json")
 
 
 def write_history(changes, path):
@@ -83,15 +93,30 @@ def write_history(changes, path):
 
 
 def apply_pins(promoted):
-    with open(MAIN, "r", encoding="utf-8") as fh:
+    with open(MAIN, "r", encoding="utf-8", newline="") as fh:
         text = fh.read()
+    replacements = []
     for key, sha in promoted.items():
-        pattern = re.compile(r"%s=\"([0-9a-f]{40})\"" % re.escape(key))
-        text, n = pattern.subn(lambda m: f"{key}=\"{sha}\"", text, count=1)
-        if n == 0:
-            print(f"  ERROR: could not locate pin for {key}", file=sys.stderr)
-            return False
-    with open(MAIN, "w", encoding="utf-8") as fh:
+        pattern = re.compile(
+            rf'^[ \t]*{re.escape(key)}(?P<assignment>[ \t]*=[^\r\n]*)?[ \t]*(?=\r?$)',
+            re.MULTILINE,
+        )
+        matches = list(pattern.finditer(text))
+        if len(matches) != 1:
+            raise ValueError(f"expected exactly one {key} assignment, found {len(matches)}")
+        match = matches[0]
+        value = re.fullmatch(r'="([0-9a-f]{40})"[ \t]*', match.group("assignment") or "")
+        if value is None:
+            raise ValueError(f"invalid {key} assignment")
+        line = match.group(0)
+        indentation = line[: len(line) - len(line.lstrip(" \t"))]
+        trailing = line[len(line.rstrip(" \t")) :]
+        replacements.append((match.start(), match.end(), f'{indentation}{key}="{sha}"{trailing}'))
+
+    for start, end, replacement in reversed(replacements):
+        text = text[:start] + replacement + text[end:]
+
+    with open(MAIN, "w", encoding="utf-8", newline="") as fh:
         fh.write(text)
     return True
 

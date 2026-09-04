@@ -27,15 +27,30 @@ runs:
   steps:
     - id: extract
       shell: bash
+      env:
+        INPUT_OS_PATCH_LEVEL: ${{ inputs.os_patch_level }}
       run: |
         set -euo pipefail
 
         SUBLEVEL="${{ inputs.sublevel }}"
-        if [ -f "${{ github.workspace }}/kernel/common/Makefile" ]; then
-          EXTRACTED="$(grep '^SUBLEVEL = ' "${{ github.workspace }}/kernel/common/Makefile" | awk '{print $3}')"
-          if [ "${{ inputs.os_patch_level }}" = "lts" ] && [ -n "$EXTRACTED" ]; then
-            SUBLEVEL="$EXTRACTED"
+        MAKEFILE="${{ github.workspace }}/kernel/common/Makefile"
+        if [ "$(printf '%s' "$INPUT_OS_PATCH_LEVEL" | tr '[:upper:]' '[:lower:]')" = "lts" ]; then
+          if [ ! -f "$MAKEFILE" ]; then
+            echo "LTS build requires $MAKEFILE" >&2
+            exit 1
           fi
+          mapfile -t matches < <(grep -E '^[[:space:]]*SUBLEVEL[[:space:]]*=' "$MAKEFILE" || true)
+          if [ "${#matches[@]}" -ne 1 ]; then
+            echo "Expected exactly one SUBLEVEL assignment in $MAKEFILE; found ${#matches[@]}" >&2
+            exit 1
+          fi
+          EXTRACTED="${matches[0]#*=}"
+          EXTRACTED="$(printf '%s' "$EXTRACTED" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if ! [[ "$EXTRACTED" =~ ^[0-9]+$ ]]; then
+            echo "Invalid numeric SUBLEVEL '$EXTRACTED' in $MAKEFILE" >&2
+            exit 1
+          fi
+          SUBLEVEL="$EXTRACTED"
         fi
 
         FILE_NAME="${{ inputs.kernel_version }}.${SUBLEVEL}-${{ inputs.android_version }}-${{ inputs.os_patch_level }}"

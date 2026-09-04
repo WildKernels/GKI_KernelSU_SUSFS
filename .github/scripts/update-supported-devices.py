@@ -5,6 +5,12 @@ import re, sys, datetime, pathlib
 ISSUE_BODY = pathlib.Path(sys.argv[1]).read_text() if len(sys.argv) > 1 else sys.stdin.read()
 MD = pathlib.Path("docs/supported-devices.md")
 
+def validate_cell(name, value):
+    if any(ch in value for ch in ('|', '\r', '\n')):
+        print(f"invalid {name}: Markdown delimiters and line breaks are not allowed", file=sys.stderr)
+        raise SystemExit(1)
+    return value
+
 def field(id):
     # issue form bodies render as "### <Label>\n\nvalue"
     # we match by id label text variations
@@ -39,12 +45,14 @@ heading_map = {
 }
 
 manufacturer = field("manufacturer") or "Other"
-device = field("device").strip()
-codename = field("codename").strip()
-gki = field("gki_kernel").strip()
-firmware = field("firmware").strip() or "stock"
-status = field("status").strip() or "Supported"
 custom_oem = field("custom_manufacturer").strip()
+if manufacturer == "Other":
+    custom_oem = validate_cell("custom_oem", custom_oem)
+device = validate_cell("device", field("device").strip())
+codename = validate_cell("codename", field("codename").strip())
+gki = validate_cell("gki", field("gki_kernel").strip())
+firmware = validate_cell("firmware", field("firmware").strip() or "stock")
+status = validate_cell("status", field("status").strip() or "Supported")
 # handle custom OEM when Other is selected
 if manufacturer == "Other" and custom_oem and custom_oem.lower() not in ("none", "_no response_", ""):
     manufacturer = custom_oem.strip().title()

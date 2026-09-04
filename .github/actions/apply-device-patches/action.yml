@@ -1,5 +1,6 @@
 name: 'Apply Device-Specific Patches'
 description: 'Apply WiFi/Bluetooth fixes for Samsung and Xiaomi 6.6 GKI devices'
+
 inputs:
   version:
     description: 'Kernel config version (e.g., android15-6.6)'
@@ -16,18 +17,105 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        SYMBOL_LIST=android/abi_gki_aarch64_galaxy
-        echo "kdp_set_cred_non_rcu" >> $SYMBOL_LIST
-        echo "kdp_usecount_dec_and_test" >> $SYMBOL_LIST
-        echo "kdp_usecount_inc" >> $SYMBOL_LIST
+        set -euo pipefail
 
         PATCH="${{ github.workspace }}/kernel_patches/samsung/min_kdp/add-min_kdp-symbols.patch"
-        if patch -p1 --dry-run < "$PATCH"; then
-          patch -p1 --no-backup-if-mismatch < $PATCH
-        fi
+        MIN_KDP="${{ github.workspace }}/kernel_patches/samsung/min_kdp/min_kdp.c"
+        test -f "$PATCH" || { echo "Missing Samsung min_kdp patch: $PATCH" >&2; exit 1; }
+        test -f "$MIN_KDP" || { echo "Missing Samsung min_kdp source: $MIN_KDP" >&2; exit 1; }
 
-        cp "${{ github.workspace }}/kernel_patches/samsung/min_kdp/min_kdp.c" drivers/min_kdp.c
-        echo "obj-y += min_kdp.o" >> drivers/Makefile
+        SYMBOL_LIST=android/abi_gki_aarch64_galaxy
+        TRANSACTION_DIR="$(mktemp -d)"
+        BACKUP_DIR="$TRANSACTION_DIR/original"
+        STAGE_DIR="$TRANSACTION_DIR/stage"
+        TRANSACTION_COMMITTED=false
+        declare -a TRANSACTION_PATHS
+        TRANSACTION_PATH_COUNT=0
+
+        add_transaction_path() {
+          local path="$1"
+          case "$path" in
+            /dev/null|..|../*|*/../*|/*)
+              echo "Unsafe Samsung patch path: $path" >&2
+              exit 1
+              ;;
+          esac
+          local index existing
+          for ((index = 0; index < TRANSACTION_PATH_COUNT; index++)); do
+            existing="${TRANSACTION_PATHS[index]}"
+            [ "$existing" = "$path" ] && return
+          done
+          TRANSACTION_PATHS[TRANSACTION_PATH_COUNT]="$path"
+          TRANSACTION_PATH_COUNT=$((TRANSACTION_PATH_COUNT + 1))
+        }
+
+        restore_transaction() {
+          set +e
+          set +u
+          if [ "$TRANSACTION_COMMITTED" = true ]; then
+            rm -rf "$TRANSACTION_DIR"
+            return
+          fi
+          local index path
+          for ((index = 0; index < TRANSACTION_PATH_COUNT; index++)); do
+            path="${TRANSACTION_PATHS[index]}"
+            if [[ -e "$BACKUP_DIR/$path" || -L "$BACKUP_DIR/$path" ]]; then
+              rm -rf "$path"
+              mkdir -p "$(dirname "$path")"
+              cp -a "$BACKUP_DIR/$path" "$path"
+            else
+              rm -rf "$path"
+            fi
+          done
+          rm -rf "$TRANSACTION_DIR"
+        }
+        trap restore_transaction EXIT
+
+        PATCH_PATHS=()
+        while IFS= read -r path; do
+          [ -n "$path" ] && PATCH_PATHS+=("$path")
+        done < <(awk '/^(---|\+\+\+) / { path=$2; sub(/^[ab]\//, "", path); print path }' "$PATCH" | sort -u)
+        for path in "${PATCH_PATHS[@]}"; do
+          add_transaction_path "$path"
+        done
+        add_transaction_path "$SYMBOL_LIST"
+        add_transaction_path drivers/min_kdp.c
+        add_transaction_path drivers/Makefile
+
+        for path in "${TRANSACTION_PATHS[@]}"; do
+          if [[ -e "$path" || -L "$path" ]]; then
+            mkdir -p "$BACKUP_DIR/$(dirname "$path")" "$STAGE_DIR/$(dirname "$path")"
+            cp -a "$path" "$BACKUP_DIR/$path"
+            cp -a "$path" "$STAGE_DIR/$path"
+          else
+            mkdir -p "$STAGE_DIR/$(dirname "$path")"
+          fi
+        done
+
+        (
+          cd "$STAGE_DIR"
+          patch -p1 --dry-run < "$PATCH"
+          patch -p1 --no-backup-if-mismatch < "$PATCH"
+          printf '%s\n' \
+            'kdp_set_cred_non_rcu' \
+            'kdp_usecount_dec_and_test' \
+            'kdp_usecount_inc' >> "$SYMBOL_LIST"
+          cp "$MIN_KDP" drivers/min_kdp.c
+          if ! grep -Fqx 'obj-y += min_kdp.o' drivers/Makefile; then
+            printf '%s\n' 'obj-y += min_kdp.o' >> drivers/Makefile
+          fi
+        )
+
+        for path in "${TRANSACTION_PATHS[@]}"; do
+          if [[ -e "$STAGE_DIR/$path" || -L "$STAGE_DIR/$path" ]]; then
+            mkdir -p "$(dirname "$path")"
+            rm -rf "$path"
+            cp -a "$STAGE_DIR/$path" "$path"
+          else
+            rm -rf "$path"
+          fi
+        done
+        TRANSACTION_COMMITTED=true
 
     - name: Fix WiFi and Bluetooth on Xiaomi 6.6 GKI Devices
       if: inputs.version == 'android15-6.6'

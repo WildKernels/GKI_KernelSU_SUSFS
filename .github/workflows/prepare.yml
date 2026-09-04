@@ -89,6 +89,8 @@ jobs:
       - name: Read Config and Build Final Matrix
         id: final
         shell: bash
+        env:
+          INPUT_OS_PATCH_LEVEL: ${{ inputs.os_patch_level }}
         run: |
           if [ ! -f "${{ inputs.config_file }}" ]; then
             echo "Error: Config file not found: ${{ inputs.config_file }}"
@@ -133,8 +135,8 @@ jobs:
               )
             }')
 
-          SELECTED_PATCH_LEVEL="${{ inputs.os_patch_level }}"
-          if [ "$(printf '%s' "$SELECTED_PATCH_LEVEL" | tr '[:upper:]' '[:lower:]')" = "all" ]; then
+          SELECTED_PATCH_LEVEL="$(printf '%s' "$INPUT_OS_PATCH_LEVEL" | tr '[:upper:]' '[:lower:]')"
+          if [ "$SELECTED_PATCH_LEVEL" = "all" ]; then
             SELECTED_PATCH_LEVEL=""
           fi
           if [ -n "$SELECTED_PATCH_LEVEL" ]; then
