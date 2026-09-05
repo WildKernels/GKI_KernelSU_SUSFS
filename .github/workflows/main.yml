@@ -1359,17 +1359,54 @@ jobs:
         done
 
     - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ steps.tag.outputs.new_tag }}
-        name: ${{ steps.release_meta.outputs.release_title }}
-        body_path: release_body.md
-        draft: false
-        prerelease: ${{ inputs.release_type == 'Pre-Release' }}
-        files: |
-          release-assets/**/*.zip
-          release-assets/**/*.apk
-          release-assets/**/*-boot*.img
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG_NAME: ${{ steps.tag.outputs.new_tag }}
+        RELEASE_TITLE: ${{ steps.release_meta.outputs.release_title }}
+        IS_PRERELEASE: ${{ inputs.release_type == 'Pre-Release' }}
+      run: |
+        set -euo pipefail
+        shopt -s nullglob globstar
+
+        # Collect assets first so a glob miss fails fast instead of mid-release.
+        files=(release-assets/**/*.zip release-assets/**/*.apk release-assets/**/*-boot*.img)
+        if [ "${#files[@]}" -eq 0 ]; then
+          echo "No release assets found" >&2
+          exit 1
+        fi
+        echo "Uploading ${#files[@]} assets one at a time..."
+
+        # The release may already exist (partial upload from a retried run).
+        if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+          echo "Release $TAG_NAME already exists — uploading into it."
+        else
+          create_args=(--title "$RELEASE_TITLE" --notes-file release_body.md)
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            create_args+=(--prerelease)
+          fi
+          gh release create "$TAG_NAME" "${create_args[@]}"
+        fi
+
+        # Sequential uploads: one asset at a time with per-file retries.
+        # (The previous single-step bulk upload fired ~500 concurrent
+        # uploads and got the runner killed twice at the same point.)
+        failed=0
+        for f in "${files[@]}"; do
+          ok=false
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG_NAME" "$f" --clobber; then
+              ok=true
+              break
+            fi
+            echo "Retry $attempt/3 failed for: $f" >&2
+            sleep 10
+          done
+          if [ "$ok" = false ]; then
+            echo "ERROR: giving up on $f" >&2
+            failed=1
+          fi
+        done
+        exit "$failed"
 
   nightly-release:
     if: always() && github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.release_type == 'Action'
