@@ -749,41 +749,32 @@ jobs:
             status: $status
           }' > "$metadata_file"
 
+        jq -e '
+          .status == "Build-verified only" and
+          (.root.manager | length > 0) and
+          (.root.version | length > 0) and
+          (.susfs_revision | test("^[0-9a-f]{40}$")) and
+          (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
+          (.artifact_url | startswith("https://")) and
+          (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
+          .catalog.availability == "eligible-with-provenance-and-checksums" and
+          .catalog.device_compatibility == "not-validated" and
+          .catalog.flashability == "not-guaranteed" and
+          .catalog.boot == "not-guaranteed"
+        ' "$metadata_file" > /dev/null
         if [ "$NOMOUNT_ENABLED" = "true" ]; then
           jq -e '
-            .status == "Build-verified only" and
-            (.root.manager | length > 0) and
-            (.root.version | length > 0) and
-            (.susfs_revision | test("^[0-9a-f]{40}$")) and
             (.nomount_commit | test("^[0-9a-f]{40}$")) and
-            (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
-            (.artifact_url | startswith("https://")) and
-            (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
             (.nomount_metamodule.commit == .nomount_commit) and
             (.nomount_metamodule.artifact_url | startswith("https://")) and
-            (.nomount_metamodule.sha256 | test("^sha256:[0-9a-f]{64}$")) and
-            .catalog.availability == "eligible-with-provenance-and-checksums" and
-            .catalog.device_compatibility == "not-validated" and
-            .catalog.flashability == "not-guaranteed" and
-            .catalog.boot == "not-guaranteed"
+            (.nomount_metamodule.sha256 | test("^sha256:[0-9a-f]{64}$"))
           ' "$metadata_file" > /dev/null
         else
           jq -e '
-            .status == "Build-verified only" and
-            (.root.manager | length > 0) and
-            (.root.version | length > 0) and
-            (.susfs_revision | test("^[0-9a-f]{40}$")) and
             (.nomount_commit == "N/A") and
-            (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
-            (.artifact_url | startswith("https://")) and
-            (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
             (.nomount_metamodule.commit == "N/A") and
             (.nomount_metamodule.artifact_url == "N/A") and
-            (.nomount_metamodule.sha256 == "N/A") and
-            .catalog.availability == "eligible-with-provenance-and-checksums" and
-            .catalog.device_compatibility == "not-validated" and
-            .catalog.flashability == "not-guaranteed" and
-            .catalog.boot == "not-guaranteed"
+            (.nomount_metamodule.sha256 == "N/A")
           ' "$metadata_file" > /dev/null
         fi
 
