@@ -94,8 +94,72 @@ runs:
 
         (
           cd "$STAGE_DIR"
-          patch -p1 --dry-run < "$PATCH"
-          patch -p1 --no-backup-if-mismatch < "$PATCH"
+          if patch -p1 --dry-run < "$PATCH" 2>/dev/null; then
+            patch -p1 --no-backup-if-mismatch < "$PATCH"
+          else
+            echo "Rigid .stg patch failed (upstream drift), falling back to idempotent insert"
+            python3 - android/abi_gki_aarch64.stg <<'PYEOF'
+        import sys
+        stg_path = sys.argv[1]
+        with open(stg_path) as f:
+            src = f.read()
+        def ensure_before(anchor, block, label):
+            global src
+            if label in src:
+                print(f"already present: {label}")
+                return
+            if anchor in src:
+                src = src.replace(anchor, block + anchor, 1)
+                print(f"inserted {label} at anchor")
+            else:
+                # STG text format is order-insensitive: append as last resort
+                if not src.endswith('\n'):
+                    src += '\n'
+                src += block
+                print(f"inserted {label} at EOF (anchor missing)")
+        func1 = ('function {\n  id: 0x1e5195df\n  return_type_id: 0x48b5725f\n'
+                 '  parameter_id: 0x3d551c03\n  parameter_id: 0x6720d32f\n}\n')
+        func2 = ('function {\n  id: 0xc18e39fb\n  return_type_id: 0x4585663f\n'
+                 '  parameter_id: 0x3d551c03\n}\n')
+        elf1 = ('elf_symbol {\n  id: 0xb0801f6e\n  name: "kdp_set_cred_non_rcu"\n  is_defined: true\n'
+                '  symbol_type: FUNCTION\n  crc: 0x738bae5e\n  type_id: 0x1e5195df\n'
+                '  full_name: "kdp_set_cred_non_rcu"\n}\n')
+        elf2 = ('elf_symbol {\n  id: 0x3037c5bc\n  name: "kdp_usecount_dec_and_test"\n  is_defined: true\n'
+                '  symbol_type: FUNCTION\n  crc: 0xda582aa5\n  type_id: 0xc18e39fb\n'
+                '  full_name: "kdp_usecount_dec_and_test"\n}\n')
+        elf3 = ('elf_symbol {\n  id: 0x8334a496\n  name: "kdp_usecount_inc"\n  is_defined: true\n'
+                '  symbol_type: FUNCTION\n  crc: 0xfb342499\n  type_id: 0x1fcd1693\n'
+                '  full_name: "kdp_usecount_inc"\n}\n')
+        ensure_before('function {\n  id: 0x1e571002', func1, 'id: 0x1e5195df')
+        ensure_before('function {\n  id: 0xc18f1240', func2, 'id: 0xc18e39fb')
+        elf_anchor = 'elf_symbol {\n  id: 0x493ce9fc\n  name: "loops_per_jiffy"'
+        for block, label in [(elf1, '"kdp_set_cred_non_rcu"'), (elf2, '"kdp_usecount_dec_and_test"'), (elf3, '"kdp_usecount_inc"')]:
+            ensure_before(elf_anchor, block, label)
+        # interface symbol_ids must land inside the interface block
+        iface_ids = ['0xb0801f6e', '0x3037c5bc', '0x8334a496']
+        missing = [i for i in iface_ids if f'symbol_id: {i}' not in src]
+        if missing:
+            lines = [f'  symbol_id: {i}\n' for i in missing]
+            # 0xc750a072 exists in all snapshots (incl. 2024-09 where
+            # 0x132eb5f1 is missing upstream); insert right after it.
+            anchor = '  symbol_id: 0xc750a072\n'
+            if anchor in src:
+                src = src.replace(anchor, anchor + ''.join(lines), 1)
+                print(f"inserted interface ids after 0xc750a072: {missing}")
+            else:
+                idx = src.find('interface {')
+                assert idx != -1, 'interface block not found in .stg'
+                end = src.find('\n}\n', idx)
+                assert end != -1, 'interface block close not found'
+                src = src[:end] + ''.join(lines).rstrip('\n') + src[end:]
+                print(f"inserted interface ids before interface close: {missing}")
+        else:
+            print('interface ids already present')
+        with open(stg_path, 'w') as f:
+            f.write(src)
+        print('fallback .stg insert done')
+        PYEOF
+          fi
           printf '%s\n' \
             'kdp_set_cred_non_rcu' \
             'kdp_usecount_dec_and_test' \
