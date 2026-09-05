@@ -35,6 +35,12 @@ Generic kernels built on [Google's GKI sources](https://android.googlesource.com
 
 ---
 
+## Build Your Own Kernel
+
+Fork the repository and follow **[Build Your Own Kernel](docs/build-from-fork.md)** to select one kernel family, patch level, root implementation, and feature set in GitHub Actions.
+
+---
+
 ## Installation
 
 See **[Installation Guide](https://github.com/WildKernels/GKI_KernelSU_SUSFS/wiki/Installation)**.
