@@ -1398,8 +1398,10 @@ jobs:
               ok=true
               break
             fi
-            echo "Retry $attempt/3 failed for: $f" >&2
-            sleep 10
+            echo "Attempt $attempt/3 failed for: $f" >&2
+            if [ "$attempt" -lt 3 ]; then
+              sleep 10
+            fi
           done
           if [ "$ok" = false ]; then
             echo "ERROR: giving up on $f" >&2
