@@ -529,6 +529,13 @@ jobs:
         fi
         SUMMARY_FILE="/tmp/build-summary-${SUMMARY_BASE}.md"
         echo "SUMMARY_BASE=${SUMMARY_BASE}" >> "$GITHUB_ENV"
+
+        # NoMount is optional (nomount_commit input is always populated, so
+        # feature_set is the only reliable signal for whether it was built).
+        NOMOUNT_ENABLED="false"
+        if [ "${{ contains(inputs.feature_set, 'NoMount') || inputs.feature_set == 'All' }}" = "true" ]; then
+          NOMOUNT_ENABLED="true"
+        fi
         
         # Determine build status
         if [ "${{ job.status }}" = "success" ]; then
@@ -554,12 +561,8 @@ jobs:
         ROOT_SHA="${ROOT_COMMIT:-${KSU_COMMIT:-N/A}}"
         if [ "$NOMOUNT_ENABLED" = "true" ]; then
           NOMOUNT_SHA="${NOMOUNT_COMMIT:-${{ inputs.nomount_commit }}}"
-          NOMOUNT_MODULE_COMMIT="${{ inputs.nomount_commit }}"
-          METHOD="GKI source build with SHA-pinned root implementation, SUSFS, and NoMount"
         else
           NOMOUNT_SHA="N/A"
-          NOMOUNT_MODULE_COMMIT="N/A"
-          METHOD="GKI source build with SHA-pinned root implementation and SUSFS"
         fi
         SUSFS_SHA="${SUSFS_COMMIT:-${{ inputs.susfs_commit }}}"
         
@@ -632,6 +635,14 @@ jobs:
         NOMOUNT_ENABLED="false"
         if [ "${{ contains(inputs.feature_set, 'NoMount') || inputs.feature_set == 'All' }}" = "true" ]; then
           NOMOUNT_ENABLED="true"
+        fi
+
+        if [ "$NOMOUNT_ENABLED" = "true" ]; then
+          METHOD="GKI source build with SHA-pinned root implementation, SUSFS, and NoMount"
+          NOMOUNT_MODULE_COMMIT="${{ inputs.nomount_commit }}"
+        else
+          METHOD="GKI source build with SHA-pinned root implementation and SUSFS"
+          NOMOUNT_MODULE_COMMIT="N/A"
         fi
 
         metadata_file="/tmp/${SUMMARY_BASE}-metadata.json"
