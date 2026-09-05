@@ -326,7 +326,7 @@ jobs:
         kernel_version: ${{ inputs.kernel_version }}
 
     - name: Integrate NoMount
-      if: inputs.nomount_commit != '' || contains(inputs.feature_set, 'NoMount') || inputs.feature_set == 'All'
+      if: contains(inputs.feature_set, 'NoMount') || inputs.feature_set == 'All'
       uses: ./.github/actions/nomount
       with:
         commit: ${{ inputs.nomount_commit }}
@@ -552,7 +552,15 @@ jobs:
         ROOT_MANAGER="${ROOT_MANAGER:-KernelSU-Next Manager}"
         ROOT_VERSION="${ROOT_VERSION:-${KSU_TAG}}"
         ROOT_SHA="${ROOT_COMMIT:-${KSU_COMMIT:-N/A}}"
-        NOMOUNT_SHA="${NOMOUNT_COMMIT:-${{ inputs.nomount_commit }}}"
+        if [ "$NOMOUNT_ENABLED" = "true" ]; then
+          NOMOUNT_SHA="${NOMOUNT_COMMIT:-${{ inputs.nomount_commit }}}"
+          NOMOUNT_MODULE_COMMIT="${{ inputs.nomount_commit }}"
+          METHOD="GKI source build with SHA-pinned root implementation, SUSFS, and NoMount"
+        else
+          NOMOUNT_SHA="N/A"
+          NOMOUNT_MODULE_COMMIT="N/A"
+          METHOD="GKI source build with SHA-pinned root implementation and SUSFS"
+        fi
         SUSFS_SHA="${SUSFS_COMMIT:-${{ inputs.susfs_commit }}}"
         
         # Get SUSFS version from susfs.h if available
@@ -611,12 +619,20 @@ jobs:
         compression-level: 9
 
     - name: Write Build-verified only artifact metadata
-      if: success() && inputs.root_flavor != '' && inputs.nomount_commit != ''
+      if: success() && inputs.root_flavor != ''
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
+
+        # NoMount is optional: only resolve its artifact when requested.
+        # (nomount_commit input is always populated, so feature_set is the
+        # only reliable signal for whether NoMount was integrated.)
+        NOMOUNT_ENABLED="false"
+        if [ "${{ contains(inputs.feature_set, 'NoMount') || inputs.feature_set == 'All' }}" = "true" ]; then
+          NOMOUNT_ENABLED="true"
+        fi
 
         metadata_file="/tmp/${SUMMARY_BASE}-metadata.json"
         summary_file="/tmp/build-summary-${SUMMARY_BASE}.md"
@@ -661,12 +677,17 @@ jobs:
         read -r kernel_artifact_url kernel_artifact_sha256 < <(
           resolve_artifact "${{ steps.extract.outputs.file_name }}-AnyKernel3"
         )
-        read -r nomount_module_url nomount_module_sha256 < <(
-          resolve_artifact "NoMount-Metamodule"
-        )
+        if [ "$NOMOUNT_ENABLED" = "true" ]; then
+          read -r nomount_module_url nomount_module_sha256 < <(
+            resolve_artifact "NoMount-Metamodule"
+          )
+        else
+          nomount_module_url="N/A"
+          nomount_module_sha256="N/A"
+        fi
 
         jq -n \
-          --arg method "GKI source build with SHA-pinned root implementation, SUSFS, and NoMount" \
+          --arg method "$METHOD" \
           --arg root_implementation "${ROOT_IMPLEMENTATION:-KernelSU-Next (legacy path)}" \
           --arg root_manager "${ROOT_MANAGER:-KernelSU-Next Manager}" \
           --arg root_version "${ROOT_VERSION:-${KSU_GIT_TAG:-N/A}}" \
@@ -679,7 +700,7 @@ jobs:
           --arg provenance_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
           --arg artifact_url "$kernel_artifact_url" \
           --arg sha256 "$kernel_artifact_sha256" \
-          --arg nomount_module_commit "${{ inputs.nomount_commit }}" \
+          --arg nomount_module_commit "$NOMOUNT_MODULE_COMMIT" \
           --arg nomount_module_url "$nomount_module_url" \
           --arg nomount_module_sha256 "$nomount_module_sha256" \
           --arg status "Build-verified only" \
@@ -717,23 +738,43 @@ jobs:
             status: $status
           }' > "$metadata_file"
 
-        jq -e '
-          .status == "Build-verified only" and
-          (.root.manager | length > 0) and
-          (.root.version | length > 0) and
-          (.susfs_revision | test("^[0-9a-f]{40}$")) and
-          (.nomount_commit | test("^[0-9a-f]{40}$")) and
-          (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
-          (.artifact_url | startswith("https://")) and
-          (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
-          (.nomount_metamodule.commit == .nomount_commit) and
-          (.nomount_metamodule.artifact_url | startswith("https://")) and
-          (.nomount_metamodule.sha256 | test("^sha256:[0-9a-f]{64}$")) and
-          .catalog.availability == "eligible-with-provenance-and-checksums" and
-          .catalog.device_compatibility == "not-validated" and
-          .catalog.flashability == "not-guaranteed" and
-          .catalog.boot == "not-guaranteed"
-        ' "$metadata_file" > /dev/null
+        if [ "$NOMOUNT_ENABLED" = "true" ]; then
+          jq -e '
+            .status == "Build-verified only" and
+            (.root.manager | length > 0) and
+            (.root.version | length > 0) and
+            (.susfs_revision | test("^[0-9a-f]{40}$")) and
+            (.nomount_commit | test("^[0-9a-f]{40}$")) and
+            (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
+            (.artifact_url | startswith("https://")) and
+            (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
+            (.nomount_metamodule.commit == .nomount_commit) and
+            (.nomount_metamodule.artifact_url | startswith("https://")) and
+            (.nomount_metamodule.sha256 | test("^sha256:[0-9a-f]{64}$")) and
+            .catalog.availability == "eligible-with-provenance-and-checksums" and
+            .catalog.device_compatibility == "not-validated" and
+            .catalog.flashability == "not-guaranteed" and
+            .catalog.boot == "not-guaranteed"
+          ' "$metadata_file" > /dev/null
+        else
+          jq -e '
+            .status == "Build-verified only" and
+            (.root.manager | length > 0) and
+            (.root.version | length > 0) and
+            (.susfs_revision | test("^[0-9a-f]{40}$")) and
+            (.nomount_commit == "N/A") and
+            (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
+            (.artifact_url | startswith("https://")) and
+            (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
+            (.nomount_metamodule.commit == "N/A") and
+            (.nomount_metamodule.artifact_url == "N/A") and
+            (.nomount_metamodule.sha256 == "N/A") and
+            .catalog.availability == "eligible-with-provenance-and-checksums" and
+            .catalog.device_compatibility == "not-validated" and
+            .catalog.flashability == "not-guaranteed" and
+            .catalog.boot == "not-guaranteed"
+          ' "$metadata_file" > /dev/null
+        fi
 
         # Merge the verified metadata into the combined summary markdown so both
         # live in a single artifact: human-readable table + machine JSON block.
