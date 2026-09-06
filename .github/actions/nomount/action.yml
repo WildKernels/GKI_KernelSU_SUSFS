@@ -57,6 +57,15 @@ runs:
             --output "$setup_script"
           test -s "$setup_script"
           chmod 0755 "$setup_script"
+          # Pre-clone at the exact SHA: upstream rewinds dev often, so a
+          # fresh clone may no longer contain the pinned tree ("unable to
+          # read tree"). Fetching by SHA works even for orphaned commits;
+          # setup.sh then reuses the clone and its checkout succeeds.
+          if [ ! -d "$KERNEL_DIR/NoMount" ]; then
+            git clone --no-checkout https://github.com/maxsteeel/nomount.git "$KERNEL_DIR/NoMount"
+          fi
+          git -C "$KERNEL_DIR/NoMount" fetch --depth=1 origin "$requested_commit"
+          git -C "$KERNEL_DIR/NoMount" checkout --detach --quiet "$requested_commit"
           (
             cd "$KERNEL_DIR"
             "$setup_script" "$requested_commit"
