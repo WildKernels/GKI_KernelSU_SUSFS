@@ -8,6 +8,10 @@ inputs:
   version:
     description: 'Kernel config version (e.g., android15-6.6)'
     required: true
+  root_flavor:
+    description: 'Selected root implementation - pershoot patches only apply to next'
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -46,5 +50,10 @@ runs:
         echo "SUSFS_COMMIT=$SUSFS_COMMIT" >> "$GITHUB_ENV"
         echo "Using SUSFS commit: $SUSFS_COMMIT"
 
-        patch -p1 < "${{ github.workspace }}/kernel_patches/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
-        patch -p1 < "${{ github.workspace }}/kernel_patches/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
+        # Pershoot's two commits (no-features core build, Toolkit coexistence)
+        # only apply to KernelSU-Next (dev-susfs fork). Other flavors use the
+        # simonpunk checkout as-is.
+        if [ "${{ inputs.root_flavor }}" = "next" ]; then
+          patch -p1 < "${{ github.workspace }}/kernel_patches/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
+          patch -p1 < "${{ github.workspace }}/kernel_patches/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
+        fi

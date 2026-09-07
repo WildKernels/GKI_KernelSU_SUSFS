@@ -33,6 +33,7 @@ runs:
       with:
         susfs_commit: ${{ inputs.susfs_commit }}
         version: ${{ inputs.version }}
+        root_flavor: ${{ inputs.root_flavor }}
 
     - name: Enable SUSFS for KernelSU (tiann)
       # tiann/KernelSU main does NOT carry SUSFS, so for the kernelsu flavor we
