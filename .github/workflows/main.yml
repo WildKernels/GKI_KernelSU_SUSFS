@@ -248,9 +248,17 @@ jobs:
           #
           # kernelsu, resukisu, and sukisu-ultra pin in verified mode;
           # KernelSU-Next (next) always builds at latest.
-          KERNELSU_COMMIT="$(pick "$PIN_KERNELSU" https://github.com/tiann/KernelSU.git refs/heads/main)"
-          RESUKISU_COMMIT="$(pick "$PIN_RESUKISU" https://github.com/ReSukiSU/ReSukiSU.git refs/heads/main)"
-          SUKISU_ULTRA_COMMIT="$(pick "$PIN_SUKISU_ULTRA" https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin)"
+          # With SUSFS off, every root tracks latest instead of pins:
+          # SukiSU-Ultra follows main (builtin only matters for SUSFS builds).
+          if [ "${{ inputs.use_susfs }}" = "true" ]; then
+            KERNELSU_COMMIT="$(pick "$PIN_KERNELSU" https://github.com/tiann/KernelSU.git refs/heads/main)"
+            RESUKISU_COMMIT="$(pick "$PIN_RESUKISU" https://github.com/ReSukiSU/ReSukiSU.git refs/heads/main)"
+            SUKISU_ULTRA_COMMIT="$(pick "$PIN_SUKISU_ULTRA" https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin)"
+          else
+            KERNELSU_COMMIT="$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)"
+            RESUKISU_COMMIT="$(resolve_sha https://github.com/ReSukiSU/ReSukiSU.git refs/heads/main)"
+            SUKISU_ULTRA_COMMIT="$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)"
+          fi
           emit ksu_commit "$KERNELSU_COMMIT"
           emit resukisu_commit "$RESUKISU_COMMIT"
           emit sukisu_ultra_commit "$SUKISU_ULTRA_COMMIT"
