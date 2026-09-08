@@ -195,6 +195,22 @@ jobs:
         config_list: |
           CONFIG_KSU_SUSFS=n
 
+    - name: Disable SUSFS for SukiSU-Ultra without SUSFS feature
+      if: inputs.root_flavor == 'sukisu-ultra' && !contains(inputs.feature_set, 'SUSFS')
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_KSU_SUSFS=n
+          CONFIG_KSU_SUSFS_SUS_PATH=n
+          CONFIG_KSU_SUSFS_SUS_MOUNT=n
+          CONFIG_KSU_SUSFS_SUS_KSTAT=n
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=n
+          CONFIG_KSU_SUSFS_ENABLE_LOG=n
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=n
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=n
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=n
+          CONFIG_KSU_SUSFS_SUS_MAP=n
+
     - name: Resolve SUSFS commit
       id: susfs-cm
       shell: bash
