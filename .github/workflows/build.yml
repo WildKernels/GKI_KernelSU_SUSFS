@@ -171,11 +171,22 @@ jobs:
         os_patch_level: ${{ inputs.os_patch_level }}
 
     - name: Setup Selected Root Implementation
-      if: inputs.root_flavor != ''
+      if: inputs.root_flavor != '' && inputs.root_flavor != 'none'
       uses: ./.github/actions/root-setup
       with:
         flavor: ${{ inputs.root_flavor }}
         commit: ${{ inputs.root_commit }}
+
+    - name: Mark No Root build metadata
+      if: inputs.root_flavor == 'none'
+      shell: bash
+      run: |
+        {
+          echo "ROOT_IMPLEMENTATION=none"
+          echo "ROOT_MANAGER=N/A"
+          echo "ROOT_VERSION=N/A"
+          echo "ROOT_COMMIT=N/A"
+        } >> "$GITHUB_ENV"
 
     - name: Disable SUSFS for ReSukiSU without SUSFS feature
       if: inputs.root_flavor == 'resukisu' && !contains(inputs.feature_set, 'SUSFS')
@@ -191,7 +202,8 @@ jobs:
         set -euo pipefail
         # KernelSU-Next (next) always uses the latest susfs4ksu gki branch tip so
         # SUSFS stays API-matched to the always-latest KernelSU-Next tree. All
-        # other roots (kernelsu, resukisu) use the pinned verified SUSFS commit.
+        # other roots (kernelsu, resukisu, sukisu-ultra) use the pinned
+        # verified SUSFS commit.
         if [ "${{ inputs.root_flavor }}" = "next" ]; then
           BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           SUSFS_COMMIT="$(git ls-remote https://gitlab.com/simonpunk/susfs4ksu.git "refs/heads/${BRANCH}" | cut -f1)"
@@ -227,7 +239,7 @@ jobs:
             #   if (func) / if (func != NULL) both trigger -Werror:
             #     -Wpointer-bool-conversion  vs  -Wtautological-pointer-compare
             # For the function form,  &func != NULL  silences both (clang note).
-            # For the pointer form (resukisu/next, no 10_enable) we want ptr != NULL.
+            # For the pointer form (resukisu/next/sukisu-ultra, no 10_enable) we want ptr != NULL.
             if grep -q "extern void security_dump_masked_av_fn" "$f"; then
               echo "[*] $f is extern-function form (10_enable applied), patching with &"
               sed -i 's/if (security_dump_masked_av_fn)/if (\&security_dump_masked_av_fn)/g' "$f"
@@ -621,7 +633,7 @@ jobs:
         compression-level: 9
 
     - name: Write Build-verified only artifact metadata
-      if: success() && inputs.root_flavor != ''
+      if: success() && inputs.root_flavor != '' && inputs.root_flavor != 'none'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}

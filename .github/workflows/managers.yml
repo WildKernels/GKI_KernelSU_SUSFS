@@ -15,6 +15,8 @@ on:
           - KernelSU-Next
           - KernelSU
           - ReSukiSU
+          - SukiSU-Ultra
+          - No Root
           - KernelSU-Next-SUSFS
         default: All
       kernelsu_next_commit:
@@ -29,6 +31,11 @@ on:
         default: ""
       resukisu_commit:
         description: "Pin ReSukiSU manager to this commit (40-char SHA, empty = latest main tip)"
+        required: false
+        type: string
+        default: ""
+      sukisu_ultra_commit:
+        description: "Pin SukiSU-Ultra manager to this commit (40-char SHA, empty = latest main tip)"
         required: false
         type: string
         default: ""
@@ -64,6 +71,11 @@ on:
         required: false
         type: string
         default: ""
+      sukisu_ultra_commit:
+        description: "Pin SukiSU-Ultra manager commit"
+        required: false
+        type: string
+        default: ""
       kernelsu_next_susfs_commit:
         description: "Pin KernelSU-Next SUSFS manager commit"
         required: false
@@ -92,6 +104,7 @@ jobs:
           INPUT_NEXT_COMMIT: ${{ inputs.kernelsu_next_commit }}
           INPUT_KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           INPUT_RESUKISU_COMMIT: ${{ inputs.resukisu_commit }}
+          INPUT_SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
           INPUT_NEXT_SUSFS_COMMIT: ${{ inputs.kernelsu_next_susfs_commit }}
         run: |
           set -euo pipefail
@@ -99,8 +112,9 @@ jobs:
           # Exact extraction of main.yml#resolve-managers / manager step.
           # Each selected root must ship ALL manager APK builds. KernelSU-Next publishes
           # its manager APKs (manager + manager-spoofed) from the official dev-tip
-          # build-manager-ci run; kernelsu (KernelSU) and ReSukiSU expose theirs as
-          # CI-run artifacts. All three are pinned to an exact commit.
+          # build-manager-ci run; kernelsu (KernelSU), ReSukiSU, and SukiSU-Ultra
+          # expose theirs as CI-run artifacts. All are pinned to an exact commit.
+          # No Root ships no manager.
 
           retry() {
             local n=0
@@ -261,6 +275,37 @@ jobs:
                   "$flavor" "$owner" "$repo" "$run_id" "$stock"
                 ;;
 
+              sukisu-ultra)
+                owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
+                if [[ -n "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
+                  stock="$INPUT_SUKISU_ULTRA_COMMIT"
+                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
+                    echo "ERROR: sukisu_ultra_commit must be a 40-char SHA (got: $stock)" >&2
+                    exit 1
+                  fi
+                else
+                  stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)
+                fi
+                run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+                  "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  | jq -r '.workflow_runs[0].id // empty')
+                if [[ -z "${run_id}" ]]; then
+                  if [[ -z "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
+                    echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
+                    fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                    run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
+                    stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
+                    if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
+                  fi
+                  if [[ -z "${run_id}" ]]; then
+                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
+                    exit 1
+                  fi
+                fi
+                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"Manager,Spoofed-Manager"}' \
+                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
+                ;;
+
               *)
                 echo "skipping unknown flavor: $flavor" >&2
                 return 0
@@ -277,6 +322,7 @@ jobs:
             KernelSU-Next-SUSFS) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next-susfs)") ;;
             KernelSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kernelsu)") ;;
             ReSukiSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one resukisu)") ;;
+            SukiSU-Ultra) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one sukisu-ultra)") ;;
             *) echo "Skipping manager resolution (no root flavor / none)." ;;
           esac
           if [ -n "$LIST" ]; then
@@ -419,6 +465,9 @@ jobs:
           - flavor: resukisu
             repo: https://github.com/ReSukiSU/ReSukiSU.git
             ref: main
+          - flavor: sukisu-ultra
+            repo: https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
+            ref: main
     steps:
       - name: Gate on root_flavor filter
         id: gate
@@ -435,6 +484,7 @@ jobs:
             KernelSU-Next-SUSFS) [[ "$FLAVOR" == "next-susfs" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             KernelSU) [[ "$FLAVOR" == "kernelsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             ReSukiSU) [[ "$FLAVOR" == "resukisu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
+            SukiSU-Ultra) [[ "$FLAVOR" == "sukisu-ultra" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             *) echo "run=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
@@ -447,6 +497,7 @@ jobs:
           KSU_NEXT_SUSFS_COMMIT: ${{ inputs.kernelsu_next_susfs_commit }}
           KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           RESUKISU_COMMIT: ${{ inputs.resukisu_commit }}
+          SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
         run: |
           set -euo pipefail
           flavor="${{ matrix.flavor }}"
@@ -455,6 +506,7 @@ jobs:
             next-susfs) pin="$KSU_NEXT_SUSFS_COMMIT" ;;
             kernelsu) pin="$KSU_COMMIT" ;;
             resukisu) pin="$RESUKISU_COMMIT" ;;
+            sukisu-ultra) pin="$SUKISU_ULTRA_COMMIT" ;;
           esac
           if [[ -n "${pin:-}" ]]; then
             echo "sha=$pin" >> "$GITHUB_OUTPUT"
@@ -590,6 +642,9 @@ jobs:
           - flavor: resukisu
             repo: https://github.com/ReSukiSU/ReSukiSU.git
             ref: main
+          - flavor: sukisu-ultra
+            repo: https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
+            ref: main
           - flavor: next-susfs
             repo: https://github.com/pershoot/KernelSU-Next.git
             ref: dev-susfs
@@ -610,6 +665,7 @@ jobs:
             KernelSU-Next-SUSFS) [[ "$FLAVOR" == "next-susfs" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             KernelSU) [[ "$FLAVOR" == "kernelsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             ReSukiSU) [[ "$FLAVOR" == "resukisu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
+            SukiSU-Ultra) [[ "$FLAVOR" == "sukisu-ultra" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             *) echo "run=false" >> "$GITHUB_OUTPUT" ;;
           esac
           cat "$GITHUB_OUTPUT"
@@ -623,6 +679,7 @@ jobs:
           KSU_NEXT_SUSFS_COMMIT: ${{ inputs.kernelsu_next_susfs_commit }}
           KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           RESUKISU_COMMIT: ${{ inputs.resukisu_commit }}
+          SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
         run: |
           set -euo pipefail
           flavor="${{ matrix.flavor }}"
@@ -631,6 +688,7 @@ jobs:
             next-susfs) pin="$KSU_NEXT_SUSFS_COMMIT" ;;
             kernelsu) pin="$KSU_COMMIT" ;;
             resukisu) pin="$RESUKISU_COMMIT" ;;
+            sukisu-ultra) pin="$SUKISU_ULTRA_COMMIT" ;;
           esac
           if [[ -n "${pin:-}" ]]; then
             if ! [[ "$pin" =~ ^[0-9a-f]{40}$ ]]; then
@@ -751,6 +809,10 @@ jobs:
           RESUKISU_KEYSTORE_PASSWORD: ${{ secrets.RESUKISU_KEYSTORE_PASSWORD }}
           RESUKISU_KEY_ALIAS: ${{ secrets.RESUKISU_KEY_ALIAS }}
           RESUKISU_KEY_PASSWORD: ${{ secrets.RESUKISU_KEY_PASSWORD }}
+          SUKISU_ULTRA_KEYSTORE: ${{ secrets.SUKISU_ULTRA_KEYSTORE }}
+          SUKISU_ULTRA_KEYSTORE_PASSWORD: ${{ secrets.SUKISU_ULTRA_KEYSTORE_PASSWORD }}
+          SUKISU_ULTRA_KEY_ALIAS: ${{ secrets.SUKISU_ULTRA_KEY_ALIAS }}
+          SUKISU_ULTRA_KEY_PASSWORD: ${{ secrets.SUKISU_ULTRA_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           dir="$SRC_DIR"
@@ -768,6 +830,7 @@ jobs:
               next|next-susfs) b64="${NEXT_KEYSTORE:-}"; pw="${NEXT_KEYSTORE_PASSWORD:-}"; alias="${NEXT_KEY_ALIAS:-}"; kp="${NEXT_KEY_PASSWORD:-}" ;;
               kernelsu) b64="${KERNELSU_KEYSTORE:-}"; pw="${KERNELSU_KEYSTORE_PASSWORD:-}"; alias="${KERNELSU_KEY_ALIAS:-}"; kp="${KERNELSU_KEY_PASSWORD:-}" ;;
               resukisu) b64="${RESUKISU_KEYSTORE:-}"; pw="${RESUKISU_KEYSTORE_PASSWORD:-}"; alias="${RESUKISU_KEY_ALIAS:-}"; kp="${RESUKISU_KEY_PASSWORD:-}" ;;
+              sukisu-ultra) b64="${SUKISU_ULTRA_KEYSTORE:-}"; pw="${SUKISU_ULTRA_KEYSTORE_PASSWORD:-}"; alias="${SUKISU_ULTRA_KEY_ALIAS:-}"; kp="${SUKISU_ULTRA_KEY_PASSWORD:-}" ;;
             esac
             if [ -n "${b64:-}" ] && [ -n "${pw:-}" ] && [ -n "${alias:-}" ]; then
               echo "Using your persistent key for $flavor (alias=$alias)"
@@ -835,6 +898,13 @@ jobs:
             # Upstream ReSukiSU: assembleRelease + randomizer (only universal variants)
             gradle_build "clean assembleRelease" || true
             # skip assembleDebug — only release universal and universal spoofed
+            if [ -x ./randomizer ]; then
+              ./randomizer 2>&1 | tail -20 || true
+              gradle_build "clean assembleRelease" || true
+            fi
+          elif [ "$flavor" = "sukisu-ultra" ]; then
+            # Upstream SukiSU-Ultra: clean assembleRelease, spoofed via randomizer
+            gradle_build "clean assembleRelease" || true
             if [ -x ./randomizer ]; then
               ./randomizer 2>&1 | tail -20 || true
               gradle_build "clean assembleRelease" || true
@@ -984,6 +1054,7 @@ jobs:
           NEXT_COMMIT: ${{ inputs.kernelsu_next_commit }}
           KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           RESUKISU_COMMIT: ${{ inputs.resukisu_commit }}
+          SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
           NEXT_SUSFS_COMMIT: ${{ inputs.kernelsu_next_susfs_commit }}
           MANAGER_LIST_FETCH: ${{ needs.resolve-managers.outputs.manager_list }}
         run: |
@@ -998,6 +1069,7 @@ jobs:
               "KernelSU-Next": env("NEXT_COMMIT") or "latest dev tip",
               "KernelSU": env("KSU_COMMIT") or "latest main tip",
               "ReSukiSU": env("RESUKISU_COMMIT") or "latest tip",
+              "SukiSU-Ultra": env("SUKISU_ULTRA_COMMIT") or "latest tip",
               "KernelSU-Next-SUSFS": env("NEXT_SUSFS_COMMIT") or "latest dev-susfs tip",
           }
           # enrich from fetch path manager_list (pure commit info, same style as prebuilt)
@@ -1005,7 +1077,7 @@ jobs:
           if raw:
               try:
                   for m in json.loads(raw):
-                      label = {"next":"KernelSU-Next","kernelsu":"KernelSU","resukisu":"ReSukiSU","next-susfs":"KernelSU-Next-SUSFS"}.get(m.get("flavor",""), "")
+                      label = {"next":"KernelSU-Next","kernelsu":"KernelSU","resukisu":"ReSukiSU","sukisu-ultra":"SukiSU-Ultra","next-susfs":"KernelSU-Next-SUSFS"}.get(m.get("flavor",""), "")
                       if label and m.get("stock"):
                           commits[label] = m["stock"]
               except: pass

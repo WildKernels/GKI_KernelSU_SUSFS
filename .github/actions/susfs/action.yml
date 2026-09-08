@@ -21,7 +21,7 @@ inputs:
     description: 'Kernel sublevel'
     required: true
   root_flavor:
-    description: 'Selected root implementation (kernelsu / next / resukisu). KernelSU (tiann main) needs the 10_enable_susfs_for_ksu patch; other flavors already ship SUSFS.'
+    description: 'Selected root implementation (kernelsu / next / resukisu / sukisu-ultra). KernelSU (tiann main) needs the 10_enable_susfs_for_ksu patch; other flavors already ship SUSFS.'
     required: false
     default: ""
 

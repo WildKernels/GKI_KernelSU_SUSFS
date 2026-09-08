@@ -2,7 +2,7 @@ name: Setup pinned root implementation
 description: Clone exactly one supported root implementation at a verified commit
 inputs:
   flavor:
-    description: 'kernelsu, next, or resukisu'
+    description: 'kernelsu, next, resukisu, or sukisu-ultra'
     required: true
   commit:
     description: 'Full immutable commit SHA'
@@ -35,6 +35,11 @@ runs:
             directory="ReSukiSU"
             manager="ReSukiSU Manager"
             ;;
+          sukisu-ultra)
+            repo="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"
+            directory="SukiSU-Ultra"
+            manager="SukiSU-Ultra Manager"
+            ;;
           *)
             echo "Unsupported root flavor: $flavor" >&2
             exit 2
@@ -46,7 +51,7 @@ runs:
           exit 2
         fi
 
-        for candidate in KernelSU KernelSU-Next ReSukiSU; do
+        for candidate in KernelSU KernelSU-Next ReSukiSU SukiSU-Ultra; do
           if [ "$candidate" != "$directory" ] && [ -e "$candidate" ]; then
             echo "Refusing mixed root implementations: found $candidate." >&2
             exit 1
