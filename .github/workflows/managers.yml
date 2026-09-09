@@ -16,6 +16,7 @@ on:
           - KernelSU
           - ReSukiSU
           - SukiSU-Ultra
+          - KowSU
           - No Root
           - KernelSU-Next-SUSFS
         default: All
@@ -112,8 +113,8 @@ jobs:
           # Exact extraction of main.yml#resolve-managers / manager step.
           # Each selected root must ship ALL manager APK builds. KernelSU-Next publishes
           # its manager APKs (manager + manager-spoofed) from the official dev-tip
-          # build-manager-ci run; kernelsu (KernelSU), ReSukiSU, and SukiSU-Ultra
-          # expose theirs as CI-run artifacts. All are pinned to an exact commit.
+          # build-manager-ci run; kernelsu (KernelSU), ReSukiSU, SukiSU-Ultra,
+          # and KowSU expose theirs as CI-run artifacts. All are pinned to an exact commit.
           # No Root ships no manager.
 
           retry() {
@@ -306,6 +307,28 @@ jobs:
                   "$flavor" "$owner" "$repo" "$run_id" "$stock"
                 ;;
 
+              kowsu)
+                # KowSU has no SUSFS support and always tracks latest master.
+                owner="KOWX712"; repo="KernelSU"; wf="build-manager.yml"
+                stock=$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)
+                run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+                  "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  | jq -r '.workflow_runs[0].id // empty')
+                if [[ -z "${run_id}" ]]; then
+                  echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
+                  fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=master&status=success&per_page=1")
+                  run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
+                  stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
+                  if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
+                  if [[ -z "${run_id}" ]]; then
+                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
+                    exit 1
+                  fi
+                fi
+                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager"}' \
+                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
+                ;;
+
               *)
                 echo "skipping unknown flavor: $flavor" >&2
                 return 0
@@ -323,6 +346,7 @@ jobs:
             KernelSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kernelsu)") ;;
             ReSukiSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one resukisu)") ;;
             SukiSU-Ultra) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one sukisu-ultra)") ;;
+            KowSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kowsu)") ;;
             *) echo "Skipping manager resolution (no root flavor / none)." ;;
           esac
           if [ -n "$LIST" ]; then
@@ -468,6 +492,9 @@ jobs:
           - flavor: sukisu-ultra
             repo: https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
             ref: main
+          - flavor: kowsu
+            repo: https://github.com/KOWX712/KernelSU.git
+            ref: master
     steps:
       - name: Gate on root_flavor filter
         id: gate
@@ -485,6 +512,7 @@ jobs:
             KernelSU) [[ "$FLAVOR" == "kernelsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             ReSukiSU) [[ "$FLAVOR" == "resukisu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             SukiSU-Ultra) [[ "$FLAVOR" == "sukisu-ultra" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
+            KowSU) [[ "$FLAVOR" == "kowsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             *) echo "run=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
@@ -507,6 +535,7 @@ jobs:
             kernelsu) pin="$KSU_COMMIT" ;;
             resukisu) pin="$RESUKISU_COMMIT" ;;
             sukisu-ultra) pin="$SUKISU_ULTRA_COMMIT" ;;
+            kowsu) pin="" ;;
           esac
           if [[ -n "${pin:-}" ]]; then
             echo "sha=$pin" >> "$GITHUB_OUTPUT"
@@ -645,6 +674,9 @@ jobs:
           - flavor: sukisu-ultra
             repo: https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
             ref: main
+          - flavor: kowsu
+            repo: https://github.com/KOWX712/KernelSU.git
+            ref: master
           - flavor: next-susfs
             repo: https://github.com/pershoot/KernelSU-Next.git
             ref: dev-susfs
@@ -666,6 +698,7 @@ jobs:
             KernelSU) [[ "$FLAVOR" == "kernelsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             ReSukiSU) [[ "$FLAVOR" == "resukisu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             SukiSU-Ultra) [[ "$FLAVOR" == "sukisu-ultra" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
+            KowSU) [[ "$FLAVOR" == "kowsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             *) echo "run=false" >> "$GITHUB_OUTPUT" ;;
           esac
           cat "$GITHUB_OUTPUT"
@@ -689,6 +722,7 @@ jobs:
             kernelsu) pin="$KSU_COMMIT" ;;
             resukisu) pin="$RESUKISU_COMMIT" ;;
             sukisu-ultra) pin="$SUKISU_ULTRA_COMMIT" ;;
+            kowsu) pin="" ;;
           esac
           if [[ -n "${pin:-}" ]]; then
             if ! [[ "$pin" =~ ^[0-9a-f]{40}$ ]]; then
@@ -894,6 +928,9 @@ jobs:
           elif [ "$flavor" = "kernelsu" ]; then
             # Upstream tiann: ./gradlew clean assembleRelease (repack is separate job — we just build manager here)
             gradle_build "clean assembleRelease" || gradle_build "assembleRelease" || true
+          elif [ "$flavor" = "kowsu" ]; then
+            # Upstream KowSU is tiann-style: clean assembleRelease
+            gradle_build "clean assembleRelease" || gradle_build "assembleRelease" || true
           elif [ "$flavor" = "resukisu" ]; then
             # Upstream ReSukiSU: assembleRelease + randomizer (only universal variants)
             gradle_build "clean assembleRelease" || true
@@ -1070,6 +1107,7 @@ jobs:
               "KernelSU": env("KSU_COMMIT") or "latest main tip",
               "ReSukiSU": env("RESUKISU_COMMIT") or "latest tip",
               "SukiSU-Ultra": env("SUKISU_ULTRA_COMMIT") or "latest tip",
+              "KowSU": "latest tip",
               "KernelSU-Next-SUSFS": env("NEXT_SUSFS_COMMIT") or "latest dev-susfs tip",
           }
           # enrich from fetch path manager_list (pure commit info, same style as prebuilt)
@@ -1077,7 +1115,7 @@ jobs:
           if raw:
               try:
                   for m in json.loads(raw):
-                      label = {"next":"KernelSU-Next","kernelsu":"KernelSU","resukisu":"ReSukiSU","sukisu-ultra":"SukiSU-Ultra","next-susfs":"KernelSU-Next-SUSFS"}.get(m.get("flavor",""), "")
+                      label = {"next":"KernelSU-Next","kernelsu":"KernelSU","resukisu":"ReSukiSU","sukisu-ultra":"SukiSU-Ultra","kowsu":"KowSU","next-susfs":"KernelSU-Next-SUSFS"}.get(m.get("flavor",""), "")
                       if label and m.get("stock"):
                           commits[label] = m["stock"]
               except: pass
@@ -1087,7 +1125,7 @@ jobs:
           lines.append("## Features")
           lines.append("")
           if root == "All":
-              lines.append("- All manager flavors (KernelSU-Next, KernelSU, ReSukiSU, KernelSU-Next-SUSFS)")
+              lines.append("- All manager flavors (KernelSU-Next, KernelSU, ReSukiSU, SukiSU-Ultra, KernelSU-Next-SUSFS)")
           else:
               lines.append(f"- {root}")
           lines.append(f"- {'Built from source' if src else 'Fetched prebuilt (upstream CI)'}")

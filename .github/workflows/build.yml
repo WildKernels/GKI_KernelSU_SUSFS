@@ -170,6 +170,13 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
 
+    - name: Reject KowSU with SUSFS
+      if: inputs.root_flavor == 'kowsu' && (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'All')
+      shell: bash
+      run: |
+        echo "ERROR: KowSU does not work together with SUSFS — re-run with SUSFS off." >&2
+        exit 1
+
     - name: Setup Selected Root Implementation
       if: inputs.root_flavor != '' && inputs.root_flavor != 'none'
       uses: ./.github/actions/root-setup
