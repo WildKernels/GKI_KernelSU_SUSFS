@@ -15,6 +15,8 @@ jobs:
 
       - name: Build commit summary
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -39,11 +41,11 @@ jobs:
           }
 
           github_latest_commit() {
-            curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/pershoot/KernelSU-Next/commits/dev-susfs" | jq -r '.sha'
+            curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -H "Authorization: Bearer ***" "https://api.github.com/repos/pershoot/KernelSU-Next/commits/dev-susfs" | jq -r '.sha'
           }
 
           github_latest_message() {
-            curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/pershoot/KernelSU-Next/commits/dev-susfs" | jq -r '.commit.message | split("\n")[0]'
+            curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -H "Authorization: Bearer ***" "https://api.github.com/repos/pershoot/KernelSU-Next/commits/dev-susfs" | jq -r '.commit.message | split("\n")[0]'
           }
 
           {

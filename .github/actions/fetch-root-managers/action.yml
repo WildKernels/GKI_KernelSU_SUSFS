@@ -50,6 +50,7 @@ runs:
           if [ "$SRC" = "release" ]; then
             echo "Downloading all $REPO manager APKs from latest release"
             curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+              -H "Authorization: Bearer ***" \
               "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" > rel.json
             for URL in $(jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' rel.json); do
               NAME="${URL##*/}"

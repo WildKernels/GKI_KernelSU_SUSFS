@@ -110,6 +110,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Credit: authenticated gh-API manager lookup adapted from EmberHeart-Kernels
+          # commit ae9a341 (nullptr-t-oss/composite_actions fetch_ksu_manager).
           # Exact extraction of main.yml#resolve-managers / manager step.
           # Each selected root must ship ALL manager APK builds. KernelSU-Next publishes
           # its manager APKs (manager + manager-spoofed) from the official dev-tip
@@ -147,14 +149,12 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)
                 fi
-                run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  -H "Authorization: Bearer $GH_TOKEN" \
-                  "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
-                  | jq -r '.workflow_runs[0].id // empty')
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_NEXT_COMMIT:-}" ]]; then
                     echo "No manager build for dev tip ${stock}, falling back to latest successful run" >&2
-                    fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev&status=success&per_page=1")
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev&status=success&per_page=1")
                     run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                     stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
@@ -179,13 +179,12 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)
                 fi
-                run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
-                  | jq -r '.workflow_runs[0].id // empty')
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_KSU_COMMIT:-}" ]]; then
                     echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
                     run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                     stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
@@ -214,20 +213,18 @@ jobs:
                     stock=$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev-susfs)
                   fi
                 fi
-                run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  -H "Authorization: Bearer ***" \
-                  "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
-                  | jq -r '.workflow_runs[0].id // empty')
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_NEXT_SUSFS_COMMIT:-}" ]]; then
                     echo "No manager build for dev-susfs tip ${stock}, falling back to latest successful run" >&2
-                    fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -H "Authorization: Bearer ***" "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev-susfs&status=success&per_page=1")
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev-susfs&status=success&per_page=1")
                     run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                     stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     if [[ -z "$run_id" ]]; then
                       # dev-susfs has no CI on this fork — try dev fallback
                       echo "No dev-susfs CI run, trying dev branch fallback" >&2
-                      fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -H "Authorization: Bearer ***" "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev&status=success&per_page=1")
+                      fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev&status=success&per_page=1")
                       run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                       stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     fi
@@ -256,13 +253,12 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/ReSukiSU/ReSukiSU.git refs/heads/main)
                 fi
-                run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
-                  | jq -r '.workflow_runs[0].id // empty')
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_RESUKISU_COMMIT:-}" ]]; then
                     echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
                     run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                     stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
@@ -287,13 +283,12 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)
                 fi
-                run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
-                  | jq -r '.workflow_runs[0].id // empty')
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
                     echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
                     run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                     stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
@@ -311,12 +306,11 @@ jobs:
                 # KowSU has no SUSFS support and always tracks latest master.
                 owner="KOWX712"; repo="KernelSU"; wf="build-manager.yml"
                 stock=$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)
-                run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
-                  | jq -r '.workflow_runs[0].id // empty')
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                  fb=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=master&status=success&per_page=1")
+                  fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=master&status=success&per_page=1")
                   run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                   stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                   if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
@@ -396,6 +390,7 @@ jobs:
               cd "$DLDIR"
               if [ "$SRC" = "release" ]; then
                 curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+                  -H "Authorization: Bearer ***" \
                   "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" > rel.json
                 for URL in $(jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' rel.json); do
                   NAME="${URL##*/}"
