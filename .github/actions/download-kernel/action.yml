@@ -64,7 +64,9 @@ runs:
             LATEST_TAG=$(git ls-remote https://android.googlesource.com/kernel/common "refs/tags/${FORMATTED_BRANCH}_r*" 2>/dev/null | awk '{print $2}' | grep -v '\^{}$' | sed 's|refs/tags/||' | awk -F'_r' '{print $NF+0, $0}' | sort -n | tail -n 1 | cut -d' ' -f2- || true)
             if [ -n "$LATEST_TAG" ]; then
               echo "[!] Note: Branch ${FORMATTED_BRANCH} head missing upstream; using tag ${LATEST_TAG}."
-              sed -i "/path=\"common\"/ s/revision=\"${FORMATTED_BRANCH}\"/revision=\"${LATEST_TAG}\"/" "$DEFAULT_MANIFEST_PATH"
+              # repo resolves revision as a branch name unless given a full
+              # ref path, so pin the tag explicitly as refs/tags/... .
+              sed -i "/path=\"common\"/ s|revision=\"${FORMATTED_BRANCH}\"|revision=\"refs/tags/${LATEST_TAG}\"|" "$DEFAULT_MANIFEST_PATH"
               TAG_FALLBACK="$LATEST_TAG"
             else
               echo "WARNING: no head or tag found for ${FORMATTED_BRANCH}; sync will likely fail." >&2
