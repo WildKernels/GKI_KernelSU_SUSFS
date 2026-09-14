@@ -47,15 +47,6 @@ See **[Installation Guide](https://github.com/WildKernels/GKI_KernelSU_SUSFS/wik
 
 ---
 
-## Supported Devices
-
-> [!NOTE]
-> These lists are maintained by the community — please update as needed!
-
-See **[Supported Devices](https://github.com/WildKernels/GKI_KernelSU_SUSFS/wiki/Supported-Devices)**.
-
----
-
 ## Our Projects
 
 | Device | Repository | Description |
