@@ -2,10 +2,10 @@ name: Apply Kernel Bypass Hack
 description: >
   Patches the kernel version-check path (bad_version) to return 1 instead of 0,
   allowing kernels that would otherwise reject the build to boot.
-  Disabled by default; enable by passing bypass: true at the workflow level.
+  Disabled by default; enable by passing allow_version_mismatch: true at the workflow level.
 inputs:
-  bypass:
-    description: 'Whether to apply the bypass hack'
+  allow_version_mismatch:
+    description: 'Whether to force-load version-mismatched modules'
     required: false
     type: boolean
     default: false
@@ -16,7 +16,7 @@ runs:
   using: composite
   steps:
     - name: Activate Bypass
-      if: ${{ inputs.bypass == 'true' }}
+      if: ${{ inputs.allow_version_mismatch == 'true' }}
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |

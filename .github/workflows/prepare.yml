@@ -56,8 +56,8 @@ on:
         required: false
         type: string
         default: Wild
-      bypass:
-        description: "Apply the kernel version-check bypass hack (disabled by default)"
+      allow_version_mismatch:
+        description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         required: false
         type: boolean
         default: false
@@ -181,6 +181,6 @@ jobs:
       anykernel3_commit: ${{ inputs.anykernel3_commit }}
       droidspaces_commit: ${{ inputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
-      bypass: ${{ inputs.bypass }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit

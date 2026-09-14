@@ -63,7 +63,7 @@ on:
         required: false
         type: string
         default: Wild
-      bypass:
+      allow_version_mismatch:
         required: false
         type: boolean
         default: false
@@ -497,11 +497,11 @@ jobs:
       run: touch "${{ github.workspace }}/wild_gki.fragment"
 
     - name: Apply Kernel Bypass Hack
-      if: ${{ inputs.bypass == 'true' }}
+      if: ${{ inputs.allow_version_mismatch == 'true' }}
       uses: ./.github/actions/bypass-kernel
       with:
         version: ${{ inputs.version }}
-        bypass: true
+        allow_version_mismatch: true
 
     - name: Build Normal Kernel
       env:

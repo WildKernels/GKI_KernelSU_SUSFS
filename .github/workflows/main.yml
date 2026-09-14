@@ -19,7 +19,7 @@ on:
         description: "Use ccache/bazel cache (restore/save)"
         type: boolean
         default: true
-      bypass:
+      allow_version_mismatch:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         type: boolean
         default: false
@@ -740,7 +740,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       os_patch_level: ${{ inputs.os_patch_level }}
-      bypass: ${{ inputs.bypass }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit
 
@@ -769,7 +769,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       os_patch_level: ${{ inputs.os_patch_level }}
-      bypass: ${{ inputs.bypass }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit
 
@@ -798,7 +798,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       os_patch_level: ${{ inputs.os_patch_level }}
-      bypass: ${{ inputs.bypass }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit
 
@@ -827,7 +827,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       os_patch_level: ${{ inputs.os_patch_level }}
-      bypass: ${{ inputs.bypass }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit
 
@@ -856,7 +856,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       os_patch_level: ${{ inputs.os_patch_level }}
-      bypass: ${{ inputs.bypass }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit
 
@@ -885,7 +885,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       os_patch_level: ${{ inputs.os_patch_level }}
-      bypass: ${{ inputs.bypass }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit
 
@@ -914,7 +914,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       os_patch_level: ${{ inputs.os_patch_level }}
-      bypass: ${{ inputs.bypass }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit
 
