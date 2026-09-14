@@ -35,13 +35,6 @@ For Pre-GKI or GKI 1.0 kernels, contact [@TheWildJames](https://t.me/TheWildJame
 > [!IMPORTANT]
 > Match by the full kernel version (e.g., `6.1.x-androidXX`) — your device's Android version and the `androidXX` in the kernel version are not necessarily the same. For example, as of writing, a Google Pixel 8 is on `6.1.157-android14` while the system Android is 17.
 
-## Supported Devices
-
-> [!NOTE]
-> These lists are maintained by the community — please update as needed!
-
-See **[Supported Devices](supported-devices.md)**.
-
 ## After flashing
 
 See [Post-Install — Verify & Finish Setup](post-install.md) for manager install, SUSFS module, and verification steps.
