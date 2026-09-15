@@ -512,6 +512,8 @@ jobs:
       env:
         SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
+        KBUILD_BUILD_USER: ${{ (inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12') && 'kleaf' || 'build-user' }}
+        KBUILD_BUILD_HOST: build-host
       uses: ./.github/actions/build-kernel
       with:
         version: ${{ inputs.version }}
@@ -559,6 +561,8 @@ jobs:
       env:
         SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
+        KBUILD_BUILD_USER: ${{ (inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12') && 'kleaf' || 'build-user' }}
+        KBUILD_BUILD_HOST: build-host
       uses: ./.github/actions/build-kernel
       with:
         version: ${{ inputs.version }}
