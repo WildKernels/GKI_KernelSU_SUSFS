@@ -63,6 +63,10 @@ on:
         required: false
         type: string
         default: Wild
+      keep_kmi:
+        required: false
+        type: boolean
+        default: true
       allow_version_mismatch:
         required: false
         type: boolean
@@ -404,6 +408,7 @@ jobs:
         version: ${{ inputs.version }}
         sublevel: ${{ steps.extract.outputs.sublevel }}
         brand_name: ${{ inputs.brand_name }}
+        keep_kmi: ${{ inputs.keep_kmi }}
 
     - name: Remove Protected Exports
       uses: ./.github/actions/remove-protected-exports

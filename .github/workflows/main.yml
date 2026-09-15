@@ -42,9 +42,13 @@ on:
         type: string
         default: All
       brand_name:
-        description: "Kernel Branding"
+        description: "Kernel Branding (empty = stock version string)"
         type: string
         default: Wild
+      keep_kmi:
+        description: "Keep stock KMI generation suffix in kernel version (fix #265)"
+        type: boolean
+        default: true
       commit_mode:
         description: "latest = branch tips, verified = audited pins, update = build latest then promote verified pins on success"
         required: false
@@ -739,6 +743,7 @@ jobs:
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       os_patch_level: ${{ inputs.os_patch_level }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
@@ -768,6 +773,7 @@ jobs:
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       os_patch_level: ${{ inputs.os_patch_level }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
@@ -797,6 +803,7 @@ jobs:
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       os_patch_level: ${{ inputs.os_patch_level }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
@@ -826,6 +833,7 @@ jobs:
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       os_patch_level: ${{ inputs.os_patch_level }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
@@ -855,6 +863,7 @@ jobs:
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       os_patch_level: ${{ inputs.os_patch_level }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
@@ -884,6 +893,7 @@ jobs:
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       os_patch_level: ${{ inputs.os_patch_level }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
@@ -913,6 +923,7 @@ jobs:
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       os_patch_level: ${{ inputs.os_patch_level }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}

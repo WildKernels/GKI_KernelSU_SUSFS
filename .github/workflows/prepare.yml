@@ -52,10 +52,15 @@ on:
         type: string
         default: ""
       brand_name:
-        description: "Kernel branding text appended to the version string"
+        description: "Kernel branding text appended to the version string (empty = stock)"
         required: false
         type: string
         default: Wild
+      keep_kmi:
+        description: "Keep stock KMI generation suffix in kernel version (fix #265)"
+        required: false
+        type: boolean
+        default: true
       allow_version_mismatch:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         required: false
@@ -181,6 +186,7 @@ jobs:
       anykernel3_commit: ${{ inputs.anykernel3_commit }}
       droidspaces_commit: ${{ inputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit

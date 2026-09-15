@@ -17,9 +17,13 @@ inputs:
     description: 'Sublevel of kernel version (e.g., 1)'
     required: true
   brand_name:
-    description: 'Branding text appended to the version (e.g., Wild)'
+    description: 'Branding text appended to the version (e.g., Wild). Empty = stock version string.'
     required: false
     default: Wild
+  keep_kmi:
+    description: 'Keep stock KMI generation suffix (e.g., -8) and append brand after it. Off = legacy hardcoded replace.'
+    required: false
+    default: 'true'
 
 runs:
   using: "composite"
@@ -32,11 +36,26 @@ runs:
         ANDROID_PART=$(echo "$VERSION" | cut -d- -f1)
         KERNEL_PART=$(echo "$VERSION" | cut -d- -f2)
         BRAND="${{ inputs.brand_name }}"
+        KEEP_KMI="${{ inputs.keep_kmi }}"
 
-        if [[ ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
-          KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
-          sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING-$BRAND\"" >> scripts/setlocalversion
+        if [ -z "$BRAND" ]; then
+          echo "brand_name is empty, keeping stock kernel version string"
+          exit 0
+        fi
+
+        if [ "$KEEP_KMI" = "true" ]; then
+          if grep -q 'scm_version}"' scripts/setlocalversion; then
+            sed -i "s|\${scm_version}\"|\${scm_version}-${BRAND}\"|" scripts/setlocalversion
+          else
+            sed -i '$d' scripts/setlocalversion && echo "echo \"\${res}-${BRAND}\"" >> scripts/setlocalversion
+          fi
         else
-          sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART-$BRAND\"" >> scripts/setlocalversion
+          if [[ ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
+            KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
+            sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING-$BRAND\"" >> scripts/setlocalversion
+          else
+            sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART-$BRAND\"" >> scripts/setlocalversion
+          fi
         fi
         chmod +x scripts/setlocalversion
+        tail -n 1 scripts/setlocalversion
