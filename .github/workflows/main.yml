@@ -64,8 +64,8 @@ on:
           - SukiSU-Ultra
           - KowSU
           - No Root
-          - All
-        default: All
+          - All (KernelSU-Next + KernelSU + ReSukiSU)
+        default: All (KernelSU-Next + KernelSU + ReSukiSU)
       use_susfs:
         description: "SUSFS"
         type: boolean
@@ -313,7 +313,7 @@ jobs:
               echo "root_commit=" >> "$GITHUB_OUTPUT"
               ROOT_MATRIX='[{"root_flavor":"none","variant":"NoRoot","root_commit":""}]'
               ;;
-            All)
+            "All (KernelSU-Next + KernelSU + ReSukiSU)")
               # Fan out to all three root variants, each with its pinned commit.
               ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT"),$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT"),$(mk_entry resukisu ReSukiSU "$RESUKISU_COMMIT")]"
               echo "root_flavor=" >> "$GITHUB_OUTPUT"
@@ -481,7 +481,7 @@ jobs:
           echo "Root flavor: ${FLAVORS}"
           LIST=""
           case "${FLAVORS}" in
-            All) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)"$'\n'"$(resolve_one kernelsu)"$'\n'"$(resolve_one resukisu)") ;;
+            All*) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)"$'\n'"$(resolve_one kernelsu)"$'\n'"$(resolve_one resukisu)") ;;
             KernelSU-Next) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)") ;;
             KernelSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kernelsu)") ;;
             ReSukiSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one resukisu)") ;;
@@ -956,8 +956,8 @@ jobs:
         RESUKISU_SHA: ${{ needs.resolve-sources.outputs.resukisu_commit }}
         SUKISU_ULTRA_SHA: ${{ needs.resolve-sources.outputs.sukisu_ultra_commit }}
         APPROVE_NOMOUNT: ${{ inputs.use_nomount }}
-        APPROVE_KERNELSU: ${{ (inputs.root_flavor == 'KernelSU' || inputs.root_flavor == 'All') }}
-        APPROVE_RESUKISU: ${{ (inputs.root_flavor == 'ReSukiSU' || inputs.root_flavor == 'All') }}
+        APPROVE_KERNELSU: ${{ (inputs.root_flavor == 'KernelSU' || startsWith(inputs.root_flavor, 'All')) }}
+        APPROVE_RESUKISU: ${{ (inputs.root_flavor == 'ReSukiSU' || startsWith(inputs.root_flavor, 'All')) }}
         APPROVE_SUKISU_ULTRA: ${{ inputs.root_flavor == 'SukiSU-Ultra' }}
 
     - name: Commit promoted pins
@@ -1569,6 +1569,7 @@ jobs:
               try: return json.loads(raw) if raw.strip() else []
               except: return []
           root = env("ROOT_FLAVOR","All")
+          if root.startswith("All"): root = "All"
           feats=[]
           if env("USE_SUSFS","true")=="true": feats.append("SUSFS")
           if env("USE_NOMOUNT","true")=="true": feats.append("NoMount")

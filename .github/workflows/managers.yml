@@ -501,7 +501,7 @@ jobs:
           WANT="${WANT:-All}"
           FLAVOR="${{ matrix.flavor }}"
           case "$WANT" in
-            All) echo "run=true" >> "$GITHUB_OUTPUT" ;;
+            All*) echo "run=true" >> "$GITHUB_OUTPUT" ;;
             KernelSU-Next) [[ "$FLAVOR" == "next" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             KernelSU-Next-SUSFS) [[ "$FLAVOR" == "next-susfs" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             KernelSU) [[ "$FLAVOR" == "kernelsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
@@ -687,7 +687,7 @@ jobs:
           WANT="${ROOT_FLAVOR:-All}"
           FLAVOR="${{ matrix.flavor }}"
           case "$WANT" in
-            All) echo "run=true" >> "$GITHUB_OUTPUT" ;;
+            All*) echo "run=true" >> "$GITHUB_OUTPUT" ;;
             KernelSU-Next) [[ "$FLAVOR" == "next" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             KernelSU-Next-SUSFS) [[ "$FLAVOR" == "next-susfs" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             KernelSU) [[ "$FLAVOR" == "kernelsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
