@@ -23,7 +23,7 @@ inputs:
   keep_kmi:
     description: 'Keep stock KMI generation suffix (e.g., -8) and append brand after it. Off = legacy hardcoded replace.'
     required: false
-    default: 'true'
+    default: 'false'
 
 runs:
   using: "composite"
@@ -43,14 +43,22 @@ runs:
           exit 0
         fi
 
+        KMI=""
         if [ "$KEEP_KMI" = "true" ]; then
+          KMI=$(grep -h "^KMI_GENERATION" build.config.common build.config.constants 2>/dev/null | head -n 1 | cut -d= -f2)
+          if [ -z "$KMI" ]; then
+            echo "WARNING: KMI_GENERATION not found, falling back to legacy branding"
+          fi
+        fi
+
+        if [ "$KEEP_KMI" = "true" ] && [ -n "$KMI" ]; then
           if grep -q 'scm_version}"' scripts/setlocalversion; then
-            sed -i "s|\${scm_version}\"|\${scm_version}-${BRAND}\"|" scripts/setlocalversion
+            sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART-$KMI-$BRAND\"" >> scripts/setlocalversion
           else
-            sed -i '$d' scripts/setlocalversion && echo "echo \"\${res}-${BRAND}\"" >> scripts/setlocalversion
+            sed -i '$d' scripts/setlocalversion && echo "echo \"-$BRAND\"" >> scripts/setlocalversion
           fi
         else
-          if [[ ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
+          if [[ ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" || ${{ inputs.version }} == "android17-6.18" ]]; then
             KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
             sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING-$BRAND\"" >> scripts/setlocalversion
           else

@@ -60,7 +60,7 @@ on:
         description: "Keep stock KMI generation suffix in kernel version (fix #265)"
         required: false
         type: boolean
-        default: true
+        default: false
       allow_version_mismatch:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         required: false

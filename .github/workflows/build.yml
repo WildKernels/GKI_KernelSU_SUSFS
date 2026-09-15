@@ -66,7 +66,7 @@ on:
       keep_kmi:
         required: false
         type: boolean
-        default: true
+        default: false
       allow_version_mismatch:
         required: false
         type: boolean
