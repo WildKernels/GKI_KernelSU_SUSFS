@@ -12,6 +12,20 @@ runs:
     if: false
     uses: ./.github/actions/set-kernel-config
   
+  - name: 'Provide host ld from repo prebuilts'
+    shell: bash
+    run: |
+      # build.sh scrubs HOSTLDFLAGS from the env, so export it is useless.
+      # Instead, put the repo-synced ld.lld on PATH as "ld": the prebuilt
+      # clang defaults to the "ld" name and the runner image has no binutils.
+      LDLLD=$(find "${{ github.workspace }}/kernel/prebuilts/clang" -name "ld.lld" -type f 2>/dev/null | sort | head -n 1)
+      if [ -n "$LDLLD" ]; then
+        sudo ln -sf "$LDLLD" /usr/local/bin/ld
+        which ld && ld --version | head -n 1
+      else
+        echo "WARNING: prebuilt ld.lld not found under kernel/prebuilts/clang" >&2
+      fi
+
   - name: 'Build Kernel'
     shell: bash
     working-directory: ${{ github.workspace }}/kernel
