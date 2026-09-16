@@ -112,16 +112,6 @@ jobs:
       with:
         swap-size-gb: 16
 
-    - name: Install Host Linker (ld)
-      shell: bash
-      run: |
-        # Free Disk Space purges *llvm* above; ensure the host linker
-        # exists or prebuilt clang dies on genheaders with:
-        #   clang: error: unable to execute command: Executable "ld" doesn't exist!
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq binutils lld
-        which ld && ld --version | head -n 1
-
     - name: Setup Build Environment
       uses: ./.github/actions/setup-build-environment
       with:
