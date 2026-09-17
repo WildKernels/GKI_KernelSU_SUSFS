@@ -15,27 +15,24 @@ runs:
   - name: 'Provide host ld from repo prebuilts'
     shell: bash
     run: |
-      # build.sh scrubs HOSTLDFLAGS from the env, so export it is useless.
-      # Instead, put the repo-synced ld.lld on PATH as "ld": the prebuilt
-      # clang defaults to the "ld" name and the runner image has no binutils.
-      # ("|| true": runner shell is -e -o pipefail, a failing find or a
+      # build.sh REPLACES PATH with 4 repo dirs (build-tools/path,
+      # prebuilts-master/clang/.../bin, prebuilts/gas, out/host_tools), so
+      # /usr/bin and /usr/local/bin are invisible: apt binutils can NOT fix
+      # this. Instead, symlink ld.lld as "ld" inside the prebuilt clang's
+      # own bin dir -- the clang driver looks there first, no PATH needed.
+      # ("|| true": runner shell is -e -o pipefail; a failing find or a
       # SIGPIPE from head must not kill this step.)
-      echo "--- workspace/kernel top level:"
-      ls "${{ github.workspace }}/kernel" | head -n 20
-      LDLLD=$(find "${{ github.workspace }}/kernel/prebuilts" -name "ld.lld" -type f 2>/dev/null | sort | head -n 1 || true)
-      if [ -z "$LDLLD" ]; then
-        LDLLD=$(find "${{ github.workspace }}/kernel" -maxdepth 5 -name "ld.lld" -type f 2>/dev/null | sort | head -n 1 || true)
-      fi
+      LDLLD=$(find "${{ github.workspace }}/kernel" -name "ld.lld" -type f 2>/dev/null | sort | head -n 1 || true)
       if [ -n "$LDLLD" ]; then
         echo "Using repo ld.lld: $LDLLD"
-        sudo ln -sf "$LDLLD" /usr/local/bin/ld
-        which ld
-        ld --version > /dev/null && echo "host ld OK"
+        ln -sf "$(basename "$LDLLD")" "$(dirname "$LDLLD")/ld"
+        ls -la "$(dirname "$LDLLD")/ld"
       else
-        echo "WARNING: no repo ld.lld found, falling back to apt binutils" >&2
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq binutils
-        which ld
+        echo "ERROR: no ld.lld anywhere under workspace/kernel:" >&2
+        ls "${{ github.workspace }}/kernel"
+        echo "--- prebuilts-master:" >&2
+        find "${{ github.workspace }}/kernel/prebuilts-master" -maxdepth 4 2>/dev/null | head -n 20
+        exit 1
       fi
 
   - name: 'Build Kernel'
