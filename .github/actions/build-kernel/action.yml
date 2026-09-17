@@ -18,15 +18,22 @@ runs:
       # build.sh REPLACES PATH with 4 repo dirs (build-tools/path,
       # prebuilts-master/clang/.../bin, prebuilts/gas, out/host_tools), so
       # /usr/bin and /usr/local/bin are invisible: apt binutils can NOT fix
-      # this. Instead, symlink ld.lld as "ld" inside the prebuilt clang's
+      # this. Instead, symlink ld.lld as "ld" inside each prebuilt clang's
       # own bin dir -- the clang driver looks there first, no PATH needed.
+      # (Loop over ALL of them: 5.10 ships 4 clang versions and `sort | head`
+      # previously picked r399163b while the build uses r416183b.)
       # ("|| true": runner shell is -e -o pipefail; a failing find or a
       # SIGPIPE from head must not kill this step.)
-      LDLLD=$(find "${{ github.workspace }}/kernel" -name "ld.lld" -type f 2>/dev/null | sort | head -n 1 || true)
-      if [ -n "$LDLLD" ]; then
+      FOUND=0
+      while IFS= read -r LDLLD; do
+        [ -n "$LDLLD" ] || continue
         echo "Using repo ld.lld: $LDLLD"
         ln -sf "$(basename "$LDLLD")" "$(dirname "$LDLLD")/ld"
-        ls -la "$(dirname "$LDLLD")/ld"
+        FOUND=1
+      done < <(find "${{ github.workspace }}/kernel" -name "ld.lld" -type f 2>/dev/null | sort || true)
+      if [ "$FOUND" = "1" ]; then
+        echo "host ld symlinks:"
+        find "${{ github.workspace }}/kernel" -name "ld" -type l 2>/dev/null | head -n 8 || true
       else
         echo "ERROR: no ld.lld anywhere under workspace/kernel:" >&2
         ls "${{ github.workspace }}/kernel"
