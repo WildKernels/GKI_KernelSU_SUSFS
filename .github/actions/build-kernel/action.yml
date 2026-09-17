@@ -18,12 +18,24 @@ runs:
       # build.sh scrubs HOSTLDFLAGS from the env, so export it is useless.
       # Instead, put the repo-synced ld.lld on PATH as "ld": the prebuilt
       # clang defaults to the "ld" name and the runner image has no binutils.
-      LDLLD=$(find "${{ github.workspace }}/kernel/prebuilts/clang" -name "ld.lld" -type f 2>/dev/null | sort | head -n 1)
+      # ("|| true": runner shell is -e -o pipefail, a failing find or a
+      # SIGPIPE from head must not kill this step.)
+      echo "--- workspace/kernel top level:"
+      ls "${{ github.workspace }}/kernel" | head -n 20
+      LDLLD=$(find "${{ github.workspace }}/kernel/prebuilts" -name "ld.lld" -type f 2>/dev/null | sort | head -n 1 || true)
+      if [ -z "$LDLLD" ]; then
+        LDLLD=$(find "${{ github.workspace }}/kernel" -maxdepth 5 -name "ld.lld" -type f 2>/dev/null | sort | head -n 1 || true)
+      fi
       if [ -n "$LDLLD" ]; then
+        echo "Using repo ld.lld: $LDLLD"
         sudo ln -sf "$LDLLD" /usr/local/bin/ld
-        which ld && ld --version | head -n 1
+        which ld
+        ld --version > /dev/null && echo "host ld OK"
       else
-        echo "WARNING: prebuilt ld.lld not found under kernel/prebuilts/clang" >&2
+        echo "WARNING: no repo ld.lld found, falling back to apt binutils" >&2
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq binutils
+        which ld
       fi
 
   - name: 'Build Kernel'
