@@ -198,7 +198,7 @@ jobs:
           PIN_SUKISU_ULTRA="b20dee702035af09cb2ecb5f35443bbc1747f3e6"
           declare -A PIN_SUSFS=(
             [susfs_commit_android12_5_10]="f3b5aecf53ff8b3296603071b91383f6be6c7cbb"
-            [susfs_commit_android13_5_10]="dd94c3a166179fed554b53665d37a41bfec3d00e"
+            [susfs_commit_android13_5_10]="04a9d713106191ba98be680bd7ad9547ab1de964"
             [susfs_commit_android13_5_15]="e126882055892c6f8767ff3bd2ddc31abc80a59d"
             [susfs_commit_android14_5_15]="300c034bdfd473da70504e17477213c3231699a2"
             [susfs_commit_android14_6_1]="05f201978bdbd5d08f842e0a2a6e0f2ff0912787"
@@ -209,7 +209,7 @@ jobs:
           # including 6.1 = 0ff93279). KernelSU's set above already diverges on 6.1.
           declare -A PIN_SUSFS_RESUKISU=(
             [susfs_commit_android12_5_10]="f3b5aecf53ff8b3296603071b91383f6be6c7cbb"
-            [susfs_commit_android13_5_10]="dd94c3a166179fed554b53665d37a41bfec3d00e"
+            [susfs_commit_android13_5_10]="04a9d713106191ba98be680bd7ad9547ab1de964"
             [susfs_commit_android13_5_15]="e126882055892c6f8767ff3bd2ddc31abc80a59d"
             [susfs_commit_android14_5_15]="300c034bdfd473da70504e17477213c3231699a2"
             [susfs_commit_android14_6_1]="05f201978bdbd5d08f842e0a2a6e0f2ff0912787"
@@ -219,7 +219,7 @@ jobs:
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
             [susfs_commit_android12_5_10]="f3b5aecf53ff8b3296603071b91383f6be6c7cbb"
-            [susfs_commit_android13_5_10]="dd94c3a166179fed554b53665d37a41bfec3d00e"
+            [susfs_commit_android13_5_10]="04a9d713106191ba98be680bd7ad9547ab1de964"
             [susfs_commit_android13_5_15]="e126882055892c6f8767ff3bd2ddc31abc80a59d"
             [susfs_commit_android14_5_15]="300c034bdfd473da70504e17477213c3231699a2"
             [susfs_commit_android14_6_1]="05f201978bdbd5d08f842e0a2a6e0f2ff0912787"
