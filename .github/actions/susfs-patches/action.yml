@@ -184,27 +184,3 @@ runs:
         #    sed -i 's/getname_flags(filename, lookup_flags, NULL)/getname_flags(filename, lookup_flags)/g' fs/open.c
         #  fi
         #fi
-
-        # Upstream's SUSFS statfs.c hunk declares the SUS_KSTAT/SUS_MOUNT
-        # externs mid-file, AFTER susfs_statfs_by_dentry() already calls
-        # them. That used to be a mere warning, but toolchains promoting
-        # -Werror=implicit-function-declaration now fail the build on it.
-        # Hoist forward declarations above first use (duplicate externs are
-        # harmless; leading whitespace is legal C). Symptom-gated +
-        # idempotent: no-op on branches whose patch already declares first.
-        if grep -q 'susfs_sus_kstat_spoof_vfs_statfs' fs/statfs.c && ! grep -q 'SUSFS_STATFS_FWD_DECL' fs/statfs.c; then
-          cat > /tmp/susfs_statfs_fwd.h <<'FWDEOF'
-          #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-          /* SUSFS_STATFS_FWD_DECL: hoisted above first use; upstream patch
-           * declares these mid-file, tripping implicit-function-declaration
-           * promoted to error. */
-          extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);
-          extern int susfs_sus_kstat_spoof_vfs_statfs(struct inode *inode, struct kstatfs *buf, bool *is_fuse);
-          #endif
-          #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-          extern struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt);
-          #endif
-          FWDEOF
-          sed -i '/#include "internal.h"/r /tmp/susfs_statfs_fwd.h' fs/statfs.c
-          echo "Hoisted SUSFS statfs forward declarations above first use"
-        fi
