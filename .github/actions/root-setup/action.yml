@@ -113,6 +113,24 @@ runs:
         config_list: |
           CONFIG_KSU=y
 
+    - name: Soften KernelSU-Next Kbuild config guard for mrproper
+      if: inputs.flavor == 'next'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        # Upstream Next's drivers/kernelsu/Kbuild hard-errors at parse time
+        # when neither CONFIG_KPROBES nor CONFIG_KSU_SUSFS is set. During
+        # build.sh's mrproper phase no .config exists yet, so the clean step
+        # dies before defconfig ever sets CONFIG_KSU_SUSFS=y. Demote to a
+        # warning: the message stays visible, and the real build still gets
+        # CONFIG_KSU_SUSFS=y via defconfig. No-op if upstream drops the guard.
+        for d in common/drivers/kernelsu drivers/kernelsu; do
+          if [ -f "$d/Kbuild" ] && grep -q 'KernelSU requires either CONFIG_KPROBES' "$d/Kbuild"; then
+            sed -i 's/$(error "KernelSU requires either CONFIG_KPROBES=y or CONFIG_KSU_SUSFS=y")/$(warning "KernelSU requires either CONFIG_KPROBES=y or CONFIG_KSU_SUSFS=y")/' "$d/Kbuild"
+            echo "Softened KSU config guard in $d/Kbuild"
+          fi
+        done
+
     - name: Disable multi-manager for ReSukiSU
       if: inputs.flavor == 'resukisu'
       uses: ./.github/actions/set-kernel-config
