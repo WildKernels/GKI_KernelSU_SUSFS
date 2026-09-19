@@ -60,7 +60,6 @@ runs:
         CXX="/usr/bin/ccache clang++" \
         HOSTCC="/usr/bin/ccache clang" \
         HOSTCXX="/usr/bin/ccache clang++" \
-        HOSTLDFLAGS="-fuse-ld=lld" \
         build/build.sh -j"$(nproc)"
       else
         sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
