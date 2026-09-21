@@ -2,6 +2,18 @@
   "version": "android17-6.18",
   "include": [
     {
+      "sublevel": "20",
+      "date": "2026-04"
+    },
+    {
+      "sublevel": "21",
+      "date": "2026-06"
+    },
+    {
+      "sublevel": "32",
+      "date": "2026-09"
+    },
+    {
       "sublevel": "X",
       "date": "lts"
     }
