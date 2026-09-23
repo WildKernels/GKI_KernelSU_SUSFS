@@ -12,34 +12,34 @@ runs:
     if: false
     uses: ./.github/actions/set-kernel-config
   
-  - name: 'Provide host ld from repo prebuilts'
-    shell: bash
-    run: |
-      cd "${{ github.workspace }}/kernel"
-      # build.sh REPLACES PATH with 4 repo dirs (build-tools/path,
-      # prebuilt clang bin, prebuilts/gas, out/host_tools), so /usr/bin and
-      # /usr/local/bin are invisible: apt binutils can NOT fix this. Instead,
-      # symlink ld.lld as "ld" inside the prebuilt clang's own bin dir -- the
-      # clang driver looks there first, no PATH needed.
-      # Dynamic, not hardcoded: resolve CLANG_PREBUILT_BIN exactly the way
-      # build.sh does -- source build.config.constants (CLANG_VERSION) then
-      # the same BUILD_CONFIG the build uses (build.config.gki.aarch64 chain).
-      # ("|| true": runner shell is -e -o pipefail; failures here must fall
-      # through to the loud error below, not kill the step silently.)
-      CLANG_BIN=""
-      if [ -f "common/build.config.gki.aarch64" ]; then
-        CLANG_BIN=$(ROOT_DIR="$PWD" KERNEL_DIR=common bash -c '[ -f common/build.config.constants ] && . common/build.config.constants; . common/build.config.gki.aarch64; echo "$CLANG_PREBUILT_BIN"' || true)
-      fi
-      if [ -n "$CLANG_BIN" ] && [ -d "$CLANG_BIN" ] && [ -f "$CLANG_BIN/ld.lld" ]; then
-        echo "Build clang bin (from build.config chain): $CLANG_BIN"
-        ln -sf "ld.lld" "$CLANG_BIN/ld"
-        ls -la "$CLANG_BIN/ld"
-      else
-        echo "ERROR: could not resolve build clang (got: '$CLANG_BIN')" >&2
-        echo "--- workspace/kernel:" >&2
-        ls "${{ github.workspace }}/kernel"
-        exit 1
-      fi
+  # - name: Provide host ld from repo prebuilts
+  #   shell: bash
+  #   run: |
+  #     cd "${{ github.workspace }}/kernel"
+  #     # build.sh REPLACES PATH with 4 repo dirs (build-tools/path,
+  #     # prebuilt clang bin, prebuilts/gas, out/host_tools), so /usr/bin and
+  #     # /usr/local/bin are invisible: apt binutils can NOT fix this. Instead,
+  #     # symlink ld.lld as "ld" inside the prebuilt clang's own bin dir -- the
+  #     # clang driver looks there first, no PATH needed.
+  #     # Dynamic, not hardcoded: resolve CLANG_PREBUILT_BIN exactly the way
+  #     # build.sh does -- source build.config.constants (CLANG_VERSION) then
+  #     # the same BUILD_CONFIG the build uses (build.config.gki.aarch64 chain).
+  #     # ("|| true": runner shell is -e -o pipefail; failures here must fall
+  #     # through to the loud error below, not kill the step silently.)
+  #     CLANG_BIN=""
+  #     if [ -f "common/build.config.gki.aarch64" ]; then
+  #       CLANG_BIN=$(ROOT_DIR="$PWD" KERNEL_DIR=common bash -c '[ -f common/build.config.constants ] && . common/build.config.constants; . common/build.config.gki.aarch64; echo "$CLANG_PREBUILT_BIN"' || true)
+  #     fi
+  #     if [ -n "$CLANG_BIN" ] && [ -d "$CLANG_BIN" ] && [ -f "$CLANG_BIN/ld.lld" ]; then
+  #       echo "Build clang bin (from build.config chain): $CLANG_BIN"
+  #       ln -sf "ld.lld" "$CLANG_BIN/ld"
+  #       ls -la "$CLANG_BIN/ld"
+  #     else
+  #       echo "ERROR: could not resolve build clang (got: '$CLANG_BIN')" >&2
+  #       echo "--- workspace/kernel:" >&2
+  #       ls "${{ github.workspace }}/kernel"
+  #       exit 1
+  #     fi
 
   - name: 'Build Kernel'
     shell: bash
@@ -64,7 +64,6 @@ runs:
       else
         sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
         tools/bazel build \
-          --config=fast \
           --disk_cache=/home/runner/.cache/bazel \
           //common:kernel_aarch64/Image
       fi
