@@ -139,17 +139,23 @@ runs:
           CONFIG_KSU_MULTI_MANAGER_SUPPORT=n
           CONFIG_KSU_TOOLKIT_SUPPORT=y
 
-    - name: Soften ReSukiSU Kbuild submodule check for bazel builds
+    - name: Set KSU_SRC for ReSukiSU to resolve bazel submodule check
       if: inputs.flavor == 'resukisu'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        # ReSukiSU's Kbuild hard-errors if it's not a git submodule (checks for .git in parent).
-        # In bazel sandbox the symlink to the separate git checkout isn't visible, so the check fails.
-        # Demote to warning: the message stays visible, and version info falls back gracefully.
-        for d in common/drivers/kernelsu drivers/kernelsu; do
-          if [ -f "$d/Kbuild" ] && grep -q 'You should use ReSukiSU as a git submodule' "$d/Kbuild"; then
-            sed -i 's/$(error You should use $(REPO_NAME) as a git submodule instead of copying code directly)/$(warning You should use $(REPO_NAME) as a git submodule instead of copying code directly)/' "$d/Kbuild"
-            echo "Softened ReSukiSU submodule check in $d/Kbuild"
+        # ReSukiSU's Kbuild hard-errors if $(KSU_SRC)/../.git is not found.
+        # The error message says: "Please go to Kbuild and change KSU_SRC
+        # to the absolute path of the KSU kernel folder."
+        # We set KSU_SRC in the drivers Makefile to the absolute path of the
+        # ReSukiSU checkout directory so the .git check resolves correctly
+        # under bazel where the symlink target isn't visible.
+        ROOT_DIR="$(realpath "ReSukiSU")"
+        for f in common/drivers/kernelsu/Makefile drivers/kernelsu; do
+          if [ -f "$f/Makefile" ] && grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$f/Makefile"; then
+            if ! grep -q 'KSU_SRC :=' "$f/Makefile"; then
+              printf '\n# Override KSU_SRC to absolute path for bazel compatibility\nKSU_SRC := %s\n' "$ROOT_DIR" >> "$f/Makefile"
+              echo "Set KSU_SRC=$ROOT_DIR in $f/Makefile"
+            fi
           fi
         done
