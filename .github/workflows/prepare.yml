@@ -76,6 +76,11 @@ on:
         required: false
         type: string
         default: ""
+      page_size:
+        description: "ARM64 page size: 4k (default) or 16k"
+        required: false
+        type: string
+        default: "4k"
 
 jobs:
   generate-matrix:
@@ -183,4 +188,5 @@ jobs:
       brand_name: ${{ inputs.brand_name }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
     secrets: inherit

@@ -41,6 +41,13 @@ on:
         required: true
         type: string
         default: All
+      page_size:
+        description: "ARM64 page size. 16k requires explicitly selecting Kernel Version 6.1.x-android14, 6.6.x-android15 or 6.12.x-android16 (All is rejected)"
+        type: choice
+        options:
+          - 4k
+          - 16k
+        default: 4k
       brand_name:
         description: "Kernel Branding"
         type: string
@@ -152,6 +159,24 @@ jobs:
       feature_set: ${{ steps.features.outputs.feature_set }}
       manager_list: ${{ steps.manager.outputs.manager_list }}
     steps:
+      - name: Validate page size selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAGE_SIZE="${{ inputs.page_size || '4k' }}"
+          [ "$PAGE_SIZE" = "16k" ] || exit 0
+          # Only these GKI families use a Kleaf build branch exposing
+          # --page_size (main-kernel-build-2023/2024, main-kernel-2025).
+          case "${{ inputs.kernel_build_version }}" in
+            6.1.x-android14|6.6.x-android15|6.12.x-android16) ;;
+            *)
+              echo "ERROR: page_size=16k requires kernel_build_version to be one of:" >&2
+              echo "  6.1.x-android14, 6.6.x-android15, 6.12.x-android16" >&2
+              echo "Got: '${{ inputs.kernel_build_version }}'." >&2
+              exit 1
+              ;;
+          esac
+
       - name: Resolve latest component commits
         id: resolve
         shell: bash
@@ -742,6 +767,7 @@ jobs:
       os_patch_level: ${{ inputs.os_patch_level }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
     secrets: inherit
 
   build-android13-5-10:
@@ -771,6 +797,7 @@ jobs:
       os_patch_level: ${{ inputs.os_patch_level }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
     secrets: inherit
 
   build-android13-5-15:
@@ -800,6 +827,7 @@ jobs:
       os_patch_level: ${{ inputs.os_patch_level }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
     secrets: inherit
 
   build-android14-5-15:
@@ -829,6 +857,7 @@ jobs:
       os_patch_level: ${{ inputs.os_patch_level }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
     secrets: inherit
 
   build-android14-6-1:
@@ -858,6 +887,7 @@ jobs:
       os_patch_level: ${{ inputs.os_patch_level }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
     secrets: inherit
 
   build-android15-6-6:
@@ -887,6 +917,7 @@ jobs:
       os_patch_level: ${{ inputs.os_patch_level }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
     secrets: inherit
 
   build-android16-6-12:
@@ -916,6 +947,7 @@ jobs:
       os_patch_level: ${{ inputs.os_patch_level }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
     secrets: inherit
 
   update-verified-pins:
@@ -1528,6 +1560,7 @@ jobs:
           USE_BPF: ${{ inputs.use_bpf }}
           USE_PERF: ${{ inputs.use_perf }}
           USE_CACHE: ${{ inputs.use_cache }}
+          PAGE_SIZE: ${{ inputs.page_size }}
           KERNEL_BUILD_VERSION: ${{ inputs.kernel_build_version }}
           NOMOUNT_COMMIT: ${{ needs.resolve-sources.outputs.nomount_commit }}
           KSU_COMMIT: ${{ needs.resolve-sources.outputs.ksu_commit }}
@@ -1580,6 +1613,7 @@ jobs:
           if env("USE_UNICODE","true")=="true": feats.append("Unicode Fix")
           if env("USE_BPF","true")=="true": feats.append("BTF / eBPF / FUSE-BPF")
           if env("USE_PERF","false")=="true": feats.append("Performance Tuning")
+          if env("PAGE_SIZE","4k")=="16k": feats.append("16 KB page size (ARM64)")
           lines=[]
           lines.append("# Wild Kernels for GKI2 Devices")
           lines.append("")

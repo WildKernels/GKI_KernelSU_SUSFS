@@ -72,6 +72,11 @@ on:
         required: false
         type: boolean
         default: true
+      page_size:
+        description: "ARM64 page size: 4k (default) or 16k (Kleaf --page_size)"
+        required: false
+        type: string
+        default: "4k"
 
 jobs:
   build-gki:
@@ -82,6 +87,27 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v7
+
+    - name: Validate Page Size
+      shell: bash
+      run: |
+        set -euo pipefail
+        PAGE_SIZE="${{ inputs.page_size }}"
+        case "$PAGE_SIZE" in
+          4k) exit 0 ;;
+          16k) ;;
+          *) echo "ERROR: unsupported page_size '$PAGE_SIZE' (expected 4k or 16k)." >&2; exit 1 ;;
+        esac
+        # Kleaf exposes --page_size only on the build branches used by these
+        # GKI families (main-kernel-build-2023/2024, main-kernel-2025).
+        case "${{ inputs.version }}" in
+          android14-6.1|android15-6.6|android16-6.12) ;;
+          *)
+            echo "ERROR: page_size=16k is not supported for ${{ inputs.version }}." >&2
+            echo "Supported families: android14-6.1, android15-6.6, android16-6.12." >&2
+            exit 1
+            ;;
+        esac
 
     - name: Emergency Disk Cleanup
       if: false
@@ -160,6 +186,7 @@ jobs:
         sublevel: ${{ inputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
         variant: ${{ inputs.variant }}
+        page_size: ${{ inputs.page_size }}
 
     - name: Kernel Fixes
       uses: ./.github/actions/kernel-fixes
@@ -453,8 +480,8 @@ jobs:
       uses: ./.github/actions/cache-restore
       with:
         cache_path: /home/runner/.cache/bazel
-        cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}
-        cache_bucket: bazel-cache-${{ inputs.version }}-${{ inputs.variant }}
+        cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
+        cache_bucket: bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
         restore_keys: |
           ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
 
@@ -510,6 +537,7 @@ jobs:
       uses: ./.github/actions/build-kernel
       with:
         version: ${{ inputs.version }}
+        page_size: ${{ inputs.page_size }}
 
     - name: Get Cache Stats
       uses: ./.github/actions/cache-stats
@@ -544,8 +572,8 @@ jobs:
       if: always() && inputs.use_cache && (inputs.version == 'android14-5.15' || inputs.version == 'android14-6.1' || inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12')
       with:
         cache_path: /home/runner/.cache/bazel
-        cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}
-        cache_bucket: "bazel-cache-${{ inputs.version }}-${{ inputs.variant }}"
+        cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
+        cache_bucket: "bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}"
         compression_level: 9
         github_token: ${{ github.token }}
 
@@ -557,6 +585,7 @@ jobs:
       uses: ./.github/actions/build-kernel
       with:
         version: ${{ inputs.version }}
+        page_size: ${{ inputs.page_size }}
 
     - name: Consolidated Build Summary
       if: always()
@@ -568,6 +597,9 @@ jobs:
           VARIANT="${{ inputs.variant }}"
           if [ -n "${VARIANT}" ] && [ "${VARIANT}" != "Normal" ]; then
             SUMMARY_BASE="${SUMMARY_BASE}-${VARIANT}"
+          fi
+          if [ "${{ inputs.page_size }}" = "16k" ]; then
+            SUMMARY_BASE="${SUMMARY_BASE}-16k"
           fi
         fi
         SUMMARY_FILE="/tmp/build-summary-${SUMMARY_BASE}.md"
@@ -645,6 +677,7 @@ jobs:
           echo "| **NoMount Commit** | ${NOMOUNT_SHA} |"
           echo "| **Feature Set** | ${{ inputs.feature_set }} |"
           echo "| **Variant** | ${{ inputs.variant }} |"
+          echo "| **Page Size** | ${{ inputs.page_size }} |"
           echo
           
           # Kernel Fixes
@@ -750,6 +783,7 @@ jobs:
           --arg nomount_commit "${NOMOUNT_COMMIT:-N/A}" \
           --arg android_branch "${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}" \
           --arg kmi "${{ inputs.android_version }}-${{ inputs.kernel_version }}" \
+          --arg page_size "${{ inputs.page_size }}" \
           --arg kernel_source_commit "${KERNEL_SOURCE_COMMIT:-N/A}" \
           --arg provenance_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
           --arg artifact_url "$kernel_artifact_url" \
@@ -774,6 +808,7 @@ jobs:
             nomount_commit: $nomount_commit,
             android_branch: $android_branch,
             kmi: $kmi,
+            page_size: $page_size,
             kernel_source_commit: $kernel_source_commit,
             provenance_url: $provenance_url,
             artifact_url: $artifact_url,
