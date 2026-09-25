@@ -139,27 +139,6 @@ runs:
           CONFIG_KSU_MULTI_MANAGER_SUPPORT=n
           CONFIG_KSU_TOOLKIT_SUPPORT=y
 
-    - name: Set KSU_SRC for ReSukiSU to resolve bazel submodule check
-      if: inputs.flavor == 'resukisu'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        # ReSukiSU's Kbuild hard-errors if $(KSU_SRC)/../.git is not found.
-        # The error message says: "Please go to Kbuild and change KSU_SRC
-        # to the absolute path of the KSU kernel folder."
-        # We set KSU_SRC in the drivers Makefile to the absolute path of the
-        # ReSukiSU checkout directory so the .git check resolves correctly
-        # under bazel where the symlink target isn't visible.
-        ROOT_DIR="$(realpath "ReSukiSU")"
-        for f in common/drivers/kernelsu/Makefile drivers/kernelsu; do
-          if [ -f "$f/Makefile" ] && grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$f/Makefile"; then
-            if ! grep -q 'KSU_SRC :=' "$f/Makefile"; then
-              printf '\n# Override KSU_SRC to absolute path for bazel compatibility\nKSU_SRC := %s\n' "$ROOT_DIR" >> "$f/Makefile"
-              echo "Set KSU_SRC=$ROOT_DIR in $f/Makefile"
-            fi
-          fi
-        done
-
     - name: Soften ReSukiSU Kbuild submodule check for bazel builds
       if: inputs.flavor == 'resukisu'
       shell: bash
