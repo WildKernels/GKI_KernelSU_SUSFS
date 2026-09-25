@@ -11,7 +11,7 @@ runs:
   - name: Setup Kernel Configs
     if: false
     uses: ./.github/actions/set-kernel-config
-  
+
   # - name: Provide host ld from repo prebuilts
   #   shell: bash
   #   run: |
@@ -63,8 +63,17 @@ runs:
         build/build.sh -j"$(nproc)"
       else
         sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
+
+        # Pass KSU_SRC to bazel for ReSukiSU to resolve git submodule check in sandbox
+        KSU_SRC_FLAG=""
+        if [ -d "ReSukiSU" ]; then
+          KSU_SRC_FLAG="--action_env=KSU_SRC=$(realpath ReSukiSU)"
+          echo "Setting KSU_SRC=$KSU_SRC_FLAG for bazel"
+        fi
+
         tools/bazel build \
           --disk_cache=/home/runner/.cache/bazel \
+          $KSU_SRC_FLAG \
           //common:kernel_aarch64/Image
       fi
 
@@ -85,4 +94,3 @@ runs:
       fi
 
       exit 1
-
