@@ -4,6 +4,10 @@ inputs:
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
     required: true
+  page_size:
+    description: 'ARM64 page size: 4k (default, unchanged behaviour) or 16k'
+    required: false
+    default: '4k'
 
 runs:
   using: composite
@@ -16,8 +20,13 @@ runs:
     shell: bash
     working-directory: ${{ github.workspace }}/kernel
     run: |
+      PAGE_SIZE="${{ inputs.page_size }}"
       sed -i 's/check_defconfig//' ./common/build.config.gki
       if [ -f "build/build.sh" ]; then
+        if [ "$PAGE_SIZE" != "4k" ]; then
+          echo "ERROR: page_size=${PAGE_SIZE} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
+          exit 1
+        fi
         BUILD_GKI_ARTIFACTS="" \
         BUILD_GKI_CERTIFICATION_TOOLS=0 \
         BUILD_SYSTEM_DLKM=0 \
@@ -34,11 +43,71 @@ runs:
         build/build.sh -j"$(nproc)"
       else
         sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
+        # --page_size is a Kleaf flag alias for //build/kernel/kleaf:page_size.
+        # 4k stays on the Kleaf default ("respect the defconfig") so the build
+        # command is byte-identical to the previous behaviour.
+        PAGE_SIZE_FLAGS=()
+        if [ "$PAGE_SIZE" = "16k" ]; then
+          PAGE_SIZE_FLAGS+=(--page_size=16k)
+        fi
         tools/bazel build \
           --config=fast \
+          "${PAGE_SIZE_FLAGS[@]}" \
           --disk_cache=/home/runner/.cache/bazel \
           //common:kernel_aarch64/Image
       fi
+
+  - name: 'Verify Page Size in Generated .config'
+    shell: bash
+    working-directory: ${{ github.workspace }}/kernel
+    run: |
+      set -euo pipefail
+      PAGE_SIZE="${{ inputs.page_size }}"
+
+      # Kleaf writes the resolved .config under the kernel_config rule output
+      # dir; the legacy build.sh writes it into OUT_DIR. Locate it instead of
+      # hardcoding a path that upstream may rename.
+      CONFIG_FILE=""
+      for candidate in \
+        bazel-bin/common/kernel_aarch64_config/out_dir/.config \
+        /home/runner/out/.config; do
+        if [ -f "$candidate" ]; then CONFIG_FILE="$candidate"; break; fi
+      done
+      if [ -z "$CONFIG_FILE" ]; then
+        CONFIG_FILE="$(find bazel-bin/common /home/runner/out -maxdepth 4 -name .config -type f 2>/dev/null | head -n1 || true)"
+      fi
+      if [ -z "$CONFIG_FILE" ]; then
+        if [ "$PAGE_SIZE" != "16k" ]; then
+          # 4k builds are unchanged from before this feature; a missing .config
+          # is a gap in the check, not a reason to fail a working build.
+          echo "WARNING: no .config found; skipping page-size verification for 4k."
+          exit 0
+        fi
+        echo "ERROR: could not locate the generated .config; page size cannot be verified." >&2
+        exit 1
+      fi
+      echo "Verifying page size using $CONFIG_FILE"
+      grep -E '^(# )?CONFIG_ARM64_(4K|16K|64K)_PAGES|^CONFIG_ARM64_PAGE_SHIFT' "$CONFIG_FILE" || true
+
+      if [ "$PAGE_SIZE" = "16k" ]; then
+        want_on="CONFIG_ARM64_16K_PAGES=y"
+        want_off="# CONFIG_ARM64_4K_PAGES is not set"
+      else
+        want_on="CONFIG_ARM64_4K_PAGES=y"
+        want_off="# CONFIG_ARM64_16K_PAGES is not set"
+      fi
+
+      if ! grep -qx "$want_on" "$CONFIG_FILE"; then
+        echo "ERROR: expected '$want_on' in $CONFIG_FILE" >&2
+        grep -E '^(# )?CONFIG_ARM64_(4K|16K|64K)_PAGES' "$CONFIG_FILE" >&2 || true
+        exit 1
+      fi
+      if ! grep -qx "$want_off" "$CONFIG_FILE"; then
+        echo "ERROR: expected '$want_off' in $CONFIG_FILE" >&2
+        grep -E '^(# )?CONFIG_ARM64_(4K|16K|64K)_PAGES' "$CONFIG_FILE" >&2 || true
+        exit 1
+      fi
+      echo "Page size verified: ${PAGE_SIZE}"
 
   - name: 'Gather Build Artifacts'
     shell: bash

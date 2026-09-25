@@ -16,6 +16,10 @@ inputs:
   sublevel:
     required: true
     type: string
+  page_size:
+    required: false
+    type: string
+    default: '4k'
 outputs:
   file_name:
     value: ${{ steps.extract.outputs.file_name }}
@@ -57,6 +61,10 @@ runs:
         # Append variant only when it's provided and not the default 'Normal'
         if [ -n "${{ inputs.variant }}" ] && [ "${{ inputs.variant }}" != "Normal" ]; then
           FILE_NAME="${FILE_NAME}-${{ inputs.variant }}"
+        fi
+        # Only non-default page sizes are tagged, so 4k artifact names stay as-is.
+        if [ "${{ inputs.page_size }}" = "16k" ]; then
+          FILE_NAME="${FILE_NAME}-16k"
         fi
 
         echo "SUBLEVEL=$SUBLEVEL" >> "$GITHUB_ENV"
