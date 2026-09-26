@@ -23,6 +23,8 @@ on:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         type: boolean
         default: false
+  schedule:
+    - cron: '0 0 * * 0'  # Sundays at midnight UTC
       kernel_build_version:
         description: "Kernel Version"
         type: choice
@@ -165,7 +167,12 @@ jobs:
           # Commit resolution mode. 'latest' (default) resolves branch tips at
           # run time via git ls-remote. 'verified' uses the audited pins below for
           # NoMount, kernelsu/resukisu roots, and SUSFS; KernelSU-Next stays latest.
-          COMMIT_MODE="${{ inputs.commit_mode || 'verified' }}"
+          # Scheduled (nightly) runs use latest by default.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            COMMIT_MODE="${{ inputs.commit_mode || 'latest' }}"
+          else
+            COMMIT_MODE="${{ inputs.commit_mode || 'verified' }}"
+          fi
           echo "commit_mode=${COMMIT_MODE}"
 
           retry() {
@@ -1475,49 +1482,8 @@ jobs:
         done
         exit "$failed"
 
-  nightly-release:
-    if: always() && github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.release_type == 'Action'
-    needs: [notes-preview]
-    runs-on: ubuntu-latest
-    concurrency:
-      group: nightly-release-${{ github.ref }}
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Download release notes preview
-        uses: actions/download-artifact@v7
-        with:
-          name: release-notes-preview
-          path: nightly
-          if-no-files-found: error
-
-      - name: Append nightly.link URL
-        run: |
-          {
-            echo ""
-            echo "- **Nightly artifacts:** https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            echo "- **Note:** not every kernel version is necessarily built in a nightly run — the link above lists exactly what this run produced."
-          } >> nightly/release_body.md
-          cat nightly/release_body.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Replace nightly prerelease
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          gh release delete nightly --cleanup-tag -y || true
-          if git ls-remote --tags origin nightly | grep -q 'refs/tags/nightly'; then
-            git push --delete origin nightly || true
-          fi
-          gh release create nightly \
-            --target "${{ github.sha }}" \
-            --prerelease \
-            --title "Nightly (${{ github.ref_name }} $(date -u +%Y-%m-%d))" \
-            --notes-file nightly/release_body.md
-
   notes-preview:
-    if: always() && github.event_name == 'workflow_dispatch'
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     needs: [resolve-sources, build-android12-5-10, build-android13-5-10, build-android13-5-15, build-android14-5-15, build-android14-6-1, build-android15-6-6, build-android16-6-12]
     runs-on: ubuntu-latest
     steps:
@@ -1687,4 +1653,42 @@ jobs:
           path: release_body.md
           retention-days: 7
           if-no-files-found: warn
+
+  nightly-release:
+    if: always() && github.event_name == 'schedule'
+    needs: [notes-preview]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download release notes preview
+        uses: actions/download-artifact@v7
+        with:
+          name: release-notes-preview
+          path: nightly
+          if-no-files-found: error
+
+      - name: Append nightly.link URL
+        run: |
+          {
+            echo ""
+            echo "- **Nightly artifacts:** https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- **Note:** not every kernel version is necessarily built in a nightly run — the link above lists exactly what this run produced."
+          } >> nightly/release_body.md
+          cat nightly/release_body.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Replace nightly prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          gh release delete nightly --cleanup-tag -y || true
+          if git ls-remote --tags origin nightly | grep -q 'refs/tags/nightly'; then
+            git push --delete origin nightly || true
+          fi
+          gh release create nightly \
+            --target "${{ github.sha }}" \
+            --prerelease \
+            --title "Nightly (${{ github.ref_name }} $(date -u +%Y-%m-%d))" \
+            --notes-file nightly/release_body.md
 
