@@ -148,7 +148,7 @@ runs:
         # Modify the Kbuild in the ReSukiSU checkout so the change propagates
         # through the symlink into bazel sandbox.
         for d in ReSukiSU/kernel; do
-          if [ -f "$d/Kbuild" ] && grep -q 'You should use ReSukiSU as a git submodule instead of copying code directly' "$d/Kbuild"; then
+          if [ -f "$d/Kbuild" ] && grep -q 'You should use \$(REPO_NAME) as a git submodule instead of copying code directly' "$d/Kbuild"; then
             sed -i 's/\$(error You should use \$(REPO_NAME) as a git submodule instead of copying code directly)/\$(warning You should use \$(REPO_NAME) as a git submodule instead of copying code directly)/' "$d/Kbuild"
             echo "Softened ReSukiSU submodule check in $d/Kbuild"
           fi
