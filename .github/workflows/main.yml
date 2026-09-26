@@ -23,8 +23,6 @@ on:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         type: boolean
         default: false
-  schedule:
-    - cron: '0 0 * * 0'  # Sundays at midnight UTC
       kernel_build_version:
         description: "Kernel Version"
         type: choice
@@ -116,6 +114,8 @@ on:
         description: "Render release notes preview only (skip all builds + release)"
         type: boolean
         default: false
+  schedule:
+    - cron: '0 0 * * 0'  # Sundays at midnight UTC
 
 jobs:
   resolve-sources:
