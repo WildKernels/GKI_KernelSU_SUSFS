@@ -1655,7 +1655,7 @@ jobs:
           if-no-files-found: warn
 
   nightly-release:
-    if: always() && (github.event_name == 'schedule' || inputs.release_type == 'Pre-Release' || inputs.release_type == 'Release')
+    if: always() && (github.event_name == 'schedule' || inputs.release_type == 'Pre-Release')
     needs: [notes-preview]
     runs-on: ubuntu-latest
     steps:
