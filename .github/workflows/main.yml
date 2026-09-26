@@ -192,39 +192,39 @@ jobs:
           }
 
           # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
-          PIN_NOMOUNT="7919faf2ab574110e388a4f444e5fef909c24e16"
-          PIN_KERNELSU="26a0991486fc686d7b952829820f1e1f3082ae99"
-          PIN_RESUKISU="6ec8d9a8a8be30878c388504cacf8ae7849c757b"
+          PIN_NOMOUNT="6b1be186322d4e0bdc465cf27f6fc0d3679087c6"
+          PIN_KERNELSU="08a3b087e49227c8a6731c5f1114998b5e25255b"
+          PIN_RESUKISU="fa8311f632a215b5381ec644627c6198d1e8a13e"
           PIN_SUKISU_ULTRA="b20dee702035af09cb2ecb5f35443bbc1747f3e6"
           declare -A PIN_SUSFS=(
-            [susfs_commit_android12_5_10]="f3b5aecf53ff8b3296603071b91383f6be6c7cbb"
-            [susfs_commit_android13_5_10]="04a9d713106191ba98be680bd7ad9547ab1de964"
-            [susfs_commit_android13_5_15]="e126882055892c6f8767ff3bd2ddc31abc80a59d"
-            [susfs_commit_android14_5_15]="300c034bdfd473da70504e17477213c3231699a2"
-            [susfs_commit_android14_6_1]="05f201978bdbd5d08f842e0a2a6e0f2ff0912787"
-            [susfs_commit_android15_6_6]="01677642e6ade3b9e56e0a8660192a664dad79e9"
-            [susfs_commit_android16_6_12]="634757955537bf77074eeeb2943728bc77dff0e9"
+            [susfs_commit_android12_5_10]="9892175b4acec7ee844e113b8d02c0f4d12cdfac"
+            [susfs_commit_android13_5_10]="5326e21a7eb232f9e21debdd5164e99bee3d1e2f"
+            [susfs_commit_android13_5_15]="687d2d18d94cb2e3e72d1074778d58384d58e379"
+            [susfs_commit_android14_5_15]="6ba6ca79f85b8873b54573842093a9ae2df56cf9"
+            [susfs_commit_android14_6_1]="24743360ea08d98f6ad72b856851abed8de5854f"
+            [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
+            [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
           )
           # ReSukiSU keeps its own SUSFS pin set (currently the shared values,
           # including 6.1 = 0ff93279). KernelSU's set above already diverges on 6.1.
           declare -A PIN_SUSFS_RESUKISU=(
-            [susfs_commit_android12_5_10]="f3b5aecf53ff8b3296603071b91383f6be6c7cbb"
-            [susfs_commit_android13_5_10]="04a9d713106191ba98be680bd7ad9547ab1de964"
-            [susfs_commit_android13_5_15]="e126882055892c6f8767ff3bd2ddc31abc80a59d"
-            [susfs_commit_android14_5_15]="300c034bdfd473da70504e17477213c3231699a2"
-            [susfs_commit_android14_6_1]="05f201978bdbd5d08f842e0a2a6e0f2ff0912787"
-            [susfs_commit_android15_6_6]="01677642e6ade3b9e56e0a8660192a664dad79e9"
-            [susfs_commit_android16_6_12]="634757955537bf77074eeeb2943728bc77dff0e9"
+            [susfs_commit_android12_5_10]="9892175b4acec7ee844e113b8d02c0f4d12cdfac"
+            [susfs_commit_android13_5_10]="5326e21a7eb232f9e21debdd5164e99bee3d1e2f"
+            [susfs_commit_android13_5_15]="687d2d18d94cb2e3e72d1074778d58384d58e379"
+            [susfs_commit_android14_5_15]="6ba6ca79f85b8873b54573842093a9ae2df56cf9"
+            [susfs_commit_android14_6_1]="24743360ea08d98f6ad72b856851abed8de5854f"
+            [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
+            [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
-            [susfs_commit_android12_5_10]="f3b5aecf53ff8b3296603071b91383f6be6c7cbb"
-            [susfs_commit_android13_5_10]="04a9d713106191ba98be680bd7ad9547ab1de964"
-            [susfs_commit_android13_5_15]="e126882055892c6f8767ff3bd2ddc31abc80a59d"
-            [susfs_commit_android14_5_15]="300c034bdfd473da70504e17477213c3231699a2"
-            [susfs_commit_android14_6_1]="05f201978bdbd5d08f842e0a2a6e0f2ff0912787"
-            [susfs_commit_android15_6_6]="01677642e6ade3b9e56e0a8660192a664dad79e9"
-            [susfs_commit_android16_6_12]="634757955537bf77074eeeb2943728bc77dff0e9"
+            [susfs_commit_android12_5_10]="9892175b4acec7ee844e113b8d02c0f4d12cdfac"
+            [susfs_commit_android13_5_10]="5326e21a7eb232f9e21debdd5164e99bee3d1e2f"
+            [susfs_commit_android13_5_15]="687d2d18d94cb2e3e72d1074778d58384d58e379"
+            [susfs_commit_android14_5_15]="6ba6ca79f85b8873b54573842093a9ae2df56cf9"
+            [susfs_commit_android14_6_1]="24743360ea08d98f6ad72b856851abed8de5854f"
+            [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
+            [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
           )
 
           pick() { # pinned repo ref  -> pinned when verified, else latest
