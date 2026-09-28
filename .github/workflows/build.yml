@@ -79,10 +79,7 @@ on:
       page_size:
         description: "ARM64 page size: 4k (default) or 16k (Kleaf --page_size)"
         required: false
-        type: choice
-        options:
-          - 4k
-          - 16k
+        type: string
         default: "4k"
 
 jobs:
