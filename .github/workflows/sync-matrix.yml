@@ -1,10 +1,9 @@
 name: Sync Kernel Matrix
 
-# Detects new upstream monthly branches and pushes them to
-# bot/sync-kernel-matrix for human review. It never opens a PR and never
-# merges: additions reach main only when a maintainer opens the PR themselves.
-# Dead/retired branches need no action: download-kernel falls back to the
-# latest release tag.
+# Adds new upstream monthly branches to the build matrix via PR against
+# main. If a sync PR is already open, it is updated in place (the sync
+# branch is rebuilt from main each run, so PRs never stack). Dead/retired branches
+# need no action: download-kernel falls back to the latest release tag.
 #
 # NOTE: scheduled runs only fire from the default branch, so the cron
 # below stays dormant until this file exists on main. workflow_dispatch
@@ -12,6 +11,7 @@ name: Sync Kernel Matrix
 
 permissions:
   contents: write
+  pull-requests: write
 
 on:
   schedule:
@@ -132,22 +132,21 @@ jobs:
               f.write(f"added={'; '.join(added)}\n")
           EOF
 
-      # Deliberately stops at the branch. The workflow never opens or updates a
-      # PR: matrix additions are verified by a human before they reach main.
-      # Open bot/sync-kernel-matrix -> main yourself when the summary below
-      # lists additions you want to review.
-      - name: Push sync branch for review
+      - name: Open or update sync PR
         if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           BRANCH="bot/sync-kernel-matrix"
           git add .github/config/
           git commit -m "Sync kernel matrix: add ${{ steps.sync.outputs.added }}"
           git push --force-with-lease origin "$BRANCH" || git push origin "$BRANCH"
-          {
-            echo "### Kernel matrix sync needs review"
-            echo
-            printf '%s\n' "${{ steps.sync.outputs.added }}" | sed 's/; /\n- /g; s/^/- /'
-            echo
-            echo "Not merged. Open a PR from \`$BRANCH\` -> \`main\` to review."
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(gh pr list --head "$BRANCH" --base main --json number --jq 'length')" = "0" ]; then
+            BODY=$(printf '%s' "${{ steps.sync.outputs.added }}" | sed 's/; /\n- /g; s/^/- /')
+            gh pr create --head "$BRANCH" --base main \
+              --title "Sync kernel matrix: add new upstream months" \
+              --body "$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")"
+          else
+            echo "Sync PR already open; updated in place."
+          fi
