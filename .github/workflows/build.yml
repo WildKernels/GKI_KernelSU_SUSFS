@@ -232,6 +232,12 @@ jobs:
           echo "ROOT_COMMIT=N/A"
         } >> "$GITHUB_ENV"
 
+    - name: Set kernel timer tick rate (HZ)
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_HZ_1000=y
+
     - name: Disable SUSFS for ReSukiSU without SUSFS feature
       if: inputs.root_flavor == 'resukisu' && !contains(inputs.feature_set, 'SUSFS')
       uses: ./.github/actions/set-kernel-config
