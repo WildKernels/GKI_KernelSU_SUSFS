@@ -391,6 +391,11 @@ jobs:
     - name: Setup Misc Configs
       uses: ./.github/actions/misc
 
+    - name: Apply BORE Scheduler
+      uses: ./.github/actions/bore
+      with:
+        kernel_version: ${{ inputs.kernel_version }}
+
     - name: Enable BPF Stack (BTF + eBPF + FUSE-BPF)
       if: contains(inputs.feature_set, 'BPF')
       uses: ./.github/actions/btf

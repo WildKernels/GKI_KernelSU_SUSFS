@@ -1,0 +1,82 @@
+name: 'Apply BORE Scheduler'
+description: 'Apply the BORE scheduler patch, selected by kernel version'
+
+inputs:
+  kernel_version:
+    description: 'Kernel version (e.g. 6.12)'
+    required: true
+    type: string
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Select BORE patch
+      id: pick
+      shell: bash
+      run: |
+        set -euo pipefail
+        VER="${{ inputs.kernel_version }}"
+        DIR="${{ github.workspace }}/kernel_patches/bore"
+
+        # Patch availability, verified by dry-run against each local GKI tree:
+        #   5.10 / 5.15  -> 5.15 patch   14-15/14 hunks, clean
+        #   6.1          -> 6.1  patch   14/14 hunks, clean
+        #   6.6          -> 6.12 patch   5 rejects, needs its own resolution
+        #   6.12         -> 6.12 patch   41/44 hunks, 3 Android-added rejects
+        #   6.18         -> 6.18 patch   43/44 hunks, 1 Android-added reject
+        case "$VER" in
+          5.4|5.10|5.15)
+            PATCH="$DIR/0001-linux5.15-bore-5.1.0.patch" ;;
+          6.1)
+            PATCH="$DIR/0001-linux6.1-bore-5.1.0.patch" ;;
+          6.6|6.12)
+            PATCH="$DIR/0001-linux6.12-bore-6.8.0.patch" ;;
+          6.18)
+            PATCH="$DIR/0001-linux6.18-bore-6.8.0.patch" ;;
+          *)
+            echo "No BORE patch mapped for kernel ${VER}; skipping."
+            echo "selected=" >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+        esac
+
+        if [ ! -f "$PATCH" ]; then
+          echo "ERROR: BORE patch not found: $PATCH" >&2
+          exit 1
+        fi
+
+        echo "BORE patch for kernel ${VER}: $(basename "$PATCH")"
+        echo "selected=${PATCH}" >> "$GITHUB_OUTPUT"
+
+    - name: Apply BORE patch
+      if: steps.pick.outputs.selected != ''
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      env:
+        PATCH: ${{ steps.pick.outputs.selected }}
+      run: |
+        set -euo pipefail
+
+        # --forward so a re-run over an already-patched tree is a no-op rather
+        # than a reverse-apply. -F3 tolerates the context drift between the
+        # sublevel the patch was cut against and the one actually building.
+        if ! patch -p1 -F3 --forward --no-backup-if-mismatch < "$PATCH"; then
+          echo "WARNING: BORE patch did not apply cleanly." >&2
+          echo "Rejects (expected on 6.6/6.12/6.18 pending Android-specific resolution):" >&2
+          find . -name '*.rej' -newer "$PATCH" 2>/dev/null | while read -r r; do
+            echo "  ${r#./}" >&2
+          done
+          echo "BORE_APPLIED=false" >> "$GITHUB_ENV"
+          exit 0
+        fi
+
+        echo "BORE patch applied cleanly."
+        BORE_APPLIED=true >> "$GITHUB_ENV"
+
+    - name: Enable CONFIG_SCHED_BORE
+      if: env.BORE_APPLIED == 'true'
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_SCHED_BORE=y
+          CONFIG_MIN_BASE_SLICE_NS=2000000
