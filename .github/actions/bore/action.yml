@@ -123,22 +123,22 @@ runs:
       if: env.BORE_APPLIED == 'true'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      env:
-        KERNEL_VERSION: ${{ inputs.kernel_version }}
       run: |
         set -euo pipefail
 
         # BORE's update_burst_score() declares locals after an early-return
         # guard, which trips -Wdeclaration-after-statement - fatal here because
         # the kernel builds it with -Werror. Only the 6.1 and older patches
-        # have this shape; 6.12+ already hoists the same declarations to file
-        # scope.
-        if [ "$(printf '%s\n' "$KERNEL_VERSION" "6.1" | sort -V | tail -n1)" = "6.1" ]; then
-          python3 "${{ github.workspace }}/.github/scripts/bore_decl_order.py" \
-            kernel/sched/fair.c
-        else
-          echo "bore-decl-order: kernel ${KERNEL_VERSION} needs no fix"
-        fi
+        # have this shape; 6.12+ already declare those variables at file scope.
+        # One substitution over the four-line block, kept on a single line because
+        # YAML will not accept a bare multi-line s command at this indent. No ^
+        # anchors inside it - they apply per-line and never match a multi-line
+        # pattern space, which is what made an earlier attempt silently do
+        # nothing. After the rewrite the block no longer exists, so a re-run is
+        # a no-op.
+        sed -i '/^\tif (!entity_is_task(se)) return;$/{N;N;N;N;s|\tif (!entity_is_task(se)) return;\n\tstruct task_struct \*p = task_of(se);\n\tu8 prio = p->static_prio - MAX_RT_PRIO;\n\tu8 prev_prio = min(39, prio + se->burst_score);|\tstruct task_struct *p;\n\tu8 prio, prev_prio;\n\n\tif (!entity_is_task(se)) return;\n\tp = task_of(se);\n\tprio = p->static_prio - MAX_RT_PRIO;\n\tprev_prio = min(39, prio + se->burst_score);|}' kernel/sched/fair.c
+
+        sed -n '/static void update_burst_score/,/^}/p' kernel/sched/fair.c | head -8
 
     - name: Enable CONFIG_SCHED_BORE
       if: env.BORE_APPLIED == 'true'
