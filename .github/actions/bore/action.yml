@@ -119,6 +119,27 @@ runs:
         echo "BORE patch applied cleanly."
         BORE_APPLIED=true >> "$GITHUB_ENV"
 
+    - name: Fix BORE declaration order (6.1 and below)
+      if: env.BORE_APPLIED == 'true'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      env:
+        KERNEL_VERSION: ${{ inputs.kernel_version }}
+      run: |
+        set -euo pipefail
+
+        # BORE's update_burst_score() declares locals after an early-return
+        # guard, which trips -Wdeclaration-after-statement - fatal here because
+        # the kernel builds it with -Werror. Only the 6.1 and older patches
+        # have this shape; 6.12+ already hoists the same declarations to file
+        # scope.
+        if [ "$(printf '%s\n' "$KERNEL_VERSION" "6.1" | sort -V | tail -n1)" = "6.1" ]; then
+          python3 "${{ github.workspace }}/.github/scripts/bore_decl_order.py" \
+            kernel/sched/fair.c
+        else
+          echo "bore-decl-order: kernel ${KERNEL_VERSION} needs no fix"
+        fi
+
     - name: Enable CONFIG_SCHED_BORE
       if: env.BORE_APPLIED == 'true'
       uses: ./.github/actions/set-kernel-config
