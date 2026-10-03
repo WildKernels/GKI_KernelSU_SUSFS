@@ -1,26 +1,39 @@
 #!/usr/bin/env python3
 """Move BORE's sched_entity burst_* fields into ANDROID_KABI_RESERVE slots.
 
-BORE adds eight fields to struct sched_entity:
+BORE adds eight fields to struct sched_entity - 25 raw, 40 with alignment -
+but sched_entity reserves only four u64 slots (32 bytes). Left inline, every
+member after the insertion point shifts and the GKI KMI breaks; stock vendor
+modules read from the wrong offsets.
 
-    u64  burst_time, child_burst_last_cached      16 bytes
-    u32  child_burst_cnt                            4 bytes
-    u8   prev_burst_penalty, curr_burst_penalty,
-         burst_penalty, burst_score, child_burst    5 bytes
+The fix uses the kernel's own ANDROID_KABI_USE() macros, not hand-rolled
+unions:
 
-25 raw, 40 padded. sched_entity reserves only four u64 slots (32 bytes), so
-the fields overflow by 8 and every member after them shifts. That breaks the
-GKI KMI and takes stock vendor modules with it.
+  - flat access is preserved, so BORE's `p->se.burst_score` keeps compiling
+    (a first attempt wrapped the fields in a named member and failed CI with
+    "no member named 'prev_burst_penalty'")
+  - under __GENKSYMS__ the macros collapse to the stock reserved u64, so the
+    KMI symbol list is unchanged - the same property the droidspaces
+    SYSVIPC patch depends on
+  - the built-in _Static_assert fails the build loudly if a slot's contents
+    ever exceed 8 bytes, instead of silently shifting offsets
 
-Claim all four reservations and narrow the two timestamps to u32. The result
-was compiled and measured against stock:
+No field is narrowed. burst_time accumulates delta_exec without bound and
+child_burst_last_cached holds a sched_clock() timestamp (ns since boot), so
+both genuinely require u64; an earlier draft narrowed them to u32, which
+would have wrapped after ~4.3s of uptime.
 
-    stock (no BORE)             176 bytes
-    BORE inline (upstream)      208 bytes  (+32 vs stock)
-    BORE inside kABI slots      176 bytes  (+0 vs stock)
+Slot layout (40 raw bytes -> 4 x 8):
+  slot 1: u64 burst_time
+  slot 2: u64 child_burst_last_cached
+  slot 3: u32 child_burst_cnt; u8 prev_burst_penalty
+  slot 4: u8 curr_burst_penalty; u8 burst_penalty;
+          u8 burst_score;     u8 child_burst
 
-So the padded form restores the stock layout exactly. This diverges from
-upstream BORE and changes two field widths, so it still needs load-testing.
+Slots 3 and 4 hold several members, but ANDROID_KABI_USE takes exactly two
+macro arguments and top-level commas split arguments, so the multi-member
+payloads are passed as helper macros - commas introduced by macro EXPANSION
+are not argument separators.
 
 Usage: bore_kabi_612.py <sched.h> [--revert]
 """
@@ -28,12 +41,14 @@ import sys
 
 MARK = "/* bore-kabi: burst_* fields live in ANDROID_KABI_RESERVE slots */"
 
-TYPES = (
-    "struct bore_child { u32 child_burst_last_cached; u32 child_burst_cnt; };\n"
-    "struct bore_bonus {\n"
-    "\tu8 prev_burst_penalty, curr_burst_penalty, burst_penalty,\n"
-    "\t   burst_score, child_burst, pad[3];\n"
-    "};\n\n"
+# Helper macros inserted just before struct sched_entity. Expansion-time
+# commas are safe; argument-time commas are not.
+SLOT_MACROS = (
+    "#ifdef CONFIG_SCHED_BORE\n"
+    "#define __BORE_KABI_SLOT3 struct { u32 child_burst_cnt; u8 prev_burst_penalty; }\n"
+    "#define __BORE_KABI_SLOT4 struct { u8 curr_burst_penalty; u8 burst_penalty; \\\n"
+    "\tu8 burst_score; u8 child_burst; }\n"
+    "#endif // CONFIG_SCHED_BORE\n\n"
 )
 
 BORE_OLD = (
@@ -51,7 +66,8 @@ BORE_OLD = (
 
 BORE_NEW = (
     "#ifdef CONFIG_SCHED_BORE\n"
-    "\t/* BORE - moved into ANDROID_KABI_RESERVE slots, see bottom of struct.\n"
+    "\t/* BORE - moved into the ANDROID_KABI_RESERVE slots at the bottom of\n"
+    "\t * the struct; see __BORE_KABI_SLOT3/4 and the ANDROID_KABI_USE lines.\n"
     "\t// u64\t\t\t\tburst_time;\n"
     "\t// u8\t\t\t\tprev_burst_penalty;\n"
     "\t// u8\t\t\t\tcurr_burst_penalty;\n"
@@ -74,10 +90,10 @@ RES_OLD = (
 RES_NEW = (
     "#ifdef CONFIG_SCHED_BORE\n"
     "\t" + MARK + "\n"
-    "\t_ANDROID_KABI_REPLACE(ANDROID_KABI_RESERVE(1), u32 burst_time);\n"
-    "\t_ANDROID_KABI_REPLACE(ANDROID_KABI_RESERVE(2), struct bore_child child);\n"
-    "\t_ANDROID_KABI_REPLACE(ANDROID_KABI_RESERVE(3), struct bore_bonus bonus);\n"
-    "\t_ANDROID_KABI_REPLACE(ANDROID_KABI_RESERVE(4), u64 __unused4);\n"
+    "\tANDROID_KABI_USE(1, u64 burst_time);\n"
+    "\tANDROID_KABI_USE(2, u64 child_burst_last_cached);\n"
+    "\tANDROID_KABI_USE(3, __BORE_KABI_SLOT3);\n"
+    "\tANDROID_KABI_USE(4, __BORE_KABI_SLOT4);\n"
     "#else\n"
     "\tANDROID_KABI_RESERVE(1);\n"
     "\tANDROID_KABI_RESERVE(2);\n"
@@ -103,7 +119,7 @@ def main():
             print("bore-kabi: not patched", file=sys.stderr)
             return 1
         src = src.replace(RES_NEW, RES_OLD).replace(BORE_NEW, BORE_OLD)
-        src = src.replace(TYPES, "")
+        src = src.replace(SLOT_MACROS, "")
         with open(path, "w", encoding="utf-8", errors="surrogateescape") as fh:
             fh.write(src)
         print("bore-kabi: reverted")
@@ -122,12 +138,13 @@ def main():
         return 1
 
     out = src.replace(BORE_OLD, BORE_NEW, 1)
-    # typedefs go immediately before "struct sched_entity {"
-    out = out.replace("struct sched_entity {", TYPES + "struct sched_entity {", 1)
+    out = out.replace("struct sched_entity {",
+                      SLOT_MACROS + "struct sched_entity {", 1)
     out = out.replace(RES_OLD, RES_NEW, 1)
     with open(path, "w", encoding="utf-8", errors="surrogateescape") as fh:
         fh.write(out)
-    print("bore-kabi: burst_* fields moved into kABI reservations")
+    print("bore-kabi: burst_* fields moved into kABI reservations "
+          "(flat access, no narrowing)")
     return 0
 
 
