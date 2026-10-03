@@ -119,6 +119,23 @@ runs:
         echo "BORE patch applied cleanly."
         BORE_APPLIED=true >> "$GITHUB_ENV"
 
+    - name: Backport task_of() (5.10 and below)
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        # BORE's update_burst_score() calls task_of(se), a container_of()
+        # wrapper that only exists from 5.15 on. On 5.10 it fails to compile:
+        #   error: implicit declaration of function 'task_of'
+        # Only the wrapper is missing - entity_is_task() and task_struct.se
+        # both exist on 5.10, so container_of() is valid. Adds no fields, so
+        # the KMI is untouched. No-ops on 5.15+ where task_of() is upstream.
+        python3 "${{ github.workspace }}/.github/scripts/bore_task_of.py" \
+          kernel/sched/sched.h
+
+        grep -A4 'bore: task_of' kernel/sched/sched.h | head -5 || true
+
     - name: Move BORE fields into kABI slots (preserve KMI)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
