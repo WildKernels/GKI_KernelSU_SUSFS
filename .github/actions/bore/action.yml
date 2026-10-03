@@ -120,7 +120,12 @@ runs:
         BORE_APPLIED=true >> "$GITHUB_ENV"
 
     - name: Fix BORE declaration order (6.1 and below)
-      if: env.BORE_APPLIED == 'true'
+      # No if: gate. env.* set via GITHUB_ENV inside a composite action is not
+      # visible to a later step's `if: env.X` in that same action, so gating on
+      # BORE_APPLIED silently skipped this step. The sed is idempotent - it
+      # rewrites the block once and no-ops afterwards - so it is safe to run
+      # unconditionally: on a tree where BORE did not apply there is nothing
+      # matching to rewrite.
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
@@ -141,7 +146,6 @@ runs:
         sed -n '/static void update_burst_score/,/^}/p' kernel/sched/fair.c | head -8
 
     - name: Enable CONFIG_SCHED_BORE
-      if: env.BORE_APPLIED == 'true'
       uses: ./.github/actions/set-kernel-config
       with:
         config_list: |
