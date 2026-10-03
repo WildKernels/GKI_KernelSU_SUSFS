@@ -119,6 +119,23 @@ runs:
         echo "BORE patch applied cleanly."
         BORE_APPLIED=true >> "$GITHUB_ENV"
 
+    - name: Move BORE fields into kABI slots (preserve KMI)
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        # BORE adds eight fields to struct sched_entity, overflowing the four
+        # u64 ANDROID_KABI_RESERVE slots and shifting every later member. That
+        # breaks the GKI KMI and takes stock vendor modules with it. Relocate
+        # them into the reservations instead, narrowing the two timestamps to
+        # u32 to fit. Verified by compiling the struct: stock 176 bytes,
+        # BORE inline 208, BORE in slots 176.
+        python3 "${{ github.workspace }}/.github/scripts/bore_kabi_612.py" \
+          include/linux/sched.h
+
+        grep -A9 'bore-kabi: burst_' include/linux/sched.h | head -10
+
     - name: Fix BORE declaration order (6.1 and below)
       # No if: gate. env.* set via GITHUB_ENV inside a composite action is not
       # visible to a later step's `if: env.X` in that same action, so gating on
