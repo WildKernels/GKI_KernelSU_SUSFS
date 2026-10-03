@@ -65,6 +65,7 @@ runs:
         workdir: ${{ github.workspace }}
 
     - name: Verify BORE patch provenance
+      id: verify
       if: steps.pick.outputs.url != ''
       shell: bash
       run: |
@@ -89,9 +90,18 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       env:
-        PATCH: ${{ steps.fetch.outputs.patch_path }}
+        PATCH: ${{ steps.verify.outputs.patch_path }}
       run: |
         set -euo pipefail
+
+        if [ -z "$PATCH" ]; then
+          echo "ERROR: PATCH path is empty; the verify step did not run." >&2
+          exit 1
+        fi
+        if [ ! -s "$PATCH" ]; then
+          echo "ERROR: BORE patch not found at $PATCH" >&2
+          exit 1
+        fi
 
         # --forward so a re-run over an already-patched tree is a no-op rather
         # than a reverse-apply. -F3 absorbs the sublevel drift between the
