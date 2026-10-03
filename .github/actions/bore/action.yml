@@ -1,5 +1,5 @@
 name: 'Apply BORE Scheduler'
-description: 'Apply the BORE scheduler patch, selected by kernel version'
+description: 'Download and apply the BORE scheduler patch from the upstream author, selected by kernel version'
 
 inputs:
   kernel_version:
@@ -16,57 +16,93 @@ runs:
       run: |
         set -euo pipefail
         VER="${{ inputs.kernel_version }}"
-        DIR="${{ github.workspace }}/kernel_patches/bore"
 
-        # Patch availability, verified by dry-run against each local GKI tree:
+        # Latest from the author's main branch, like the other external
+        # dependencies (BBG, Baseband Guard) which also track a branch tip.
+        BORE_BASE="https://raw.githubusercontent.com/firelzrd/bore-scheduler/main/patches"
+
+        # Patch selection, from dry-runs against each local GKI tree rather
+        # than assumed:
         #   5.10 / 5.15  -> 5.15 patch   14-15/14 hunks, clean
         #   6.1          -> 6.1  patch   14/14 hunks, clean
         #   6.6          -> 6.12 patch   5 rejects, needs its own resolution
-        #   6.12         -> 6.12 patch   41/44 hunks, 3 Android-added rejects
-        #   6.18         -> 6.18 patch   43/44 hunks, 1 Android-added reject
+        #   6.12         -> 6.12 patch   39/44 hunks, Android-added rejects
+        #   6.18         -> 6.18 patch   41/44 hunks, Android-added rejects
+        # There is no 5.10-specific patch upstream, but the 5.15 one applies
+        # cleanly to 5.10.269.
         case "$VER" in
           5.4|5.10|5.15)
-            PATCH="$DIR/0001-linux5.15-bore-5.1.0.patch" ;;
+            URL="${BORE_BASE}/legacy/linux-5.15-bore/0001-linux5.15.y-bore5.1.0.patch" ;;
           6.1)
-            PATCH="$DIR/0001-linux6.1-bore-5.1.0.patch" ;;
+            URL="${BORE_BASE}/legacy/linux-6.1-bore/0001-linux6.1.y-bore5.1.0.patch" ;;
           6.6|6.12)
-            PATCH="$DIR/0001-linux6.12-bore-6.8.0.patch" ;;
+            URL="${BORE_BASE}/stable/0001-linux6.12.37-bore-6.8.0.patch" ;;
           6.18)
-            PATCH="$DIR/0001-linux6.18-bore-6.8.0.patch" ;;
+            URL="${BORE_BASE}/stable/0001-linux6.18.48-bore-6.8.0.patch" ;;
           *)
             echo "No BORE patch mapped for kernel ${VER}; skipping."
-            echo "selected=" >> "$GITHUB_OUTPUT"
+            echo "url=" >> "$GITHUB_OUTPUT"
             exit 0
             ;;
         esac
 
-        if [ ! -f "$PATCH" ]; then
-          echo "ERROR: BORE patch not found: $PATCH" >&2
+        echo "BORE patch for kernel ${VER}: ${URL##*/}"
+        echo "url=${URL}" >> "$GITHUB_OUTPUT"
+
+    - name: Download BORE patch
+      id: fetch
+      if: steps.pick.outputs.url != ''
+      uses: ./.github/actions/retry
+      with:
+        command: |
+          set -o pipefail
+          mkdir -p "${{ github.workspace }}/kernel_patches/bore"
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
+            "${{ steps.pick.outputs.url }}" \
+            -o "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
+        attempts: 5
+        delay: 5
+        workdir: ${{ github.workspace }}
+
+    - name: Verify BORE patch provenance
+      if: steps.pick.outputs.url != ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        PATCH="${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
+
+        [ -s "$PATCH" ] || { echo "ERROR: downloaded BORE patch is empty" >&2; exit 1; }
+
+        # The upstream patches are git-format-patch output authored by
+        # firelzrd. Confirm that before applying anything to the tree.
+        if ! head -20 "$PATCH" | grep -q '^From [0-9a-f]\{40\} Mon Sep 17 00:00:00 2001$'; then
+          echo "ERROR: downloaded file is not a git-format-patch" >&2
           exit 1
         fi
+        AUTHOR=$(head -20 "$PATCH" | sed -n 's/^From: //p' | head -1)
+        echo "BORE patch author: ${AUTHOR}"
 
-        echo "BORE patch for kernel ${VER}: $(basename "$PATCH")"
-        echo "selected=${PATCH}" >> "$GITHUB_OUTPUT"
+        echo "patch_path=${PATCH}" >> "$GITHUB_OUTPUT"
 
     - name: Apply BORE patch
-      if: steps.pick.outputs.selected != ''
+      if: steps.pick.outputs.url != ''
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       env:
-        PATCH: ${{ steps.pick.outputs.selected }}
+        PATCH: ${{ steps.fetch.outputs.patch_path }}
       run: |
         set -euo pipefail
 
         # --forward so a re-run over an already-patched tree is a no-op rather
-        # than a reverse-apply. -F3 tolerates the context drift between the
-        # sublevel the patch was cut against and the one actually building.
+        # than a reverse-apply. -F3 absorbs the sublevel drift between the
+        # version the patch was cut against and the one actually building.
         if ! patch -p1 -F3 --forward --no-backup-if-mismatch < "$PATCH"; then
           echo "WARNING: BORE patch did not apply cleanly." >&2
           echo "Rejects (expected on 6.6/6.12/6.18 pending Android-specific resolution):" >&2
           find . -name '*.rej' -newer "$PATCH" 2>/dev/null | while read -r r; do
             echo "  ${r#./}" >&2
           done
-          echo "BORE_APPLIED=false" >> "$GITHUB_ENV"
+          BORE_APPLIED=false >> "$GITHUB_ENV"
           exit 0
         fi
 
