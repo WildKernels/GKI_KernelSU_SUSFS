@@ -135,8 +135,19 @@ runs:
         # has no declaration in scope. A prototype fixes that without any
         # risk of collision - and no-ops on 5.15+ where fair.c already has
         # task_of in scope before BORE's call site.
+        #
+        # Placement matters twice over. A first attempt inserted the
+        # prototype after the SPDX line, before the #includes; there
+        # struct sched_entity has no file-scope declaration yet, so the
+        # tag got PROTOTYPE scope and vanished at the closing paren
+        # (C11 6.2.1p4) - every later task_of call then failed with
+        # 'incompatible pointer types' naming two identical types, and the
+        # stock definition 'conflicted' with the phantom. Insert AFTER the
+        # includes instead, so the tag resolves to the real struct.
         if ! grep -q 'bore: task_of fwd' kernel/sched/fair.c; then
-          sed -i '1a\/* bore: task_of fwd - defined below, in scope too late */\nstatic inline struct task_struct *task_of(struct sched_entity *se);' kernel/sched/fair.c
+          # only the early include block counts; pelt.h at ~821 is mid-file
+          EARLY=$(grep -n '^#include' kernel/sched/fair.c | awk -F: '$1 < 100' | tail -1 | cut -d: -f1)
+          sed -i "${EARLY}a\\/* bore: task_of fwd - defined below, in scope too late */\nstatic inline struct task_struct *task_of(struct sched_entity *se);" kernel/sched/fair.c
         fi
         grep -n 'bore: task_of fwd' kernel/sched/fair.c | head -2
 
