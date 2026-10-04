@@ -119,22 +119,26 @@ runs:
         echo "BORE patch applied cleanly."
         BORE_APPLIED=true >> "$GITHUB_ENV"
 
-    - name: Backport task_of() (5.10 and below)
+    - name: Forward-declare task_of() (5.10 and below)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         set -euo pipefail
 
-        # BORE's update_burst_score() calls task_of(se), a container_of()
-        # wrapper that only exists from 5.15 on. On 5.10 it fails to compile:
-        #   error: implicit declaration of function 'task_of'
-        # Only the wrapper is missing - entity_is_task() and task_struct.se
-        # both exist on 5.10, so container_of() is valid. Adds no fields, so
-        # the KMI is untouched. No-ops on 5.15+ where task_of() is upstream.
-        python3 "${{ github.workspace }}/.github/scripts/bore_task_of.py" \
-          kernel/sched/sched.h
-
-        grep -A4 'bore: task_of' kernel/sched/sched.h | head -5 || true
+        # 5.10 DOES define task_of() - twice, in fair.c (CONFIG_FAIR_GROUP_SCHED
+        # at ~line 267 and the #else at ~454). An earlier diagnosis claimed it
+        # was missing because it only grepped sched.h, and a backport step
+        # added a sched.h definition that collided with the stock ones:
+        #   fair.c:341: error: redefinition of 'task_of'
+        # The actual problem is ordering: BORE inserts update_burst_score()
+        # near the top of fair.c, ABOVE both stock definitions, so the call
+        # has no declaration in scope. A prototype fixes that without any
+        # risk of collision - and no-ops on 5.15+ where fair.c already has
+        # task_of in scope before BORE's call site.
+        if ! grep -q 'bore: task_of fwd' kernel/sched/fair.c; then
+          sed -i '1a\/* bore: task_of fwd - defined below, in scope too late */\nstatic inline struct task_struct *task_of(struct sched_entity *se);' kernel/sched/fair.c
+        fi
+        grep -n 'bore: task_of fwd' kernel/sched/fair.c | head -2
 
     - name: Move BORE fields into kABI slots (preserve KMI)
       shell: bash
@@ -175,7 +179,14 @@ runs:
         # pattern space, which is what made an earlier attempt silently do
         # nothing. After the rewrite the block no longer exists, so a re-run is
         # a no-op.
-        sed -i '/^\tif (!entity_is_task(se)) return;$/{N;N;N;N;s|\tif (!entity_is_task(se)) return;\n\tstruct task_struct \*p = task_of(se);\n\tu8 prio = p->static_prio - MAX_RT_PRIO;\n\tu8 prev_prio = min(39, prio + se->burst_score);|\tstruct task_struct *p;\n\tu8 prio, prev_prio;\n\n\tif (!entity_is_task(se)) return;\n\tp = task_of(se);\n\tprio = p->static_prio - MAX_RT_PRIO;\n\tprev_prio = min(39, prio + se->burst_score);|}' kernel/sched/fair.c
+        sed -i '/^\tif (!entity_is_task(se)) return;$/{N;N;N;N;s|\tif (!entity_is_task(se)) return;\n\tstruct task_struct \*p = task_of(se);\n\tu8 prio = p->static_prio - MAX_RT_PRIO;\n\tu8 prev_prio = min(39, prio + se->burst_score);|\tstruct task_struct *p;\n\tu8 prio, prev_prio, new_prio;\n\n\tif (!entity_is_task(se)) return;\n\tp = task_of(se);\n\tprio = p->static_prio - MAX_RT_PRIO;\n\tprev_prio = min(39, prio + se->burst_score);|}' kernel/sched/fair.c
+
+        # Second site in the same function: BORE declares u8 new_prio after
+        # the se->burst_score assignment statement. On sublevels where
+        # -Wdeclaration-after-statement is -Werror this fails the build; on
+        # the others it warns. Its declaration was hoisted above, so this
+        # turns the second site into a plain assignment.
+        sed -i 's|^\tu8 new_prio = min(39, prio + se->burst_score);$|\tnew_prio = min(39, prio + se->burst_score);|' kernel/sched/fair.c
 
         sed -n '/static void update_burst_score/,/^}/p' kernel/sched/fair.c | head -8
 
