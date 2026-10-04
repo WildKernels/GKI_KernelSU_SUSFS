@@ -6,6 +6,11 @@ inputs:
     description: 'Kernel version (e.g. 6.12)'
     required: true
     type: string
+  sublevel:
+    description: 'Kernel sublevel, or lts (X) - gates 5.10 API-era fixes'
+    required: false
+    type: string
+    default: ''
 
 runs:
   using: 'composite'
@@ -200,6 +205,35 @@ runs:
         sed -i 's|^\tu8 new_prio = min(39, prio + se->burst_score);$|\tnew_prio = min(39, prio + se->burst_score);|' kernel/sched/fair.c
 
         sed -n '/static void update_burst_score/,/^}/p' kernel/sched/fair.c | head -8
+
+    - name: Fix reweight_task call (5.10 2024-11+)
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      env:
+        SUBLEVEL: ${{ inputs.sublevel }}
+      run: |
+        set -euo pipefail
+
+        # Upstream changed reweight_task()'s signature between 5.10 sublevels:
+        # older kernels take (struct task_struct *p, u8 prio), newer ones
+        # (2024-11 / sublevel 226 onward, incl. lts) take
+        # (struct task_struct *p, const struct load_weight *lw).
+        # BORE's 5.15 patch predates the change and still passes the u8:
+        #   fair.c:144:20: error: incompatible integer to pointer conversion
+        #   passing 'u8' to parameter of type 'const struct load_weight *'
+        # Mirror what set_load_weight() in core.c does for the new API:
+        # build a load_weight from sched_prio_to_weight/wmult and pass &lw.
+        # 'lts' (X) sorts above any numeric sublevel, and older sublevels keep
+        # the u8 form that already compiles - so this only fires on 226+.
+        if [ "$SUBLEVEL" != "lts" ] && [ "$SUBLEVEL" -lt 226 ] 2>/dev/null; then
+          echo "bore-reweight: sublevel $SUBLEVEL has the old u8 API; nothing to do"
+          exit 0
+        fi
+
+        if ! grep -q 'bore: reweight via load_weight' kernel/sched/fair.c; then
+          sed -i 's|^\t\treweight_task(p, new_prio);$|\t\t{\n\t\t\tstruct load_weight lw;\n\t\t\t/* bore: reweight via load_weight (upstream API changed) */\n\t\t\tlw.weight = scale_load(sched_prio_to_weight[new_prio]);\n\t\t\tlw.inv_weight = sched_prio_to_wmult[new_prio];\n\t\t\treweight_task(p, \&lw);\n\t\t}|' kernel/sched/fair.c
+        fi
+        grep -n 'bore: reweight via load_weight' kernel/sched/fair.c | head -2
 
     - name: Enable CONFIG_SCHED_BORE
       uses: ./.github/actions/set-kernel-config

@@ -395,6 +395,7 @@ jobs:
       uses: ./.github/actions/bore
       with:
         kernel_version: ${{ inputs.kernel_version }}
+        sublevel: ${{ inputs.sublevel }}
 
     - name: Enable BPF Stack (BTF + eBPF + FUSE-BPF)
       if: contains(inputs.feature_set, 'BPF')
