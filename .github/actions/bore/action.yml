@@ -209,31 +209,32 @@ runs:
     - name: Fix reweight_task call (5.10 2024-11+)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      env:
-        SUBLEVEL: ${{ inputs.sublevel }}
       run: |
         set -euo pipefail
 
-        # Upstream changed reweight_task()'s signature between 5.10 sublevels:
-        # older kernels take (struct task_struct *p, u8 prio), newer ones
-        # (2024-11 / sublevel 226 onward, incl. lts) take
-        # (struct task_struct *p, const struct load_weight *lw).
-        # BORE's 5.15 patch predates the change and still passes the u8:
-        #   fair.c:144:20: error: incompatible integer to pointer conversion
-        #   passing 'u8' to parameter of type 'const struct load_weight *'
-        # Mirror what set_load_weight() in core.c does for the new API:
-        # build a load_weight from sched_prio_to_weight/wmult and pass &lw.
-        # 'lts' (X) sorts above any numeric sublevel, and older sublevels keep
-        # the u8 form that already compiles - so this only fires on 226+.
-        if [ "$SUBLEVEL" != "lts" ] && [ "$SUBLEVEL" -lt 226 ] 2>/dev/null; then
-          echo "bore-reweight: sublevel $SUBLEVEL has the old u8 API; nothing to do"
-          exit 0
+        # Upstream changed reweight_task()'s signature in newer 5.10 sources, but
+        # NOT uniformly: android12-5.10 (2024-11 onward) moved to
+        #   reweight_task(struct task_struct *p, const struct load_weight *lw)
+        # while android13-5.10 - even at sublevel 269/lts - still has
+        #   reweight_task(struct task_struct *p, int prio)
+        # A first cut gated on sublevel >= 226, which fixed a12 but broke a13
+        # (39 jobs green there, 9 new failures: 'incompatible pointer to
+        # integer conversion passing struct load_weight * to parameter of
+        # type int'). The API era cannot be inferred from the sublevel; it
+        # must be detected from the actual header. On the old API, BORE's
+        # original call reweight_task(p, new_prio) is already correct -
+        # the kernel does the sched_prio_to_weight/wmult math internally.
+        # On the new API, mirror set_load_weight(): build a load_weight and
+        # pass &lw, since reweight_task consumes both lw->weight and
+        # lw->inv_weight.
+        if grep -q 'reweight_task(struct task_struct \*p, const struct load_weight \*lw)' kernel/sched/sched.h; then
+          if ! grep -q 'bore: reweight via load_weight' kernel/sched/fair.c; then
+            sed -i 's|^\t\treweight_task(p, new_prio);$|\t\t{\n\t\t\tstruct load_weight lw;\n\t\t\t/* bore: reweight via load_weight (upstream API changed) */\n\t\t\tlw.weight = scale_load(sched_prio_to_weight[new_prio]);\n\t\t\tlw.inv_weight = sched_prio_to_wmult[new_prio];\n\t\t\treweight_task(p, \&lw);\n\t\t}|' kernel/sched/fair.c
+          fi
+          grep -n 'bore: reweight via load_weight' kernel/sched/fair.c | head -2
+        else
+          echo "bore-reweight: old reweight_task(p, int prio) API; BORE's call is already correct"
         fi
-
-        if ! grep -q 'bore: reweight via load_weight' kernel/sched/fair.c; then
-          sed -i 's|^\t\treweight_task(p, new_prio);$|\t\t{\n\t\t\tstruct load_weight lw;\n\t\t\t/* bore: reweight via load_weight (upstream API changed) */\n\t\t\tlw.weight = scale_load(sched_prio_to_weight[new_prio]);\n\t\t\tlw.inv_weight = sched_prio_to_wmult[new_prio];\n\t\t\treweight_task(p, \&lw);\n\t\t}|' kernel/sched/fair.c
-        fi
-        grep -n 'bore: reweight via load_weight' kernel/sched/fair.c | head -2
 
     - name: Enable CONFIG_SCHED_BORE
       uses: ./.github/actions/set-kernel-config
