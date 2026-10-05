@@ -273,6 +273,12 @@ runs:
         # marker that the address regex requires to end with a bare '{',
         # so a re-run does not match. No ^/$ inside the multi-line s
         # command - they never match mid pattern-space.
+        # Guard: ONLY the 5.9.6/6.8.0 generations have bore.c; the 5.1.0
+        # patches (5.10/5.15/6.1) keep all BORE code in fair.c, so on those
+        # families the file does not exist and sed would exit 2, failing
+        # this step under pipefail (run 37273722560's 5.15 jobs: 'sed:
+        # can't read kernel/sched/bore.c').
+        if [ -f kernel/sched/bore.c ]; then
         sed -i '/^void update_burst_score(struct sched_entity \*se) {$/{N;N;N;s|void update_burst_score(struct sched_entity \*se) {\n\tif (!entity_is_task(se)) return;\n\tstruct task_struct \*p = task_of(se);\n\tu8 prev_prio = effective_prio(p);|void update_burst_score(struct sched_entity *se) { /* bore: decls hoisted */\n\tstruct task_struct *p;\n\tu8 prev_prio, burst_score, new_prio;\n\n\tif (!entity_is_task(se)) return;\n\tp = task_of(se);\n\tprev_prio = effective_prio(p);|}' kernel/sched/bore.c
         # The two mid-function decls become plain assignments - but ONLY
         # inside update_burst_score. A first version ran these unscoped and
@@ -291,9 +297,17 @@ runs:
         # idempotent because neither pattern survives the rewrite.
         sed -i '/^void restart_burst_rescale_deadline/,/^}/ s|^\tu8 prev_prio = effective_prio(p);$|\tu8 prev_prio = effective_prio(p), new_prio;|' kernel/sched/bore.c
         sed -i '/^void restart_burst_rescale_deadline/,/^}/ s|^\tu8 new_prio = effective_prio(p);$|\tnew_prio = effective_prio(p);|' kernel/sched/bore.c
+        else
+          echo "bore.c not present (5.1.0-generation patch); bore.c seds skipped."
+        fi
 
         sed -n '/static void update_burst_score/,/^}/p' kernel/sched/fair.c | head -8
-        sed -n '/^void update_burst_score/,/^}/p' kernel/sched/bore.c 2>/dev/null | head -12
+        # if/then, not '[ ] &&': a failing [ -f ] as the last command leaves
+        # the script's exit status at 1 even under set -e, which fails the
+        # step on the 5.1.0 families where bore.c does not exist.
+        if [ -f kernel/sched/bore.c ]; then
+          sed -n '/^void update_burst_score/,/^}/p' kernel/sched/bore.c | head -12
+        fi
 
     - name: Fix 6.6 sysctl reject (Android base_slice block)
       # The 5.9.6 patch's sysctl hunk targets upstream 6.6.67 declarations;
