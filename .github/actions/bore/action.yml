@@ -30,7 +30,11 @@ runs:
         # than assumed:
         #   5.10 / 5.15  -> 5.15 patch   14-15/14 hunks, clean
         #   6.1          -> 6.1  patch   14/14 hunks, clean
-        #   6.6          -> 6.12 patch   5 rejects, needs its own resolution
+        #   6.6          -> 6.6  patch    17/18 hunks (from the author's
+        #                    6.6-bore branch tip, linux-6.6.67 + BORE 5.9.6;
+        #                    there is no 6.6 entry in patches/ on main, and
+        #                    the 6.12 patch rejects 9/24 here because its
+        #                    hooks target sched-ext code 6.6 does not have)
         #   6.12         -> 6.12 patch   39/44 hunks, Android-added rejects
         #   6.18         -> 6.18 patch   41/44 hunks, Android-added rejects
         # There is no 5.10-specific patch upstream, but the 5.15 one applies
@@ -40,7 +44,15 @@ runs:
             URL="${BORE_BASE}/legacy/linux-5.15-bore/0001-linux5.15.y-bore5.1.0.patch" ;;
           6.1)
             URL="${BORE_BASE}/legacy/linux-6.1-bore/0001-linux6.1.y-bore5.1.0.patch" ;;
-          6.6|6.12)
+          6.6)
+            # Not published under patches/ on main; vendored from the
+            # author's 6.6-bore branch tip (git diff linux-6.6.67..HEAD).
+            # NOTE: lives in the action dir, NOT kernel_patches/ - the
+            # setup step wipes kernel_patches/ and re-clones the separate
+            # WildKernels/kernel_patches repo before this action runs.
+            URL=".github/actions/bore/patches/0001-linux6.6.67-bore-5.9.6.patch"
+            URL_IS_LOCAL="true" ;;
+          6.12)
             URL="${BORE_BASE}/stable/0001-linux6.12.37-bore-6.8.0.patch" ;;
           6.18)
             URL="${BORE_BASE}/stable/0001-linux6.18.48-bore-6.8.0.patch" ;;
@@ -53,6 +65,7 @@ runs:
 
         echo "BORE patch for kernel ${VER}: ${URL##*/}"
         echo "url=${URL}" >> "$GITHUB_OUTPUT"
+        echo "local=${URL_IS_LOCAL:-}" >> "$GITHUB_OUTPUT"
 
     - name: Download BORE patch
       id: fetch
@@ -62,9 +75,17 @@ runs:
         command: |
           set -o pipefail
           mkdir -p "${{ github.workspace }}/kernel_patches/bore"
-          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
-            "${{ steps.pick.outputs.url }}" \
-            -o "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
+          if [ "${{ steps.pick.outputs.local }}" = "true" ]; then
+            # local URL is relative to the REPO root (where this action's
+            # dir lives), while workdir is github.workspace - hence the
+            # extra workspace prefix on cp source.
+            cp "${{ github.workspace }}/${{ steps.pick.outputs.url }}" \
+               "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
+          else
+            curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
+              "${{ steps.pick.outputs.url }}" \
+              -o "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
+          fi
         attempts: 5
         delay: 5
         workdir: ${{ github.workspace }}
@@ -81,12 +102,18 @@ runs:
 
         # The upstream patches are git-format-patch output authored by
         # firelzrd. Confirm that before applying anything to the tree.
-        if ! head -20 "$PATCH" | grep -q '^From [0-9a-f]\{40\} Mon Sep 17 00:00:00 2001$'; then
-          echo "ERROR: downloaded file is not a git-format-patch" >&2
+        # The vendored 6.6 patch is a git diff export from the author's
+        # 6.6-bore branch and carries no mail headers, so check it by
+        # content instead.
+        if head -1 "$PATCH" | grep -q '^From [0-9a-f]\{40\} Mon Sep 17 00:00:00 2001$'; then
+          AUTHOR=$(head -20 "$PATCH" | sed -n 's/^From: //p' | head -1)
+          echo "BORE patch author: ${AUTHOR}"
+        elif head -1 "$PATCH" | grep -q '^diff --git a/include/linux/sched.h'; then
+          echo "BORE patch: vendored diff (no mail headers)"
+        else
+          echo "ERROR: unrecognized patch format" >&2
           exit 1
         fi
-        AUTHOR=$(head -20 "$PATCH" | sed -n 's/^From: //p' | head -1)
-        echo "BORE patch author: ${AUTHOR}"
 
         echo "patch_path=${PATCH}" >> "$GITHUB_OUTPUT"
 
@@ -162,16 +189,37 @@ runs:
       run: |
         set -euo pipefail
 
-        # BORE adds eight fields to struct sched_entity, overflowing the four
+        # BORE adds burst fields to struct sched_entity, overflowing the four
         # u64 ANDROID_KABI_RESERVE slots and shifting every later member. That
         # breaks the GKI KMI and takes stock vendor modules with it. Relocate
-        # them into the reservations instead, narrowing the two timestamps to
-        # u32 to fit. Verified by compiling the struct: stock 176 bytes,
-        # BORE inline 208, BORE in slots 176.
+        # them into the reservations instead.
+        #
+        # The 5.15/6.1-generation patch (which 5.10 also uses) adds the eight
+        # scalar fields the script relocates. The 6.6 patch (5.9.6) has a
+        # DIFFERENT shape: two 24-byte spinlocked sched_burst_cache members
+        # that cannot fit in any 8-byte slot - the kernel's own
+        # _Static_assert in ANDROID_KABI_USE refuses them (verified by
+        # compiling). Relocating that shape needs the out-of-line
+        # bore_state design instead, which is follow-up work; for now the
+        # 6.6 tree is left with the inline fields so it builds, and this
+        # step reports that loudly instead of failing the job.
         python3 "${{ github.workspace }}/.github/scripts/bore_kabi_612.py" \
-          include/linux/sched.h
+          include/linux/sched.h || rc=$?
+        if [ "${rc:-0}" != "0" ]; then
+          if grep -q 'struct sched_burst_cache child_burst;' include/linux/sched.h; then
+            echo "" >&2
+            echo "WARNING: 6.6-shape BORE fields present (spinlocked 24-byte" >&2
+            echo "caches); cannot be relocated into 8-byte KABI slots." >&2
+            echo "Building with inline fields - sched_entity offsets shift" >&2
+            echo "past the BORE block. Out-of-line bore_state is the" >&2
+            echo "follow-up. See the kABI step comment in the bore action." >&2
+          else
+            echo "ERROR: kABI relocation failed and the tree is not the 6.6 shape" >&2
+            exit "${rc}"
+          fi
+        fi
 
-        grep -A9 'bore-kabi: burst_' include/linux/sched.h | head -10
+        grep -A9 'bore-kabi: burst_' include/linux/sched.h | head -10 || true
 
     - name: Fix BORE declaration order (6.1 and below)
       # No if: gate. env.* set via GITHUB_ENV inside a composite action is not
@@ -204,7 +252,115 @@ runs:
         # turns the second site into a plain assignment.
         sed -i 's|^\tu8 new_prio = min(39, prio + se->burst_score);$|\tnew_prio = min(39, prio + se->burst_score);|' kernel/sched/fair.c
 
+        # 5.9.6 (the 6.6 family patch) has the same disease in
+        # kernel/sched/bore.c with a different body shape: the task_of
+        # declaration sits AFTER the early-return guard, and burst_score /
+        # new_prio are declared mid-function. Hoist all three. Idempotent:
+        # the rewritten function head carries a 'bore: decls hoisted'
+        # marker that the address regex requires to end with a bare '{',
+        # so a re-run does not match. No ^/$ inside the multi-line s
+        # command - they never match mid pattern-space.
+        sed -i '/^void update_burst_score(struct sched_entity \*se) {$/{N;N;N;s|void update_burst_score(struct sched_entity \*se) {\n\tif (!entity_is_task(se)) return;\n\tstruct task_struct \*p = task_of(se);\n\tu8 prev_prio = effective_prio(p);|void update_burst_score(struct sched_entity *se) { /* bore: decls hoisted */\n\tstruct task_struct *p;\n\tu8 prev_prio, burst_score, new_prio;\n\n\tif (!entity_is_task(se)) return;\n\tp = task_of(se);\n\tprev_prio = effective_prio(p);|}' kernel/sched/bore.c
+        sed -i 's|^\tu8 burst_score = 0;$|\tburst_score = 0;|' kernel/sched/bore.c
+        sed -i 's|^\tu8 new_prio = effective_prio(p);$|\tnew_prio = effective_prio(p);|' kernel/sched/bore.c
+
         sed -n '/static void update_burst_score/,/^}/p' kernel/sched/fair.c | head -8
+        sed -n '/^void update_burst_score/,/^}/p' kernel/sched/bore.c 2>/dev/null | head -12
+
+    - name: Fix 6.6 sysctl reject (Android base_slice block)
+      # The 5.9.6 patch's sysctl hunk targets upstream 6.6.67 declarations;
+      # GKI 6.6 (android15-6.6) differs twice: base_slice defaults are
+      # 700000ULL not 750000ULL, and Android adds an EXPORT_SYMBOL_GPL
+      # between the two declarations that upstream does not have. The hunk
+      # rejects, and every BORE hunk that references nsecs_per_tick or
+      # sysctl_sched_min_base_slice then fails to compile - this is what
+      # killed run 37192434627 ('use of undeclared identifier nsecs_per_tick').
+      # Rebuild the block in place instead of forcing the hunk: keep
+      # Android's export and the 700000 values in the #else branch, add the
+      # BORE declarations in the #ifdef branch, and re-attach the export to
+      # the BORE base_slice so the exported symbol stays defined either way.
+      # Idempotent: keyed on the BORE nsecs_per_tick declaration; if the
+      # sed already ran (or the hunk applied on a non-GKI tree), it no-ops.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        if grep -q 'bore: base_slice block' kernel/sched/fair.c; then
+          echo "6.6 sysctl block already repaired; skipping."
+          exit 0
+        fi
+
+        # Repair is needed exactly when the APPLIED hunks use nsecs_per_tick
+        # but the REJECTED hunk's declaration is missing. If the declaration
+        # is present the hunk applied cleanly (nothing to do); if there are
+        # no uses at all the BORE patch did not apply (nothing to do).
+        if grep -q 'nsecs_per_tick' kernel/sched/fair.c && \
+           ! grep -q 'static const unsigned int nsecs_per_tick' kernel/sched/fair.c; then
+          echo "nsecs_per_tick used but undeclared - repairing sysctl block."
+        else
+          echo "NOTE: no missing BORE sysctl declarations; nothing to do."
+          exit 0
+        fi
+
+        # Part 1: tunable_scaling default. BORE sets NONE; stock is LOG.
+        # Nothing compiled under CONFIG_SCHED_BORE reads the value (BORE's
+        # update_sysctl ignores the factor machinery), but the sysctl stays
+        # visible in /proc/sys, so report the BORE default for parity with
+        # the author's patch.
+        TUNE_LINE=$(grep -n '^unsigned int sysctl_sched_tunable_scaling' kernel/sched/fair.c | cut -d: -f1)
+        if [ -n "$TUNE_LINE" ]; then
+          sed -i "${TUNE_LINE}i\\
+        /* bore: tunable_scaling default */\\
+        #ifdef CONFIG_SCHED_BORE\\
+        unsigned int sysctl_sched_tunable_scaling = SCHED_TUNABLESCALING_NONE;\\
+        #else // !CONFIG_SCHED_BORE" kernel/sched/fair.c
+          TUNE_LINE=$(grep -n '^unsigned int sysctl_sched_tunable_scaling = SCHED_TUNABLESCALING_LOG' kernel/sched/fair.c | cut -d: -f1)
+          sed -i "${TUNE_LINE}a\\
+        #endif // CONFIG_SCHED_BORE" kernel/sched/fair.c
+        else
+          echo "NOTE: tunable_scaling declaration not found; skipping its wrap."
+        fi
+
+        # Locate the stock base_slice declaration; the BORE block goes in
+        # front of it, and the #else closes after the stock EXPORT line.
+        # normalized_sysctl_sched_base_slice stays OUTSIDE the conditional:
+        # newer sublevels (6.12.17+ set_protect_slice, kept in GKI 6.12.92
+        # and 6.18) read it under CONFIG_SCHED_BORE too, and the author's
+        # patch never had to handle that because his 6.12.37 base predates
+        # set_protect_slice. Leaving it unwrapped preserves stock behavior
+        # exactly; on 6.6 it is simply unused under BORE (benign).
+        SLICE_LINE=$(grep -n '^unsigned int sysctl_sched_base_slice' kernel/sched/fair.c | head -1 | cut -d: -f1)
+        if [ -z "$SLICE_LINE" ]; then
+          echo "ERROR: stock sysctl block not found; aborting so we do not mangle fair.c" >&2
+          exit 1
+        fi
+        echo "stock base_slice at line $SLICE_LINE"
+
+        # Insert the BORE block BEFORE the stock base_slice declaration,
+        # wrapping it with #ifdef CONFIG_SCHED_BORE ... #else.
+        sed -i "${SLICE_LINE}i\\
+        /* bore: base_slice block - GKI variant of the rejected hunk */\\
+        #ifdef CONFIG_SCHED_BORE\\
+        static const unsigned int nsecs_per_tick       = 1000000000ULL / HZ;\\
+        unsigned int sysctl_sched_min_base_slice       = CONFIG_MIN_BASE_SLICE_NS;\\
+        __read_mostly uint sysctl_sched_base_slice     = nsecs_per_tick;\\
+        EXPORT_SYMBOL_GPL(sysctl_sched_base_slice);\\
+        #else // !CONFIG_SCHED_BORE" kernel/sched/fair.c
+
+        # Close the #else right after the STOCK export line - the second
+        # EXPORT_SYMBOL_GPL(sysctl_sched_base_slice) in the file (the first
+        # is the one just inserted in the BORE branch).
+        EXPORT_LINE=$(grep -n '^EXPORT_SYMBOL_GPL(sysctl_sched_base_slice)' kernel/sched/fair.c | sed -n '2p' | cut -d: -f1)
+        if [ -z "$EXPORT_LINE" ]; then
+          echo "ERROR: stock EXPORT_SYMBOL_GPL(sysctl_sched_base_slice) not found" >&2
+          exit 1
+        fi
+        sed -i "${EXPORT_LINE}a\\
+        #endif // CONFIG_SCHED_BORE" kernel/sched/fair.c
+
+        echo "=== repaired block ==="
+        sed -n "$((SLICE_LINE-2)),$((EXPORT_LINE+3))p" kernel/sched/fair.c
 
     - name: Fix reweight_task call (5.10 2024-11+)
       shell: bash
