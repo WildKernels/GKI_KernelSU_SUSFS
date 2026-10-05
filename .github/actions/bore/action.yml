@@ -261,8 +261,23 @@ runs:
         # so a re-run does not match. No ^/$ inside the multi-line s
         # command - they never match mid pattern-space.
         sed -i '/^void update_burst_score(struct sched_entity \*se) {$/{N;N;N;s|void update_burst_score(struct sched_entity \*se) {\n\tif (!entity_is_task(se)) return;\n\tstruct task_struct \*p = task_of(se);\n\tu8 prev_prio = effective_prio(p);|void update_burst_score(struct sched_entity *se) { /* bore: decls hoisted */\n\tstruct task_struct *p;\n\tu8 prev_prio, burst_score, new_prio;\n\n\tif (!entity_is_task(se)) return;\n\tp = task_of(se);\n\tprev_prio = effective_prio(p);|}' kernel/sched/bore.c
-        sed -i 's|^\tu8 burst_score = 0;$|\tburst_score = 0;|' kernel/sched/bore.c
-        sed -i 's|^\tu8 new_prio = effective_prio(p);$|\tnew_prio = effective_prio(p);|' kernel/sched/bore.c
+        # The two mid-function decls become plain assignments - but ONLY
+        # inside update_burst_score. A first version ran these unscoped and
+        # they also rewrote restart_burst_rescale_deadline's ONLY new_prio
+        # declaration into an assignment, producing (run 37270128980):
+        #   bore.c:116: error: use of undeclared identifier 'new_prio'
+        # The 6.6.102 job of run 37255515932 never showed it because fair.o
+        # failed first and make stopped before scheduling bore.o.
+        sed -i '/^void update_burst_score/,/^}/ s|^\tu8 burst_score = 0;$|\tburst_score = 0;|' kernel/sched/bore.c
+        sed -i '/^void update_burst_score/,/^}/ s|^\tu8 new_prio = effective_prio(p);$|\tnew_prio = effective_prio(p);|' kernel/sched/bore.c
+
+        # restart_burst_rescale_deadline has its own decl-after-statement
+        # violation: 'u8 new_prio' after the restart_burst(se) statement.
+        # Hoist it onto the prev_prio declaration line, then make the
+        # mid-function decl an assignment. Scoped to the function body;
+        # idempotent because neither pattern survives the rewrite.
+        sed -i '/^void restart_burst_rescale_deadline/,/^}/ s|^\tu8 prev_prio = effective_prio(p);$|\tu8 prev_prio = effective_prio(p), new_prio;|' kernel/sched/bore.c
+        sed -i '/^void restart_burst_rescale_deadline/,/^}/ s|^\tu8 new_prio = effective_prio(p);$|\tnew_prio = effective_prio(p);|' kernel/sched/bore.c
 
         sed -n '/static void update_burst_score/,/^}/p' kernel/sched/fair.c | head -8
         sed -n '/^void update_burst_score/,/^}/p' kernel/sched/bore.c 2>/dev/null | head -12
