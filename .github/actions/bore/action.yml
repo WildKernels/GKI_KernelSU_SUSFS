@@ -206,7 +206,20 @@ runs:
         python3 "${{ github.workspace }}/.github/scripts/bore_kabi_612.py" \
           include/linux/sched.h || rc=$?
         if [ "${rc:-0}" != "0" ]; then
-          if grep -q 'struct sched_burst_cache child_burst;' include/linux/sched.h; then
+          if grep -q 'struct bore_ctx' include/linux/sched.h; then
+            # 6.8.0 generation (6.12/6.18): BORE state is a bore_ctx member in
+            # task_struct; sched_entity is untouched, so this relocation -
+            # which targets the 5.1.0-generation sched_entity fields - has
+            # nothing to do. The inline task_struct member does shift the
+            # offsets of task_struct members after it; moving bore_ctx into
+            # task_struct's free KABI reserve slots is the follow-up, same as
+            # the 6.6 bore_state work.
+            echo "" >&2
+            echo "NOTE: 6.8.0-generation BORE (bore_ctx in task_struct);" >&2
+            echo "sched_entity untouched, no kABI relocation needed here." >&2
+            echo "WARNING: bore_ctx is an INLINE task_struct member - KMI" >&2
+            echo "follow-up needed (slots 3-8 are free). See bore action." >&2
+          elif grep -q 'struct sched_burst_cache child_burst;' include/linux/sched.h; then
             echo "" >&2
             echo "WARNING: 6.6-shape BORE fields present (spinlocked 24-byte" >&2
             echo "caches); cannot be relocated into 8-byte KABI slots." >&2
