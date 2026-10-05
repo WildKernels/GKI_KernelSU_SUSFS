@@ -359,6 +359,18 @@ runs:
         sed -i "${EXPORT_LINE}a\\
         #endif // CONFIG_SCHED_BORE" kernel/sched/fair.c
 
+        # normalized_sysctl_sched_base_slice is static, and on 6.6 nothing
+        # under CONFIG_SCHED_BORE reads it (its only stock reader, the
+        # SET_SYSCTL expansion inside the #else update_sysctl, is compiled
+        # out), so -Werror=unused-variable kills the build there (run
+        # 37255515932). The author's own hunk wraps it inside #else - which
+        # instead strands 6.12/6.18, whose set_protect_slice (6.12.17+,
+        # present in GKI 6.12.92 and 6.18) reads it under BORE too. Keep it
+        # unconditional and mark it __maybe_unused: silences the warning
+        # where it is unused, is the kernel's standard marker, and changes
+        # nothing at runtime where it is used.
+        sed -i 's|^static unsigned int normalized_sysctl_sched_base_slice|static unsigned int normalized_sysctl_sched_base_slice __maybe_unused|' kernel/sched/fair.c
+
         echo "=== repaired block ==="
         sed -n "$((SLICE_LINE-2)),$((EXPORT_LINE+3))p" kernel/sched/fair.c
 
