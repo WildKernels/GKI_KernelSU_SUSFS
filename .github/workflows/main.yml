@@ -179,16 +179,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Scheduled (nightly) runs carry no inputs; default them the same
+          # as the workflow_dispatch defaults below.
           PAGE_SIZE="${{ inputs.page_size || '4k' }}"
+          KVER="${{ inputs.kernel_build_version || 'All' }}"
           [ "$PAGE_SIZE" = "16k" ] || exit 0
           # Only these GKI families use a Kleaf build branch exposing
           # --page_size (main-kernel-build-2023/2024, main-kernel-2025).
-          case "${{ inputs.kernel_build_version }}" in
+          case "$KVER" in
             6.1.x-android14|6.6.x-android15|6.12.x-android16) ;;
             *)
               echo "ERROR: page_size=16k requires kernel_build_version to be one of:" >&2
               echo "  6.1.x-android14, 6.6.x-android15, 6.12.x-android16" >&2
-              echo "Got: '${{ inputs.kernel_build_version }}'." >&2
+              echo "Got: '${KVER}'." >&2
               exit 1
               ;;
           esac
@@ -298,7 +301,14 @@ jobs:
           # KernelSU-Next (next) always builds at latest.
           # With SUSFS off, every root tracks latest instead of pins:
           # SukiSU-Ultra follows main (builtin only matters for SUSFS builds).
-          if [ "${{ inputs.use_susfs }}" = "true" ]; then
+          # Scheduled runs default SUSFS on (all features on, see the
+          # feature_set computation) - a nightly is a full-featured build.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            SCHED_SUSFS=true
+          else
+            SCHED_SUSFS="${{ inputs.use_susfs }}"
+          fi
+          if [ "$SCHED_SUSFS" = "true" ]; then
             KERNELSU_COMMIT="$(pick "$PIN_KERNELSU" https://github.com/tiann/KernelSU.git refs/heads/main)"
             RESUKISU_COMMIT="$(pick "$PIN_RESUKISU" https://github.com/ReSukiSU/ReSukiSU.git refs/heads/main)"
             SUKISU_ULTRA_COMMIT="$(pick "$PIN_SUKISU_ULTRA" https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin)"
@@ -314,7 +324,7 @@ jobs:
           # (it can only ever run with SUSFS off — enforced below).
           KOWSU_COMMIT="$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)"
           emit kowsu_commit "$KOWSU_COMMIT"
-          if [ "${{ inputs.use_susfs }}" = "true" ]; then
+          if [ "$SCHED_SUSFS" = "true" ]; then
             NEXT_COMMIT="$(resolve_sha https://github.com/pershoot/KernelSU-Next.git refs/heads/dev-susfs)"
           else
             NEXT_COMMIT="$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)"
@@ -561,17 +571,33 @@ jobs:
           # SukiSU-Ultra, KowSU, or 'All' are all valid release targets ('No Root'
           # ships no manager).
 
+          # Scheduled (nightly) runs carry NO inputs - the use_* booleans are
+          # empty strings, not true - so read them with schedule defaults:
+          # every feature ON (matching the dispatch defaults) except Perf,
+          # which is opt-in on dispatch and stays off for nightlies.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            F_SUSFS=true;  F_NOMOUNT=true; F_BBG=true;  F_NET=true
+            F_DS=true;     F_NTSYNC=true;  F_PTRACE=true; F_UNICODE=true
+            F_BPF=true;    F_PERF=false
+          else
+            F_SUSFS="${{ inputs.use_susfs }}";   F_NOMOUNT="${{ inputs.use_nomount }}"
+            F_BBG="${{ inputs.use_bbg }}";        F_NET="${{ inputs.use_net }}"
+            F_DS="${{ inputs.use_ds }}";          F_NTSYNC="${{ inputs.use_ntsync }}"
+            F_PTRACE="${{ inputs.use_ptrace }}";  F_UNICODE="${{ inputs.use_unicode }}"
+            F_BPF="${{ inputs.use_bpf }}";        F_PERF="${{ inputs.use_perf }}"
+          fi
+
           FEATURES=""
-          [ "${{ inputs.use_susfs }}" = "true" ] && FEATURES="${FEATURES}SUSFS+"
-          [ "${{ inputs.use_nomount }}" = "true" ] && FEATURES="${FEATURES}NoMount+"
-          [ "${{ inputs.use_bbg }}" = "true" ] && FEATURES="${FEATURES}BBG+"
-          [ "${{ inputs.use_net }}" = "true" ] && FEATURES="${FEATURES}NET+"
-          [ "${{ inputs.use_ds }}" = "true" ] && FEATURES="${FEATURES}DS+"
-          [ "${{ inputs.use_ntsync }}" = "true" ] && FEATURES="${FEATURES}NTSync+"
-          [ "${{ inputs.use_ptrace }}" = "true" ] && FEATURES="${FEATURES}Ptrace+"
-          [ "${{ inputs.use_unicode }}" = "true" ] && FEATURES="${FEATURES}Unicode+"
-          [ "${{ inputs.use_bpf }}" = "true" ] && FEATURES="${FEATURES}BPF+"
-          [ "${{ inputs.use_perf }}" = "true" ] && FEATURES="${FEATURES}Perf+"
+          [ "$F_SUSFS" = "true" ] && FEATURES="${FEATURES}SUSFS+"
+          [ "$F_NOMOUNT" = "true" ] && FEATURES="${FEATURES}NoMount+"
+          [ "$F_BBG" = "true" ] && FEATURES="${FEATURES}BBG+"
+          [ "$F_NET" = "true" ] && FEATURES="${FEATURES}NET+"
+          [ "$F_DS" = "true" ] && FEATURES="${FEATURES}DS+"
+          [ "$F_NTSYNC" = "true" ] && FEATURES="${FEATURES}NTSync+"
+          [ "$F_PTRACE" = "true" ] && FEATURES="${FEATURES}Ptrace+"
+          [ "$F_UNICODE" = "true" ] && FEATURES="${FEATURES}Unicode+"
+          [ "$F_BPF" = "true" ] && FEATURES="${FEATURES}BPF+"
+          [ "$F_PERF" = "true" ] && FEATURES="${FEATURES}Perf+"
           echo "feature_set=${FEATURES%+}" >> "$GITHUB_OUTPUT"
 
       - name: Clone shared source repos once
@@ -729,15 +755,22 @@ jobs:
 
   build-nomount-module:
     needs: resolve-sources
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes"
+    # Scheduled (nightly) runs carry NO inputs at all - inputs.use_nomount is
+    # empty, not true - so the inner steps' `if: inputs.use_nomount` gates
+    # would skip everything and produce no metamodule artifact. Compute the
+    # effective flag once here and have the steps key off the job-level
+    # env instead of the raw input.
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes"
+    env:
+      NOMOUNT_WANTED: ${{ inputs.use_nomount || (github.event_name == 'schedule' && true) || false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        if: inputs.use_nomount
+        if: env.NOMOUNT_WANTED == 'true'
 
       - name: Clone NoMount source at pinned commit
         id: clone
-        if: inputs.use_nomount
+        if: env.NOMOUNT_WANTED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -750,14 +783,14 @@ jobs:
           echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
 
       - name: Build NoMount metamodule (nm only, no .ko)
-        if: inputs.use_nomount
+        if: env.NOMOUNT_WANTED == 'true'
         id: buildmod
         uses: ./.github/actions/nomount-metamodule
         with:
           commit: ${{ steps.clone.outputs.commit }}
 
       - name: Upload NoMount metamodule
-        if: inputs.use_nomount
+        if: env.NOMOUNT_WANTED == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: NoMount-Metamodule
@@ -769,7 +802,7 @@ jobs:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.10.x-android12')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.10.x-android12')"
     strategy:
       fail-fast: false
       matrix:
@@ -787,19 +820,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android13-5-10:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.10.x-android13')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.10.x-android13')"
     strategy:
       fail-fast: false
       matrix:
@@ -817,19 +850,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android13-5-15:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.15.x-android13')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.15.x-android13')"
     strategy:
       fail-fast: false
       matrix:
@@ -847,19 +880,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android14-5-15:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.15.x-android14')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.15.x-android14')"
     strategy:
       fail-fast: false
       matrix:
@@ -877,19 +910,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android14-6-1:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.1.x-android14')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.1.x-android14')"
     strategy:
       fail-fast: false
       matrix:
@@ -907,19 +940,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android15-6-6:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.6.x-android15')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.6.x-android15')"
     strategy:
       fail-fast: false
       matrix:
@@ -937,19 +970,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android16-6-12:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.12.x-android16')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.12.x-android16')"
     strategy:
       fail-fast: false
       matrix:
@@ -967,12 +1000,12 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   update-verified-pins:
@@ -1586,19 +1619,23 @@ jobs:
           FEATURE_SET: ${{ needs.resolve-sources.outputs.feature_set }}
           MANAGER_LIST: ${{ needs.resolve-sources.outputs.manager_list }}
           ROOT_MATRIX: ${{ needs.resolve-sources.outputs.root_matrix }}
-          USE_SUSFS: ${{ inputs.use_susfs }}
-          USE_NOMOUNT: ${{ inputs.use_nomount }}
-          USE_BBG: ${{ inputs.use_bbg }}
-          USE_DS: ${{ inputs.use_ds }}
-          USE_NET: ${{ inputs.use_net }}
-          USE_NTSYNC: ${{ inputs.use_ntsync }}
-          USE_PTRACE: ${{ inputs.use_ptrace }}
-          USE_UNICODE: ${{ inputs.use_unicode }}
-          USE_BPF: ${{ inputs.use_bpf }}
-          USE_PERF: ${{ inputs.use_perf }}
-          USE_CACHE: ${{ inputs.use_cache }}
-          PAGE_SIZE: ${{ inputs.page_size }}
-          KERNEL_BUILD_VERSION: ${{ inputs.kernel_build_version }}
+          # Scheduled (nightly) runs carry no inputs; fall back to the same
+          # all-features-on defaults the resolve-sources feature computation
+          # uses, so the rendered notes list the features actually built.
+          IS_SCHEDULE: ${{ github.event_name == 'schedule' }}
+          USE_SUSFS: ${{ inputs.use_susfs || (github.event_name == 'schedule' && true) || false }}
+          USE_NOMOUNT: ${{ inputs.use_nomount || (github.event_name == 'schedule' && true) || false }}
+          USE_BBG: ${{ inputs.use_bbg || (github.event_name == 'schedule' && true) || false }}
+          USE_DS: ${{ inputs.use_ds || (github.event_name == 'schedule' && true) || false }}
+          USE_NET: ${{ inputs.use_net || (github.event_name == 'schedule' && true) || false }}
+          USE_NTSYNC: ${{ inputs.use_ntsync || (github.event_name == 'schedule' && true) || false }}
+          USE_PTRACE: ${{ inputs.use_ptrace || (github.event_name == 'schedule' && true) || false }}
+          USE_UNICODE: ${{ inputs.use_unicode || (github.event_name == 'schedule' && true) || false }}
+          USE_BPF: ${{ inputs.use_bpf || (github.event_name == 'schedule' && true) || false }}
+          USE_PERF: ${{ inputs.use_perf || false }}
+          USE_CACHE: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+          PAGE_SIZE: ${{ inputs.page_size || '4k' }}
+          KERNEL_BUILD_VERSION: ${{ inputs.kernel_build_version || 'All' }}
           NOMOUNT_COMMIT: ${{ needs.resolve-sources.outputs.nomount_commit }}
           KSU_COMMIT: ${{ needs.resolve-sources.outputs.ksu_commit }}
           RESUKISU_COMMIT: ${{ needs.resolve-sources.outputs.resukisu_commit }}
@@ -1776,9 +1813,83 @@ jobs:
           {
             echo ""
             echo "- **Nightly artifacts:** https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            echo "- **Note:** not every kernel version is necessarily built in a nightly run — the link above lists exactly what this run produced."
+            echo "- **Note:** kernels that built successfully this run are attached below; failed families are simply absent. The link above lists everything this run produced."
           } >> nightly/release_body.md
           cat nightly/release_body.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Publish-everything-that-built: download each family's AnyKernel3
+      # artifacts and attach them to the nightly release. A family whose
+      # builds all failed (or that was skipped) simply contributes nothing -
+      # the release still publishes with whatever succeeded. One
+      # download-artifact step per family, same as the release job: a single
+      # broad pattern silently truncates on runs this large
+      # (run 34015449465: 495/591 artifacts).
+      - name: Download AnyKernel3 (5.10 android12)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '5.10.*-android12-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (5.10 android13)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '5.10.*-android13-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (5.15 android13)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '5.15.*-android13-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (5.15 android14)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '5.15.*-android14-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (6.1 android14)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '6.1.*-android14-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (6.6 android15)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '6.6.*-android15-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (6.12 android16)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '6.12.*-android16-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download NoMount metamodule
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '*NoMount-Metamodule'
+          merge-multiple: false
+
+      - name: Zip artifacts for Release
+        run: |
+          set -e
+          shopt -s nullglob
+          for dir in release-assets/*-AnyKernel3 release-assets/*NoMount-Metamodule; do
+            zip_name="${dir}.zip"
+            rm -f "$zip_name"
+            (cd "$dir" && zip -r -q -9 "../$(basename "$zip_name")" .)
+          done
+          ls release-assets/*.zip 2>/dev/null | wc -l | xargs -I{} echo "{} zips ready"
 
       - name: Replace nightly prerelease
         env:
@@ -1794,4 +1905,44 @@ jobs:
             --prerelease \
             --title "Nightly (${{ github.ref_name }} $(date -u +%Y-%m-%d))" \
             --notes-file nightly/release_body.md
+
+      # Sequential uploads with per-file retries, non-fatal per file: a
+      # single failed asset must not unpublish the nightly (the kernels it
+      # shipped are still valid for testers). Missing/failed counts land
+      # in the step summary instead. This runs AFTER the release exists.
+      - name: Upload kernel assets to nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(release-assets/*.zip)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No kernel artifacts this run; nightly published with notes only." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Uploading ${#files[@]} kernel assets..." >> "$GITHUB_STEP_SUMMARY"
+          failed=0
+          for f in "${files[@]}"; do
+            ok=false
+            for attempt in 1 2 3; do
+              if gh release upload nightly "$f" --clobber; then
+                ok=true
+                break
+              fi
+              echo "Attempt $attempt/3 failed for: $(basename "$f")" >&2
+              if [ "$attempt" -lt 3 ]; then sleep 10; fi
+            done
+            if [ "$ok" = false ]; then
+              echo "ERROR: giving up on $(basename "$f")" >&2
+              failed=$((failed + 1))
+            fi
+          done
+          {
+            echo ""
+            echo "### Nightly assets"
+            echo "- uploaded: $(( ${#files[@]} - failed )) / ${#files[@]}"
+            if [ "$failed" -ne 0 ]; then
+              echo "- failed uploads: $failed (see job log)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
