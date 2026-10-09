@@ -60,22 +60,36 @@ runs:
             # The author promotes new BORE versions into patches/stable/
             # and DELETES the old files - a pinned name 404'd all 27 6.12
             # jobs of run 37814552622 when 6.8.0 became 7.0.0. Resolve the
-            # newest matching file at build time instead: list the dir via
-            # the GitHub API, filter to this kernel's patch, sort by
-            # version, take the last. If nothing resolves, degrade to an
-            # unpatched build with a loud warning rather than failing the
-            # job - a nightly without BORE on one family beats no nightly
-            # for that family at all.
-            NAMES=$(curl -fsSL --retry 3 --retry-delay 3 \
-              "https://api.github.com/repos/firelzrd/bore-scheduler/contents/patches/stable" \
-              | grep -o '"name": *"0001-linux'"${VER}"'[^"]*\.patch"' \
-              | sed 's/"name": *"//;s/"$//' | sort -V) || true
-            LATEST=$(printf '%s\n' "$NAMES" | tail -1)
+            # newest matching file at build time instead. BORE is always
+            # wanted, so a resolution failure fails the job - but the
+            # listing itself must survive the matrix: with ~54 6.12 jobs
+            # firing simultaneously, GitHub's API returns 403 (secondary
+            # rate limit) on some of the concurrent listings (run
+            # 37910384802, 6.12.23 job: curl 403 -> empty NAMES ->
+            # "no patch found"). So: retry the listing with backoff, and
+            # only treat it as "no patch exists" when a 200 listing with
+            # zero matches is actually seen.
+            LATEST=""
+            for attempt in 1 2 3 4 5; do
+              HTTP=$(curl -sSL -o /tmp/bore_listing.json -w '%{http_code}' \
+                "https://api.github.com/repos/firelzrd/bore-scheduler/contents/patches/stable") || HTTP=""
+              if [ "$HTTP" = "200" ]; then
+                NAMES=$(grep -o '"name": *"0001-linux'"${VER}"'[^"]*\.patch"' /tmp/bore_listing.json \
+                  | sed 's/"name": *"//;s/"$//' | sort -V)
+                LATEST=$(printf '%s\n' "$NAMES" | tail -1)
+                break
+              fi
+              echo "patches/stable listing attempt $attempt/5 got HTTP ${HTTP:-none}; backing off..." >&2
+              sleep $((attempt * 15))
+            done
+            if [ "$HTTP" != "200" ]; then
+              echo "ERROR: could not list firelzrd/bore-scheduler patches/stable/ (HTTP $HTTP after 5 attempts)" >&2
+              exit 1
+            fi
             if [ -z "$LATEST" ]; then
-              # No patch for this kernel version upstream = a real problem,
-              # not a skip case: BORE is always wanted. Fail the job loudly
-              # so it shows in the run summary rather than silently
-              # shipping a family without BORE.
+              # A 200 listing with zero matches = the author really has
+              # no patch for this version. Real problem, not a skip case:
+              # BORE is always wanted. Fail the job loudly.
               echo "ERROR: no BORE patch found for ${VER} in firelzrd/bore-scheduler patches/stable/" >&2
               echo "Check: https://github.com/firelzrd/bore-scheduler/tree/main/patches" >&2
               exit 1
@@ -445,6 +459,75 @@ runs:
 
         echo "=== repaired block ==="
         sed -n "$((SLICE_LINE-2)),$((EXPORT_LINE+3))p" kernel/sched/fair.c
+
+    - name: Fix fuzz-spliced update_curr_bore block (6.12/6.18 7.0.0)
+      # BORE 7.0.0's update_curr() hunk was cut against the author's 6.12.37
+      # base, whose update_curr() has 'struct task_struct *p = task_of(curr);'
+      # and 'update_curr_task(p, delta_exec);'. GKI 6.12.92+ inlined those
+      # away and has a fair_server accounting comment in their place, so with
+      # -F3 fuzz patch anchors the hunk INSIDE that comment:
+      #   ... whether or not the task is running on
+      #   #ifdef CONFIG_SCHED_BORE          <- spliced mid-comment
+      #           update_curr_bore(p, delta_exec);
+      #   #endif /* CONFIG_SCHED_BORE */
+      #   * behalf of fair_server or not:   <- comment resumes, '/*' now
+      #                                        nests (-Werror,-Wcomment) and
+      #   'behalf'/'of' parse as code. This killed all 27 6.12 jobs of run
+      #   37910384802 at Build Normal Kernel. Detection key: update_curr_bore
+      # call site whose preceding non-blank line is NOT '#ifdef
+      # CONFIG_SCHED_BORE' - i.e. the #ifdef landed somewhere unexpected.
+      # No-ops on: 6.6 (5.9.6 has no update_curr_bore), 6.12.37-era bases
+      # where the hunk applies at the real anchor, and unpatched trees.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        if ! grep -q 'update_curr_bore' kernel/sched/fair.c 2>/dev/null; then
+          echo "No update_curr_bore call site (6.6/5.x generation or patch absent); nothing to do."
+          exit 0
+        fi
+
+        # Find the update_curr_bore call and check what sits directly above
+        # the #ifdef that should guard it.
+        CALL_LINE=$(grep -n 'update_curr_bore(p, delta_exec);' kernel/sched/fair.c | head -1 | cut -d: -f1)
+        IFDEF_LINE=$(grep -n '^#ifdef CONFIG_SCHED_BORE' kernel/sched/fair.c \
+                     | awk -F: -v c="$CALL_LINE" '$1 < c && c - $1 <= 2 {print $1}' | tail -1)
+
+        # Inspect the line immediately above the #ifdef: it must be either
+        # blank or a code line (task_of/update_curr_task region). If it is
+        # a comment-continuation line (' * ...') the hunk fuzz-spliced into
+        # the middle of the fair_server comment.
+        ABOVE=$((IFDEF_LINE - 1))
+        ABOVE_TXT=$(sed -n "${ABOVE}p" kernel/sched/fair.c)
+        if printf '%s' "$ABOVE_TXT" | grep -qE '^\s*(\*|/\*)'; then
+          echo "Detected fuzz-spliced BORE block inside a comment (line $IFDEF_LINE, above: $ABOVE_TXT)."
+          echo "Relocating the block to the correct anchor..."
+        else
+          echo "update_curr_bore block looks correctly anchored (above: $ABOVE_TXT); nothing to do."
+          exit 0
+        fi
+
+        # Remove the spliced 3-line block...
+        sed -i "${IFDEF_LINE},$((CALL_LINE + 1))d" kernel/sched/fair.c
+
+        # ...and reinsert it at the true anchor: right after
+        # 'if (entity_is_task(curr)) {' inside update_curr(), before the
+        # fair_server comment. Abort loudly if that anchor is missing - a
+        # silent anchor miss is exactly the failure class we are fixing.
+        ANCHOR=$(grep -n $'\tif (entity_is_task(curr)) {' kernel/sched/fair.c \
+                 | awk -F: -v c="$CALL_LINE" '$1 < c' | tail -1 | cut -d: -f1)
+        if [ -z "$ANCHOR" ]; then
+          echo "ERROR: 'if (entity_is_task(curr)) {' anchor not found in update_curr(); refusing to guess." >&2
+          exit 1
+        fi
+        sed -i "${ANCHOR}a\\
+        #ifdef CONFIG_SCHED_BORE\\
+        \t\tupdate_curr_bore(p, delta_exec);\\
+        #endif /* CONFIG_SCHED_BORE */" kernel/sched/fair.c
+
+        echo "=== update_curr() after repair ==="
+        sed -n "${ANCHOR},$((ANCHOR + 14))p" kernel/sched/fair.c
 
     - name: Fix reweight_task call (5.10 2024-11+)
       shell: bash
