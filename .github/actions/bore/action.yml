@@ -72,9 +72,13 @@ runs:
               | sed 's/"name": *"//;s/"$//' | sort -V) || true
             LATEST=$(printf '%s\n' "$NAMES" | tail -1)
             if [ -z "$LATEST" ]; then
-              echo "::warning::No BORE patch found for ${VER} in firelzrd/bore-scheduler patches/stable/ - building WITHOUT BORE. Check https://github.com/firelzrd/bore-scheduler/tree/main/patches"
-              echo "url=" >> "$GITHUB_OUTPUT"
-              exit 0
+              # No patch for this kernel version upstream = a real problem,
+              # not a skip case: BORE is always wanted. Fail the job loudly
+              # so it shows in the run summary rather than silently
+              # shipping a family without BORE.
+              echo "ERROR: no BORE patch found for ${VER} in firelzrd/bore-scheduler patches/stable/" >&2
+              echo "Check: https://github.com/firelzrd/bore-scheduler/tree/main/patches" >&2
+              exit 1
             fi
             echo "Resolved ${VER} BORE patch: ${LATEST}"
             URL="${BORE_BASE}/stable/${LATEST}" ;;
@@ -106,20 +110,13 @@ runs:
         else
           # curl's own retries handle transient network flake. A step-level
           # attempts:5 wrapper was here before (the retry action); on a
-          # genuinely dead URL it just hammered the 404 five times and
-          # failed 27 jobs (run 37814552622). Now: transient errors get
-          # retried; a persistent failure degrades to an unpatched build
-          # with a loud warning instead of killing the job - a nightly
-          # without BORE on one family still ships that family.
-          code=0
+          # genuinely dead URL it just hammered the 404 five times. With
+          # dynamic resolution the URL should always exist; if the download
+          # STILL fails, fail the job - BORE is always wanted, never build
+          # a family silently without it.
           curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
             "${{ steps.pick.outputs.url }}" \
-            -o "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch" || code=$?
-          if [ "$code" -ne 0 ]; then
-            echo "::warning::BORE patch download failed (curl exit $code) from ${{ steps.pick.outputs.url }} - building WITHOUT BORE for this family."
-            echo "downloaded=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+            -o "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
         fi
         echo "downloaded=true" >> "$GITHUB_OUTPUT"
 
