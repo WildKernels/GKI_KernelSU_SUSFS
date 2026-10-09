@@ -35,12 +35,16 @@ runs:
         #                    there is no 6.6 entry in patches/ on main, and
         #                    the 6.12 patch rejects 9/24 here because its
         #                    hooks target sched-ext code 6.6 does not have)
-        #   6.12         -> 6.12 patch   39/44 hunks, Android-added rejects
-        #   6.18         -> 6.18 patch   41/44 hunks, Android-added rejects
+        #   6.12 / 6.18  -> resolved DYNAMICALLY from patches/stable/
+        #                    (see below - the author promotes versions and
+        #                    deletes the old files, which 404'd us in run
+        #                    37814552622: 6.8.0 was replaced by 7.0.0)
         # There is no 5.10-specific patch upstream, but the 5.15 one applies
         # cleanly to 5.10.269.
         case "$VER" in
           5.4|5.10|5.15)
+            # The legacy series is frozen upstream - these files do not
+            # move, so a pinned URL is fine here (and faster).
             URL="${BORE_BASE}/legacy/linux-5.15-bore/0001-linux5.15.y-bore5.1.0.patch" ;;
           6.1)
             URL="${BORE_BASE}/legacy/linux-6.1-bore/0001-linux6.1.y-bore5.1.0.patch" ;;
@@ -52,10 +56,28 @@ runs:
             # WildKernels/kernel_patches repo before this action runs.
             URL=".github/actions/bore/patches/0001-linux6.6.67-bore-5.9.6.patch"
             URL_IS_LOCAL="true" ;;
-          6.12)
-            URL="${BORE_BASE}/stable/0001-linux6.12.37-bore-6.8.0.patch" ;;
-          6.18)
-            URL="${BORE_BASE}/stable/0001-linux6.18.48-bore-6.8.0.patch" ;;
+          6.12|6.18)
+            # The author promotes new BORE versions into patches/stable/
+            # and DELETES the old files - a pinned name 404'd all 27 6.12
+            # jobs of run 37814552622 when 6.8.0 became 7.0.0. Resolve the
+            # newest matching file at build time instead: list the dir via
+            # the GitHub API, filter to this kernel's patch, sort by
+            # version, take the last. If nothing resolves, degrade to an
+            # unpatched build with a loud warning rather than failing the
+            # job - a nightly without BORE on one family beats no nightly
+            # for that family at all.
+            NAMES=$(curl -fsSL --retry 3 --retry-delay 3 \
+              "https://api.github.com/repos/firelzrd/bore-scheduler/contents/patches/stable" \
+              | grep -o '"name": *"0001-linux'"${VER}"'[^"]*\.patch"' \
+              | sed 's/"name": *"//;s/"$//' | sort -V) || true
+            LATEST=$(printf '%s\n' "$NAMES" | tail -1)
+            if [ -z "$LATEST" ]; then
+              echo "::warning::No BORE patch found for ${VER} in firelzrd/bore-scheduler patches/stable/ - building WITHOUT BORE. Check https://github.com/firelzrd/bore-scheduler/tree/main/patches"
+              echo "url=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Resolved ${VER} BORE patch: ${LATEST}"
+            URL="${BORE_BASE}/stable/${LATEST}" ;;
           *)
             echo "No BORE patch mapped for kernel ${VER}; skipping."
             echo "url=" >> "$GITHUB_OUTPUT"
@@ -70,29 +92,40 @@ runs:
     - name: Download BORE patch
       id: fetch
       if: steps.pick.outputs.url != ''
-      uses: ./.github/actions/retry
-      with:
-        command: |
-          set -o pipefail
-          mkdir -p "${{ github.workspace }}/kernel_patches/bore"
-          if [ "${{ steps.pick.outputs.local }}" = "true" ]; then
-            # local URL is relative to the REPO root (where this action's
-            # dir lives), while workdir is github.workspace - hence the
-            # extra workspace prefix on cp source.
-            cp "${{ github.workspace }}/${{ steps.pick.outputs.url }}" \
-               "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
-          else
-            curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
-              "${{ steps.pick.outputs.url }}" \
-              -o "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        mkdir -p "${{ github.workspace }}/kernel_patches/bore"
+        if [ "${{ steps.pick.outputs.local }}" = "true" ]; then
+          # local URL is relative to the REPO root (where this action's
+          # dir lives), while workdir is github.workspace - hence the
+          # extra workspace prefix on cp source.
+          cp "${{ github.workspace }}/${{ steps.pick.outputs.url }}" \
+             "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch"
+        else
+          # curl's own retries handle transient network flake. A step-level
+          # attempts:5 wrapper was here before (the retry action); on a
+          # genuinely dead URL it just hammered the 404 five times and
+          # failed 27 jobs (run 37814552622). Now: transient errors get
+          # retried; a persistent failure degrades to an unpatched build
+          # with a loud warning instead of killing the job - a nightly
+          # without BORE on one family still ships that family.
+          code=0
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
+            "${{ steps.pick.outputs.url }}" \
+            -o "${{ github.workspace }}/kernel_patches/bore/0001-bore.patch" || code=$?
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::BORE patch download failed (curl exit $code) from ${{ steps.pick.outputs.url }} - building WITHOUT BORE for this family."
+            echo "downloaded=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-        attempts: 5
-        delay: 5
-        workdir: ${{ github.workspace }}
+        fi
+        echo "downloaded=true" >> "$GITHUB_OUTPUT"
 
     - name: Verify BORE patch provenance
       id: verify
-      if: steps.pick.outputs.url != ''
+      if: steps.pick.outputs.url != '' && steps.fetch.outputs.downloaded != 'false'
       shell: bash
       run: |
         set -euo pipefail
@@ -118,7 +151,7 @@ runs:
         echo "patch_path=${PATCH}" >> "$GITHUB_OUTPUT"
 
     - name: Apply BORE patch
-      if: steps.pick.outputs.url != ''
+      if: steps.pick.outputs.url != '' && steps.fetch.outputs.downloaded != 'false'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       env:
