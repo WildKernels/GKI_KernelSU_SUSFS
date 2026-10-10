@@ -70,44 +70,52 @@ BORE_STATE_DEF = (
     "#endif // CONFIG_SCHED_BORE\n"
 )
 
-# task_struct tail slots: 3 is free on 6.6 (1=dmabuf_info, 2=user_dumpable).
-# Anchor on the dmabuf_info USE(1) - unique to task_struct - so sibling
-# structs with plain RESERVE(3)+RESERVE(4) tails (mm_struct etc.) are not
-# miscounted. The full block through RESERVE(8) is matched and slot 3
-# replaced in place.
-TS_SLOT3_OLD = (
-    "\tANDROID_KABI_USE(1, struct task_dma_buf_info *dmabuf_info);\n"
-    "\tANDROID_KABI_USE(2, struct {\n"
-    "\t\t/* Save user-dumpable when mm goes away */\n"
-    "\t\tunsigned\tuser_dumpable:1;\n"
-    "\t\t});\n"
-    "\n"
-    "\tANDROID_KABI_RESERVE(3);\n"
-    "\tANDROID_KABI_RESERVE(4);\n"
-    "\tANDROID_KABI_RESERVE(5);\n"
-    "\tANDROID_KABI_RESERVE(6);\n"
-    "\tANDROID_KABI_RESERVE(7);\n"
-    "\tANDROID_KABI_RESERVE(8);\n"
-)
+# task_struct tail slots: slot 3 is free on 6.6. TWO tail shapes exist
+# across the 6.6 sublevels (run 38046971754: every 6.6 job failed with
+# 'expected exactly 1 slot-3 tail, found 0' because the anchor below was
+# 6.6.143-specific):
+#   - newer (6.6.14x): slot 1 = dmabuf_info, slot 2 = user_dumpable (USEs)
+#   - older (<= 6.6.139): slots 1-2 are plain RESERVEs - the dmabuf block
+#     is itself a GKI 6.6.14x-era change, verified against googlesource's
+#     android15-6.6-2025-03 (6.6.77): plain RESERVE(1..8).
+# Handle both; consume slot 3 in either.
+TS_SLOT3_NEW_FORMS = [
+    # newer shape (dmabuf_info + user_dumpable present)
+    (
+        "\tANDROID_KABI_USE(1, struct task_dma_buf_info *dmabuf_info);\n"
+        "\tANDROID_KABI_USE(2, struct {\n"
+        "\t\t/* Save user-dumpable when mm goes away */\n"
+        "\t\tunsigned\tuser_dumpable:1;\n"
+        "\t\t});\n"
+        "\n"
+        "\tANDROID_KABI_RESERVE(3);\n"
+    ),
+    # older shape (plain reserves): task_struct is disambiguated by the
+    # l1d_flush_kill #ifdef block that directly precedes its tail (sched_avg
+    # and sched_rt_entity share the bare RESERVE prefix but lack it).
+    (
+        "#ifdef CONFIG_ARCH_HAS_PARANOID_L1D_FLUSH\n"
+        "\t/*\n"
+        "\t * If L1D flush is supported on mm context switch\n"
+        "\t * then we use this callback head to queue kill work\n"
+        "\t * to kill tasks that are not running on SMT disabled\n"
+        "\t * cores\n"
+        "\t */\n"
+        "\tstruct callback_head\t\tl1d_flush_kill;\n"
+        "#endif\n"
+        "\tANDROID_KABI_RESERVE(1);\n"
+        "\tANDROID_KABI_RESERVE(2);\n"
+        "\tANDROID_KABI_RESERVE(3);\n"
+    ),
+]
 
-TS_SLOT3_NEW = (
-    "\tANDROID_KABI_USE(1, struct task_dma_buf_info *dmabuf_info);\n"
-    "\tANDROID_KABI_USE(2, struct {\n"
-    "\t\t/* Save user-dumpable when mm goes away */\n"
-    "\t\tunsigned\tuser_dumpable:1;\n"
-    "\t\t});\n"
-    "\n"
+SLOT3_USE = (
     "#ifdef CONFIG_SCHED_BORE\n"
     "\t" + MARK + "\n"
     "\tANDROID_KABI_USE(3, struct bore_state *bore_state);\n"
     "#else\n"
     "\tANDROID_KABI_RESERVE(3);\n"
     "#endif\n"
-    "\tANDROID_KABI_RESERVE(4);\n"
-    "\tANDROID_KABI_RESERVE(5);\n"
-    "\tANDROID_KABI_RESERVE(6);\n"
-    "\tANDROID_KABI_RESERVE(7);\n"
-    "\tANDROID_KABI_RESERVE(8);\n"
 )
 
 
@@ -122,9 +130,24 @@ def process(path: str) -> bool:
         print(f"bore66-state: {path}: inline sched_entity burst fields "
               f"absent (not the 5.9.6 6.6 shape); no edit")
         return True
-    if src.count(TS_SLOT3_OLD) != 1:
-        print(f"bore66-state: {path}: expected exactly 1 task_struct "
-              f"slot-3 tail, found {src.count(TS_SLOT3_OLD)}; aborting",
+
+    # Find which task_struct tail shape this sublevel carries and locate
+    # its slot-3 RESERVE. Each form tuple ends with the slot-3 line; the
+    # prefix (dmabuf USEs or plain reserves) disambiguates task_struct from
+    # sibling structs with similar tails. Exactly one form must match once.
+    matched = None
+    for prefix_and_slot in TS_SLOT3_NEW_FORMS:
+        n = src.count(prefix_and_slot)
+        if n == 1:
+            matched = prefix_and_slot
+            break
+        if n > 1:
+            print(f"bore66-state: {path}: slot-3 tail form matched {n}x; "
+                  f"aborting", file=sys.stderr)
+            return False
+    if matched is None:
+        print(f"bore66-state: {path}: no known task_struct slot-3 tail "
+              f"shape (neither dmabuf-era nor plain-reserve); aborting",
               file=sys.stderr)
         return False
 
@@ -138,7 +161,11 @@ def process(path: str) -> bool:
     out = out.replace(anchor,
                       "#endif // CONFIG_SCHED_BORE\n\n" + BORE_STATE_DEF +
                       "\nstruct sched_entity {", 1)
-    out = out.replace(TS_SLOT3_OLD, TS_SLOT3_NEW, 1)
+    # Replace ONLY the slot-3 line within the matched form's context:
+    # split the matched form at its final line (the slot-3 RESERVE).
+    prefix = matched.rsplit("\tANDROID_KABI_RESERVE(3);\n", 1)[0]
+    out = out.replace(prefix + "\tANDROID_KABI_RESERVE(3);\n",
+                      prefix + SLOT3_USE, 1)
 
     with open(path, "w", encoding="utf-8", errors="surrogateescape") as fh:
         fh.write(out)
