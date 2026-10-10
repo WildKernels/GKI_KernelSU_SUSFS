@@ -251,18 +251,21 @@ runs:
           include/linux/sched.h || rc=$?
         if [ "${rc:-0}" != "0" ]; then
           if grep -q 'struct bore_ctx' include/linux/sched.h; then
-            # 6.8.0 generation (6.12/6.18): BORE state is a bore_ctx member in
-            # task_struct; sched_entity is untouched, so this relocation -
-            # which targets the 5.1.0-generation sched_entity fields - has
-            # nothing to do. The inline task_struct member does shift the
-            # offsets of task_struct members after it; moving bore_ctx into
-            # task_struct's free KABI reserve slots is the follow-up, same as
-            # the 6.6 bore_state work.
+            # 7.0.0 generation (6.12/6.18): BORE state is a bore_ctx member
+            # in task_struct; sched_entity is untouched, so the 5.1.0
+            # sched_entity relocation has nothing to do. But the INLINE
+            # bore_ctx member shifts every task_struct member after it, and
+            # task_struct is the most vendor-referenced struct in the KMI -
+            # every android_vh hook passes a task_struct*. That mismatch
+            # bootloops devices with stock vendor modules (reported on 6.12
+            # after run 38015274643). bore_task_slots_7.py below moves the
+            # state into task_struct's free KABI reserve slots 4..8 so
+            # offsets stay byte-identical to stock; this branch only
+            # explains why the sched_entity script had nothing to do.
             echo "" >&2
-            echo "NOTE: 6.8.0-generation BORE (bore_ctx in task_struct);" >&2
-            echo "sched_entity untouched, no kABI relocation needed here." >&2
-            echo "WARNING: bore_ctx is an INLINE task_struct member - KMI" >&2
-            echo "follow-up needed (slots 3-8 are free). See bore action." >&2
+            echo "NOTE: 7.x-generation BORE (bore_ctx in task_struct);" >&2
+            echo "sched_entity untouched; task_struct slot relocation" >&2
+            echo "runs at the next step." >&2
           elif grep -q 'struct sched_burst_cache child_burst;' include/linux/sched.h; then
             echo "" >&2
             echo "WARNING: 6.6-shape BORE fields present (spinlocked 24-byte" >&2
@@ -277,6 +280,45 @@ runs:
         fi
 
         grep -A9 'bore-kabi: burst_' include/linux/sched.h | head -10 || true
+
+    - name: Move 7.x bore_ctx into task_struct KABI slots (fix bootloops)
+      # 7.0.0/6.12-inline bore_ctx shifts task_struct offsets and bootloops
+      # stock-vendor devices. bore_task_slots_7.py overlays the state onto
+      # free ANDROID_KABI_RESERVE(4..8) - 40 bytes = 5 slots exactly, layout
+      # compile-proven (stock tail 40 == slotted tail 40, _Static_asserts
+      # green), genksyms still sees stock reserved u64s so the KMI symbol
+      # list is unchanged. bore_flat_accessors_7.py then rewrites the 23
+      # `->bore.X` accessor sites to flat members (p->burst_time, ...),
+      # removes the four `struct bore_ctx *ctx = &p->bore` shorthand locals,
+      # and turns reset_task_bore's contiguous memset into per-member
+      # assignments. Both no-op on every other family: 5.10/5.15/6.1 carry
+      # the 5.1.0 shape, 6.6 the 5.9.6 shape - neither has an inline
+      # task_struct bore_ctx.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        if ! grep -q 'struct bore_ctx' include/linux/sched.h 2>/dev/null; then
+          echo "No bore_ctx in task_struct (5.x/6.6 generations); nothing to do."
+          exit 0
+        fi
+
+        python3 "${{ github.workspace }}/.github/scripts/bore_task_slots_7.py" \
+          include/linux/sched.h
+
+        # Flatten accessors in every file that references ->bore or a
+        # bore_ctx shorthand local. fair.c.rej is included harmlessly - it
+        # is patch residue, not compiled source.
+        FILES=$(grep -rl -- '->bore\.\|struct bore_ctx \*ctx' \
+          include kernel 2>/dev/null || true)
+        if [ -n "$FILES" ]; then
+          python3 "${{ github.workspace }}/.github/scripts/bore_flat_accessors_7.py" \
+            $FILES
+        fi
+
+        echo "=== task_struct tail after relocation ==="
+        grep -A7 'bore-kabi: bore_ctx lives' include/linux/sched.h | head -8
 
     - name: Fix BORE declaration order (6.1 and below)
       # No if: gate. env.* set via GITHUB_ENV inside a composite action is not
