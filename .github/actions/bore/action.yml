@@ -281,6 +281,57 @@ runs:
 
         grep -A9 'bore-kabi: burst_' include/linux/sched.h | head -10 || true
 
+    - name: Move 6.6 burst state out-of-line (fix sched_entity KMI shift)
+      # 5.9.6 (the 6.6 patch) stores burst state INLINE in struct
+      # sched_entity: two 24-byte spinlocked sched_burst_cache structs plus
+      # scalars (~64 bytes), shifting every member after the insertion. The
+      # 6.6 KMI pins sched_entity structurally, and at least one user
+      # bootloops on 6.6 BORE builds with stock vendor modules - the same
+      # failure class as the 6.12 task_struct insertion. The caches cannot
+      # fit 8-byte ANDROID_KABI slots (24 > 8, _Static_assert refuses), so
+      # instead the state moves out-of-line:
+      #   - bore66_state.py removes the inline fields (sched_entity back to
+      #     its stock layout exactly), defines struct bore_state with the
+      #     identical field layout (both spinlocks kept, pointer identity
+      #     preserved), and consumes task_struct's free
+      #     ANDROID_KABI_RESERVE(3) for a 'struct bore_state *' - genksyms
+      #     still sees the stock reserved u64.
+      #   - bore66_flat.py translates every accessor (se->X ->
+      #     task_of(se)->bore_state->X, p->se.X -> p->bore_state->X,
+      #     curr->X -> task_of(curr)->bore_state->X, P(se.X) ->
+      #     P(bore_state->X)), allocates the state in copy_process (goto
+      #     bad_fork_cleanup_bore on ENOMEM, label before
+      #     bad_fork_cleanup_thread - the dmabuf_info pattern), allocates
+      #     init_task's static state in sched_bore_init, and frees it
+      #     NULL-safely in free_task() before trace_android_vh_free_task.
+      # cfs_b->burst_time (CFS bandwidth, stock) is keyed apart and never
+      # touched. No-ops on all other generations (no inline sched_entity
+      # burst fields present).
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        if ! grep -q 'struct sched_burst_cache child_burst;' include/linux/sched.h 2>/dev/null; then
+          echo "No inline sched_entity burst fields (5.1.0/7.x generations); nothing to do."
+          exit 0
+        fi
+
+        python3 "${{ github.workspace }}/.github/scripts/bore66_state.py" \
+          include/linux/sched.h
+        python3 "${{ github.workspace }}/.github/scripts/bore66_flat.py" \
+          kernel/sched/bore.c kernel/sched/fair.c kernel/fork.c kernel/sched/debug.c
+
+        echo "=== task_struct slot 3 ==="
+        grep -B1 -A2 'bore-kabi: 6.6 burst state' include/linux/sched.h | head -5
+        echo "=== residual accessor check ==="
+        if grep -rn -- '->se\.burst_\|se->burst_\|P(se\.burst' \
+            kernel/sched/fair.c kernel/sched/debug.c kernel/sched/bore.c kernel/fork.c 2>/dev/null; then
+          echo "ERROR: residual inline-form BORE accessors remain" >&2
+          exit 1
+        fi
+        echo "clean: no residual inline-form accessors"
+
     - name: Move 7.x bore_ctx into task_struct KABI slots (fix bootloops)
       # 7.0.0/6.12-inline bore_ctx shifts task_struct offsets and bootloops
       # stock-vendor devices. bore_task_slots_7.py overlays the state onto
