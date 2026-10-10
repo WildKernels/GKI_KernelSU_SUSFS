@@ -515,15 +515,25 @@ runs:
         # 'if (entity_is_task(curr)) {' inside update_curr(), before the
         # fair_server comment. Abort loudly if that anchor is missing - a
         # silent anchor miss is exactly the failure class we are fixing.
+        # NOTE on the call argument: the author's 6.12.37 base declares
+        # 'struct task_struct *p = task_of(curr);' inside update_curr(); GKI
+        # 6.12.92 inlined that away (no 'p' in scope - run 38015274643:
+        # fair.c:1378 'use of undeclared identifier p'). Call it with
+        # task_of(curr) directly, the same pattern the 6.8.0-era patches
+        # used at their call sites.
         ANCHOR=$(grep -n $'\tif (entity_is_task(curr)) {' kernel/sched/fair.c \
                  | awk -F: -v c="$CALL_LINE" '$1 < c' | tail -1 | cut -d: -f1)
         if [ -z "$ANCHOR" ]; then
           echo "ERROR: 'if (entity_is_task(curr)) {' anchor not found in update_curr(); refusing to guess." >&2
           exit 1
         fi
+        CALLER_ARG="p, delta_exec"
+        if ! grep -q 'struct task_struct \*p = task_of(curr);' kernel/sched/fair.c; then
+          CALLER_ARG="task_of(curr), delta_exec"
+        fi
         sed -i "${ANCHOR}a\\
         #ifdef CONFIG_SCHED_BORE\\
-        \t\tupdate_curr_bore(p, delta_exec);\\
+        \t\tupdate_curr_bore(${CALLER_ARG});\\
         #endif /* CONFIG_SCHED_BORE */" kernel/sched/fair.c
 
         echo "=== update_curr() after repair ==="
