@@ -815,7 +815,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || (fromJson(needs.resolve-sources.outputs.root_matrix) | length == 1) }}
+      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -846,7 +846,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || (fromJson(needs.resolve-sources.outputs.root_matrix) | length == 1) }}
+      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -877,7 +877,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || (fromJson(needs.resolve-sources.outputs.root_matrix) | length == 1) }}
+      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -908,7 +908,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || (fromJson(needs.resolve-sources.outputs.root_matrix) | length == 1) }}
+      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -939,7 +939,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || (fromJson(needs.resolve-sources.outputs.root_matrix) | length == 1) }}
+      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -970,7 +970,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || (fromJson(needs.resolve-sources.outputs.root_matrix) | length == 1) }}
+      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -1001,7 +1001,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || (fromJson(needs.resolve-sources.outputs.root_matrix) | length == 1) }}
+      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
