@@ -67,9 +67,13 @@ SE_RESERVES_OLD = (
     "} __randomize_layout;\n"
 )
 
-# DroidSpaces-style merge: scalars into SE slots 1+2. Flat members - the
-# patch's se->burst_time accessors need no translation. Slots 3+4 stay
-# reserved (stock).
+# DroidSpaces-style merge, DS-combo edition: SE slots 1+2 carry the
+# scalars (patch's se->burst_time accessors need no translation), SE
+# slots 3+4 carry child_burst packed to 16 bytes (timestamp u64,
+# spinlock, count u16, score u8 - count caps at 64 so u16 is ample),
+# and task_struct slots 3-5 carry group_burst in the same packed form
+# (16 of the 24 available bytes). Slots 5-8 of SE and 6-8 of TS stay
+# untouched so the DroidSpaces SYSVIPC patch (TS slots 6-8) coexists.
 SE_RESERVES_NEW = (
     "#ifdef CONFIG_SCHED_BORE\n"
     "\t" + MARK + "\n"
@@ -83,13 +87,21 @@ SE_RESERVES_NEW = (
     "\t\t\tu8\tburst_penalty;\n"
     "\t\t\tu8\tburst_score;\n"
     "\t\t});\n"
+    "\t_ANDROID_KABI_REPLACE(\n"
+    "\t\tANDROID_KABI_RESERVE(3);\n"
+    "\t\tANDROID_KABI_RESERVE(4),\n"
+    "\t\tstruct {\n"
+    "\t\t\tu64\ttimestamp;\n"
+    "\t\t\tspinlock_t\tlock;\n"
+    "\t\t\tu16\tcount;\n"
+    "\t\t\tu8\tscore;\n"
+    "\t\t});\n"
     "#else\n"
     "\tANDROID_KABI_RESERVE(1);\n"
     "\tANDROID_KABI_RESERVE(2);\n"
-    "#endif\n"
     "\tANDROID_KABI_RESERVE(3);\n"
     "\tANDROID_KABI_RESERVE(4);\n"
-    "} __randomize_layout;\n"
+    "#endif\n"
 )
 
 # task_struct tail shapes (three GKI eras; each ends at RESERVE(3) - the
@@ -141,27 +153,28 @@ DS_CONFLICT_MSG = (
     "DS feature for android15-6.6 builds (build.yml gates it off)."
 )
 
-# task_struct: both caches, merged across their slots (DroidSpaces shape).
-TS_CACHES_NEW = (
+# task_struct: group_burst packed into slots 3-5 (16 of the 24 bytes).
+# DS-combo: slots 6-8 stay stock (plain reserves, or DroidSpaces'
+# SYSVIPC USE/REPLACE when the DS patch ran first) - the transform
+# replaces ONLY the RESERVE(3..5) triple and preserves whatever
+# follows (the DS #ifdef block or plain reserves).
+TS_GROUP_NEW = (
     "#ifdef CONFIG_SCHED_BORE\n"
     "\t" + MARK + "\n"
     "\t_ANDROID_KABI_REPLACE(\n"
     "\t\tANDROID_KABI_RESERVE(3);\n"
     "\t\tANDROID_KABI_RESERVE(4);\n"
     "\t\tANDROID_KABI_RESERVE(5),\n"
-    "\t\tstruct sched_burst_cache child_burst);\n"
-    "\t_ANDROID_KABI_REPLACE(\n"
-    "\t\tANDROID_KABI_RESERVE(6);\n"
-    "\t\tANDROID_KABI_RESERVE(7);\n"
-    "\t\tANDROID_KABI_RESERVE(8),\n"
-    "\t\tstruct sched_burst_cache group_burst);\n"
+    "\t\tstruct {\n"
+    "\t\t\tu64\ttimestamp;\n"
+    "\t\t\tspinlock_t\tlock;\n"
+    "\t\t\tu16\tcount;\n"
+    "\t\t\tu8\tscore;\n"
+    "\t\t});\n"
     "#else\n"
     "\tANDROID_KABI_RESERVE(3);\n"
     "\tANDROID_KABI_RESERVE(4);\n"
     "\tANDROID_KABI_RESERVE(5);\n"
-    "\tANDROID_KABI_RESERVE(6);\n"
-    "\tANDROID_KABI_RESERVE(7);\n"
-    "\tANDROID_KABI_RESERVE(8);\n"
     "#endif\n"
 )
 
@@ -207,6 +220,30 @@ def process(path: str) -> bool:
         return False
     tail_abs = se_pos + m.start()
     closing = m.group(1)
+    # The patch defines `struct sched_burst_cache` (24-byte form) above
+    # sched_entity; all cache accessors take pointers to that type. The
+    # merged members use a PACKED 16-byte layout (timestamp u64, lock,
+    # count u16, score u8) - rewrite the definition to match, or every
+    # bc->X access would read the wrong offsets.
+    struct_def_old = (
+        "struct sched_burst_cache {\n"
+        "\tu8\t\t\t\tscore;\n"
+        "\tu32\t\t\t\tcount;\n"
+        "\tu64\t\t\t\ttimestamp;\n"
+        "    spinlock_t\t\tlock;\n"
+        "};\n"
+    )
+    struct_def_new = (
+        "struct sched_burst_cache {\n"
+        "\tu64\t\t\t\ttimestamp;\n"
+        "\tspinlock_t\t\tlock;\n"
+        "\tu16\t\t\t\tcount;\n"
+        "\tu8\t\t\t\tscore;\n"
+        "};\n"
+    )
+    if struct_def_old in out:
+        out = out.replace(struct_def_old, struct_def_new, 1)
+        print(f"bore66-state: {path}: sched_burst_cache packed to 16 bytes")
     se_new = (
         "#ifdef CONFIG_SCHED_BORE\n"
         "\t" + MARK + "\n"
@@ -219,6 +256,15 @@ def process(path: str) -> bool:
         "\t\t\tu8\tcurr_burst_penalty;\n"
         "\t\t\tu8\tburst_penalty;\n"
         "\t\t\tu8\tburst_score;\n"
+        "\t\t});\n"
+        "\t_ANDROID_KABI_REPLACE(\n"
+        "\t\tANDROID_KABI_RESERVE(3);\n"
+        "\t\tANDROID_KABI_RESERVE(4),\n"
+        "\t\tstruct {\n"
+        "\t\t\tu64\ttimestamp;\n"
+        "\t\t\tspinlock_t\tlock;\n"
+        "\t\t\tu16\tcount;\n"
+        "\t\t\tu8\tscore;\n"
         "\t\t});\n"
         "#else\n"
         "\tANDROID_KABI_RESERVE(1);\n"
@@ -251,32 +297,29 @@ def process(path: str) -> bool:
         print(f"bore66-state: {path}: no known task_struct tail shape; "
               f"aborting", file=sys.stderr)
         return False
-    if matched is TS_TAIL_FORMS[3]:
-        print(f"bore66-state: {path}: {DS_CONFLICT_MSG}", file=sys.stderr)
-        return False
 
-    r8 = "\tANDROID_KABI_RESERVE(8);\n"
-    if out.count(r8) != 1:
-        print(f"bore66-state: {path}: found {out.count(r8)} "
-              f"ANDROID_KABI_RESERVE(8) lines (expected 1)", file=sys.stderr)
-        return False
+    # DS-combo: only the RESERVE(3)(4)(5) triple is consumed (16 bytes of
+    # group_burst in 24 bytes of slots). Slots 6-8 stay as-is - plain
+    # reserves, or DroidSpaces' SYSVIPC USE/REPLACE when the DS patch ran
+    # first (the DS block sits AFTER slot 5 and is preserved verbatim).
     form_pos = out.find(matched)
-    r3 = "\tANDROID_KABI_RESERVE(3);\n"
+    r3 = ("\tANDROID_KABI_RESERVE(3);\n"
+          "\tANDROID_KABI_RESERVE(4);\n"
+          "\tANDROID_KABI_RESERVE(5);\n")
     r3_pos = out.find(r3, form_pos)
-    r8_pos = out.find(r8, form_pos)
-    if r3_pos == -1 or r8_pos == -1 or r3_pos > r8_pos:
-        print(f"bore66-state: {path}: RESERVE(3)..RESERVE(8) block not found "
+    if r3_pos == -1:
+        print(f"bore66-state: {path}: RESERVE(3..5) triple not found "
               f"contiguously after the matched tail; aborting",
               file=sys.stderr)
         return False
-    block_end = r8_pos + len(r8)
-    out = out[:r3_pos] + TS_CACHES_NEW + out[block_end:]
+    out = out[:r3_pos] + TS_GROUP_NEW + out[r3_pos + len(r3):]
 
     with open(path, "w", encoding="utf-8", errors="surrogateescape") as fh:
         fh.write(out)
     print(f"bore66-state: {path}: inline fields removed, scalars merged "
-          f"into sched_entity slots 1-2, caches merged into task_struct "
-          f"slots 3-8 (DroidSpaces method)")
+          f"into sched_entity slots 1-2, child_burst into sched_entity "
+          f"slots 3-4, group_burst into task_struct slots 3-5 - DroidSpaces "
+          f"slots 6-8 preserved (DS-combo method)")
     return True
 
 

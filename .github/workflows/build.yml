@@ -380,13 +380,11 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: DroidSpaces-OSS Patches
-      # android15-6.6 is excluded: the 6.6 burst state uses ALL of
-      # task_struct's free KABI slots 3-8 inline (DroidSpaces method, see
-      # bore66_state.py) and DS's SYSVIPC needs 3 of those same slots - the
-      # two cannot coexist (84 bytes of payload vs an 80-byte budget).
+      # 6.6 runs the DS-combo: bore's group_burst uses TS slots 3-5
+      # (packed 16B), DS's SYSVIPC gap-trick patch uses the pre-se
+      # alignment hole (no slots), so both coexist on every family.
       if: >-
-        (contains(inputs.feature_set, 'DS') || inputs.feature_set == 'All') &&
-        inputs.version != 'android15-6.6'
+        (contains(inputs.feature_set, 'DS') || inputs.feature_set == 'All')
       uses: ./.github/actions/droidspaces
       with:
         version: ${{ inputs.version }}
