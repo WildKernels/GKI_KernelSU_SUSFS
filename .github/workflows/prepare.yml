@@ -226,7 +226,7 @@ jobs:
           echo "cache_key=${CACHE_KEY}" >> "$GITHUB_OUTPUT"
 
       - name: Restore Stock Config Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/stock-configs
           key: ${{ steps.heads.outputs.cache_key }}
@@ -299,7 +299,7 @@ jobs:
       - name: Save Stock Config Cache
         if: always()
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/stock-configs
           key: ${{ steps.heads.outputs.cache_key }}
