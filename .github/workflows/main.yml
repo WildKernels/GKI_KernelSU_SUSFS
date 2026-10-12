@@ -1064,8 +1064,33 @@ jobs:
       SUSFS_ANDROID15_6_6: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6 }}
       SUSFS_ANDROID16_6_12: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12 }}
       DIGEST_FEATURES: "susfs,nomount,bbg,ds,net,ntsync,ptrace,unicode,bpf"
+      # Local Bot API 10.x server (rich cards: real tables, styled button
+      # rows, expandable quotes). Optional - without these secrets the job
+      # falls back to the cloud API and the plain HTML cards.
+      TG_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TG_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
     steps:
       - uses: actions/checkout@v7
+      - name: Start local Telegram Bot API server (rich messages)
+        if: ${{ env.TG_API_ID != '' && env.TG_API_HASH != '' }}
+        run: |
+          # A bot token can be logged into only ONE bot-api server at a
+          # time. Once this container logs the bot in, every send in this
+          # job MUST go through it (cloud api.telegram.org would 401).
+          docker run -d --name tg-bot-api -p 8081:8081 \
+            -e TELEGRAM_API_ID="${TG_API_ID}" \
+            -e TELEGRAM_API_HASH="${TG_API_HASH}" \
+            -e TELEGRAM_LOCAL=true \
+            aiogram/telegram-bot-api:latest > /dev/null 2>&1 || true
+          for i in $(seq 1 20); do
+            if curl -sf --max-time 5 "http://localhost:8081/bot${TG_TOKEN}/getMe" > /dev/null 2>&1; then
+              echo "TG_API=http://localhost:8081" >> "$GITHUB_ENV"
+              echo "Local Bot API server up - rich sendRichMessage cards enabled."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "WARN: local Bot API server did not come up; falling back to the cloud API (plain HTML cards)."
       - name: Post per-family digests to Telegram topics
         shell: bash
         env:
@@ -1116,24 +1141,45 @@ jobs:
           sent=0
           FAMILY_LINKS=""
           FAMILY_BTN_ROWS=""
+          RICH_BTN_ROWS=""
           while IFS= read -r -d $'\x1e' rec; do
             [ -z "$rec" ] && continue
             chat="${rec%%$'\t'*}"; rest="${rec#*$'\t'}"
             topic="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
             famname="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
+            rich_md="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
             html_msg="${rest%%$'\t'*}"
             buttons="${rest#*$'\t'}"
-            MK=( )
-            [ -n "$buttons" ] && MK=(--data-urlencode "reply_markup=${buttons}")
-            RESP=$(curl -sf --max-time 30 \
-              "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=${chat}" \
-              --data-urlencode "message_thread_id=${topic}" \
-              --data-urlencode "parse_mode=HTML" \
-              --data-urlencode "disable_web_page_preview=true" \
-              --data-urlencode "text=${html_msg}" \
-              "${MK[@]}") \
-              || { echo "WARN: telegram send to chat ${chat} topic ${topic} failed: $(printf '%s' "${RESP:-}" | head -c 300)"; continue; }
+            RESP=""
+            if [ -n "${TG_API:-}" ]; then
+              # Rich path (Bot API 10.x sendRichMessage on the local server):
+              # tables, styled button rows, expandable quotes.
+              BODY=$(jq -nc --arg chat "$chat" --arg topic "$topic" --arg md "$rich_md" \
+                '{chat_id: ($chat|tonumber? // $chat),
+                  message_thread_id: ($topic|tonumber? // $topic),
+                  rich_message: {markdown: $md}}')
+              RESP=$(curl -s --max-time 60 \
+                "${TG_API}/bot${TG_TOKEN}/sendRichMessage" \
+                -H 'Content-Type: application/json' -d "$BODY")
+              if ! printf '%s' "$RESP" | jq -e '.ok' > /dev/null 2>&1; then
+                echo "WARN: sendRichMessage to chat ${chat} topic ${topic} failed: $(printf '%s' "$RESP" | head -c 300)"
+                RESP=""
+              fi
+            fi
+            if [ -z "$RESP" ]; then
+              # Cloud fallback: plain HTML card + inline keyboard.
+              MK=( )
+              [ -n "$buttons" ] && MK=(--data-urlencode "reply_markup=${buttons}")
+              RESP=$(curl -sf --max-time 30 \
+                "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${chat}" \
+                --data-urlencode "message_thread_id=${topic}" \
+                --data-urlencode "parse_mode=HTML" \
+                --data-urlencode "disable_web_page_preview=true" \
+                --data-urlencode "text=${html_msg}" \
+                "${MK[@]}") \
+                || { echo "WARN: telegram send to chat ${chat} topic ${topic} failed: $(printf '%s' "${RESP:-}" | head -c 300)"; continue; }
+            fi
             sent=$((sent + 1))
             MID=$(printf '%s' "$RESP" | jq -r '.result.message_id // empty' 2>/dev/null)
             # Remember the in-group t.me link for the combined testing card
@@ -1141,15 +1187,17 @@ jobs:
             if [ -n "$MID" ] && [ -n "$TME_USER" ]; then
               TME_URL="https://t.me/${TME_USER}/${topic}/${MID}"
               FAMILY_LINKS="${FAMILY_LINKS}<li><a href=\"${TME_URL}\">${famname}</a></li>"
-              # One button row per family card, for the combined card.
+              # One button row per family card, for the combined card
+              # (JSON for the cloud path, rich markup for the rich path).
               ROW=$(jq -nc --arg t "🔨 ${famname}" --arg u "${TME_URL}" \
                 '[{text:$t,url:$u}]' 2>/dev/null || true)
               [ -n "$ROW" ] && FAMILY_BTN_ROWS="${FAMILY_BTN_ROWS}${ROW},"
+              RICH_BTN_ROWS="${RICH_BTN_ROWS}<tg-button-row><tg-button type=\"url\" style=\"primary\" url=\"${TME_URL}\">🔨 ${famname}</tg-button></tg-button-row>"$'\n'
             fi
             # Pin the digest in its topic so the latest build stays on top.
             if [ -n "$MID" ]; then
               curl -sf --max-time 30 \
-                "https://api.telegram.org/bot${TG_TOKEN}/pinChatMessage" \
+                "${TG_API:-https://api.telegram.org}/bot${TG_TOKEN}/pinChatMessage" \
                 -d "chat_id=${chat}" -d "message_id=${MID}" \
                 -d "disable_notification=true" > /dev/null \
                 || echo "WARN: could not pin in chat ${chat} topic ${topic} (needs pin permission)"
@@ -1160,30 +1208,51 @@ jobs:
           # linking each family's digest post in the announcement group,
           # with a t.me button row per family + the all-artifacts button.
           if [ -n "$TG_TEST_CHAT" ] && [ -n "$TG_TEST_TOPIC" ] && [ -n "$FAMILY_LINKS" ]; then
-            COMBINED=$(printf '%s' \
-              "👋 <b>Hello, new testing release here:</b><br>🔨 <b>Wild Kernels</b> — <code>${{ github.ref_name }}</code><br><b>Run</b>: <a href=\"${RUN_URL}\">#${RUN_ID}</a><br><ul>${FAMILY_LINKS}</ul>")
             ALL_ROW=$(jq -nc --arg u "${NIGHTLY_URL}" \
               '[{text:"📦 All artifacts",url:$u}]' 2>/dev/null || true)
             TEST_BTN_ROWS="${FAMILY_BTN_ROWS}${ALL_ROW}"
-            MK=( )
-            if [ -n "$TEST_BTN_ROWS" ]; then
-              TEST_BUTTONS=$(jq -nc --argjson rows "[${TEST_BTN_ROWS%,}]" \
-                '{inline_keyboard:$rows}' 2>/dev/null || true)
-              [ -n "$TEST_BUTTONS" ] && MK=(--data-urlencode "reply_markup=${TEST_BUTTONS}")
+            TRESP=""
+            if [ -n "${TG_API:-}" ]; then
+              # Rich combined card (same dialect as the family cards).
+              RICH_ALL="<tg-button-row><tg-button type=\"url\" style=\"success\" url=\"${NIGHTLY_URL}\">📦 All artifacts</tg-button></tg-button-row>"
+              RICH_MSG=$(printf '# 👋 New Testing Release\n\n**Wild Kernels** — %s\n\nRun: [#%s](%s)\n\n%s\n\n%s' \
+                "${{ github.ref_name }}" "${RUN_ID}" "${RUN_URL}" \
+                "${RICH_BTN_ROWS}" "${RICH_ALL}")
+              TBODY=$(jq -nc --arg chat "$TG_TEST_CHAT" --arg topic "$TG_TEST_TOPIC" --arg md "$RICH_MSG" \
+                '{chat_id: ($chat|tonumber? // $chat),
+                  message_thread_id: ($topic|tonumber? // $topic),
+                  rich_message: {markdown: $md}}')
+              TRESP=$(curl -s --max-time 60 \
+                "${TG_API}/bot${TG_TOKEN}/sendRichMessage" \
+                -H 'Content-Type: application/json' -d "$TBODY")
+              if ! printf '%s' "$TRESP" | jq -e '.ok' > /dev/null 2>&1; then
+                echo "WARN: rich combined card failed: $(printf '%s' "$TRESP" | head -c 300)"
+                TRESP=""
+              fi
             fi
-            TRESP=$(curl -sf --max-time 30 \
-              "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=${TG_TEST_CHAT}" \
-              --data-urlencode "message_thread_id=${TG_TEST_TOPIC}" \
-              --data-urlencode "parse_mode=HTML" \
-              --data-urlencode "disable_web_page_preview=true" \
-              --data-urlencode "text=${COMBINED}" \
-              "${MK[@]}") \
-              || echo "WARN: combined testing card send failed"
+            if [ -z "$TRESP" ]; then
+              COMBINED=$(printf '%s' \
+                "👋 <b>Hello, new testing release here:</b><br>🔨 <b>Wild Kernels</b> — <code>${{ github.ref_name }}</code><br><b>Run</b>: <a href=\"${RUN_URL}\">#${RUN_ID}</a><br><ul>${FAMILY_LINKS}</ul>")
+              MK=( )
+              if [ -n "$TEST_BTN_ROWS" ]; then
+                TEST_BUTTONS=$(jq -nc --argjson rows "[${TEST_BTN_ROWS%,}]" \
+                  '{inline_keyboard:$rows}' 2>/dev/null || true)
+                [ -n "$TEST_BUTTONS" ] && MK=(--data-urlencode "reply_markup=${TEST_BUTTONS}")
+              fi
+              TRESP=$(curl -sf --max-time 30 \
+                "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${TG_TEST_CHAT}" \
+                --data-urlencode "message_thread_id=${TG_TEST_TOPIC}" \
+                --data-urlencode "parse_mode=HTML" \
+                --data-urlencode "disable_web_page_preview=true" \
+                --data-urlencode "text=${COMBINED}" \
+                "${MK[@]}") \
+                || echo "WARN: combined testing card send failed"
+            fi
             TMID=$(printf '%s' "${TRESP:-}" | jq -r '.result.message_id // empty' 2>/dev/null)
             if [ -n "$TMID" ]; then
               curl -sf --max-time 30 \
-                "https://api.telegram.org/bot${TG_TOKEN}/pinChatMessage" \
+                "${TG_API:-https://api.telegram.org}/bot${TG_TOKEN}/pinChatMessage" \
                 -d "chat_id=${TG_TEST_CHAT}" -d "message_id=${TMID}" \
                 -d "disable_notification=true" > /dev/null \
                 || echo "WARN: could not pin in the testing group (needs pin permission)"
