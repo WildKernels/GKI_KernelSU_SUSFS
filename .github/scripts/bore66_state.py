@@ -186,6 +186,35 @@ def process(path: str) -> bool:
     if MARK in src:
         print(f"bore66-state: {path}: already relocated")
         return True
+
+    # The patch defines `struct sched_burst_cache` (24-byte form) above
+    # sched_entity; all cache accessors take pointers to that type. The
+    # merged members use a PACKED 16-byte layout (timestamp u64, lock,
+    # count u16, score u8) - rewrite the definition to match, or every
+    # bc->X access would read the wrong offsets. MUST run BEFORE any
+    # offset is computed: the rewrite changes character lengths, and a
+    # stale tail_abs splices mid-line (run 38302086915: the 6.6.127 legs
+    # died on a '\tAN' fragment at the SE seam).
+    struct_def_old = (
+        "struct sched_burst_cache {\n"
+        "\tu8\t\t\t\tscore;\n"
+        "\tu32\t\t\t\tcount;\n"
+        "\tu64\t\t\t\ttimestamp;\n"
+        "    spinlock_t\t\tlock;\n"
+        "};\n"
+    )
+    struct_def_new = (
+        "struct sched_burst_cache {\n"
+        "\tu64\t\t\t\ttimestamp;\n"
+        "\tspinlock_t\t\tlock;\n"
+        "\tu16\t\t\t\tcount;\n"
+        "\tu8\t\t\t\tscore;\n"
+        "};\n"
+    )
+    if struct_def_old in src:
+        src = src.replace(struct_def_old, struct_def_new, 1)
+        print(f"bore66-state: {path}: sched_burst_cache packed to 16 bytes")
+
     if SE_FIELDS_OLD not in src:
         print(f"bore66-state: {path}: inline sched_entity burst fields "
               f"absent (not the 5.9.6 6.6 shape); no edit")
@@ -218,32 +247,12 @@ def process(path: str) -> bool:
               f"after the inline fields (before sched_rt_entity); "
               f"aborting", file=sys.stderr)
         return False
+    # m.start()/m.end() are offsets WITHIN out[se_pos:] - the absolute end
+    # is se_pos + m.end(), NOT tail_abs + m.end() (double-counting
+    # m.start() overshoots the slice past the match and swallows whatever
+    # follows - run 38198611423 ate all of sched_rt_entity this way).
     tail_abs = se_pos + m.start()
     closing = m.group(1)
-    # The patch defines `struct sched_burst_cache` (24-byte form) above
-    # sched_entity; all cache accessors take pointers to that type. The
-    # merged members use a PACKED 16-byte layout (timestamp u64, lock,
-    # count u16, score u8) - rewrite the definition to match, or every
-    # bc->X access would read the wrong offsets.
-    struct_def_old = (
-        "struct sched_burst_cache {\n"
-        "\tu8\t\t\t\tscore;\n"
-        "\tu32\t\t\t\tcount;\n"
-        "\tu64\t\t\t\ttimestamp;\n"
-        "    spinlock_t\t\tlock;\n"
-        "};\n"
-    )
-    struct_def_new = (
-        "struct sched_burst_cache {\n"
-        "\tu64\t\t\t\ttimestamp;\n"
-        "\tspinlock_t\t\tlock;\n"
-        "\tu16\t\t\t\tcount;\n"
-        "\tu8\t\t\t\tscore;\n"
-        "};\n"
-    )
-    if struct_def_old in out:
-        out = out.replace(struct_def_old, struct_def_new, 1)
-        print(f"bore66-state: {path}: sched_burst_cache packed to 16 bytes")
     se_new = (
         "#ifdef CONFIG_SCHED_BORE\n"
         "\t" + MARK + "\n"
@@ -274,15 +283,10 @@ def process(path: str) -> bool:
         "#endif\n"
         + closing
     )
-    # m.start()/m.end() are offsets WITHIN out[se_pos:] - the absolute end
-    # is se_pos + m.end(), NOT tail_abs + m.end() (double-counting
-    # m.start() overshoots the slice past the match and swallows whatever
-    # follows - run 38198611423 ate all of sched_rt_entity this way).
     out = out[:tail_abs] + se_new + out[se_pos + m.end():]
 
-    # task_struct: locate the tail era form, then merge RESERVE(3..5) and
-    # RESERVE(6..8) into the two burst caches. RESERVE(8) must be unique -
-    # sched_rt_entity/sched_entity stop at RESERVE(4).
+    # task_struct: locate the tail era form, then pack group_burst into
+    # the RESERVE(3..5) triple. Slots 6-8 stay untouched.
     matched = None
     for form in TS_TAIL_FORMS:
         n = out.count(form)
