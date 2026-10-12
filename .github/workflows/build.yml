@@ -67,6 +67,11 @@ on:
         required: false
         type: boolean
         default: false
+      use_bore:
+        description: "Apply the BORE scheduler (false = stock scheduler, A/B boot tests)"
+        required: false
+        type: boolean
+        default: true
       allow_version_mismatch:
         required: false
         type: boolean
@@ -418,6 +423,8 @@ jobs:
       uses: ./.github/actions/misc
 
     - name: Apply BORE Scheduler
+      # use_bore=false = stock CFS/EEVDF, for A/B boot-loop isolation.
+      if: inputs.use_bore != false
       uses: ./.github/actions/bore
       with:
         kernel_version: ${{ inputs.kernel_version }}
