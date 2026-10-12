@@ -66,6 +66,11 @@ on:
         required: false
         type: boolean
         default: false
+      use_bore:
+        description: "Apply the BORE scheduler (false = stock scheduler, A/B boot tests)"
+        required: false
+        type: boolean
+        default: true
       allow_version_mismatch:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         required: false
@@ -344,6 +349,7 @@ jobs:
       droidspaces_commit: ${{ inputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi }}
+      use_bore: ${{ inputs.use_bore }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size }}
