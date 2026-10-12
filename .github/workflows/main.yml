@@ -330,8 +330,8 @@ jobs:
             NEXT_COMMIT="$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)"
           fi
 
-          mk_entry() { # flavor variant commit
-            printf '{"root_flavor":"%s","variant":"%s","root_commit":"%s"}' "$1" "$2" "$3"
+          mk_entry() { # flavor variant commit produce
+            printf '{"root_flavor":"%s","variant":"%s","root_commit":"%s","produce":%s}' "$1" "$2" "$3" "$4"
           }
 
           # On 'schedule' there are no inputs, so the default must be the exact
@@ -342,22 +342,22 @@ jobs:
             KernelSU)
               echo "root_flavor=kernelsu" >> "$GITHUB_OUTPUT"
               emit root_commit "$KERNELSU_COMMIT"
-              ROOT_MATRIX="[$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT")]"
+              ROOT_MATRIX="[$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT" true)]"
               ;;
             KernelSU-Next)
               echo "root_flavor=next" >> "$GITHUB_OUTPUT"
               emit root_commit "$NEXT_COMMIT"
-              ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT")]"
+              ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT" true)]"
               ;;
             BakaSU)
               echo "root_flavor=bakasu" >> "$GITHUB_OUTPUT"
               emit root_commit "$BAKASU_COMMIT"
-              ROOT_MATRIX="[$(mk_entry bakasu BakaSU "$BAKASU_COMMIT")]"
+              ROOT_MATRIX="[$(mk_entry bakasu BakaSU "$BAKASU_COMMIT" true)]"
               ;;
             SukiSU-Ultra)
               echo "root_flavor=sukisu-ultra" >> "$GITHUB_OUTPUT"
               emit root_commit "$SUKISU_ULTRA_COMMIT"
-              ROOT_MATRIX="[$(mk_entry sukisu-ultra SukiSU-Ultra "$SUKISU_ULTRA_COMMIT")]"
+              ROOT_MATRIX="[$(mk_entry sukisu-ultra SukiSU-Ultra "$SUKISU_ULTRA_COMMIT" true)]"
               ;;
             KowSU)
               if [ "${{ inputs.use_susfs }}" = "true" ]; then
@@ -366,7 +366,7 @@ jobs:
               fi
               echo "root_flavor=kowsu" >> "$GITHUB_OUTPUT"
               emit root_commit "$KOWSU_COMMIT"
-              ROOT_MATRIX="[$(mk_entry kowsu KowSU "$KOWSU_COMMIT")]"
+              ROOT_MATRIX="[$(mk_entry kowsu KowSU "$KOWSU_COMMIT" true)]"
               ;;
             "No Root")
               echo "root_flavor=none" >> "$GITHUB_OUTPUT"
@@ -375,7 +375,7 @@ jobs:
               ;;
             "All (KernelSU-Next + KernelSU + BakaSU)")
               # Fan out to all three root variants, each with its pinned commit.
-              ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT"),$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT"),$(mk_entry bakasu BakaSU "$BAKASU_COMMIT")]"
+              ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT" true),$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT" false),$(mk_entry bakasu BakaSU "$BAKASU_COMMIT" false)]"
               echo "root_flavor=" >> "$GITHUB_OUTPUT"
               echo "root_commit=" >> "$GITHUB_OUTPUT"
               ;;
@@ -815,7 +815,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
+      produce_stock_configs: ${{ matrix.root.produce }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -846,7 +846,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
+      produce_stock_configs: ${{ matrix.root.produce }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -877,7 +877,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
+      produce_stock_configs: ${{ matrix.root.produce }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -908,7 +908,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
+      produce_stock_configs: ${{ matrix.root.produce }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -939,7 +939,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
+      produce_stock_configs: ${{ matrix.root.produce }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -970,7 +970,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
+      produce_stock_configs: ${{ matrix.root.produce }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -1001,7 +1001,7 @@ jobs:
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
-      produce_stock_configs: ${{ matrix.root.root_flavor == 'next' || length(fromJson(needs.resolve-sources.outputs.root_matrix)) == 1 }}
+      produce_stock_configs: ${{ matrix.root.produce }}
       root_commit: ${{ matrix.root.root_commit }}
       variant: ${{ matrix.root.variant }}
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
