@@ -1068,6 +1068,17 @@ jobs:
           gh api --paginate \
             "repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
             > /tmp/artifacts.json || true
+          # No kernels built -> nothing to announce. The gate is the
+          # artifact list: zero AnyKernel3 zips means every build failed
+          # (or nothing ran), and a card that only says "it all failed"
+          # is noise. A missing/unparseable artifact list still announces
+          # (old behavior) rather than silently dropping good builds.
+          if [ -s /tmp/artifacts.json ] \
+             && AK3_COUNT=$(jq -s '[.[] | .artifacts[]? | select((.name // "") | contains("AnyKernel3"))] | length' /tmp/artifacts.json 2>/dev/null) \
+             && [ "${AK3_COUNT:-0}" -eq 0 ]; then
+            echo "No AnyKernel3 artifacts in this run - no kernels built; skipping Telegram announce."
+            exit 0
+          fi
           python3 .github/scripts/telegram_digest.py \
             --run-id "$RUN_ID" \
             --branch "${{ github.ref_name }}" \

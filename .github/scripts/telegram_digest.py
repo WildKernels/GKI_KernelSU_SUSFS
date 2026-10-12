@@ -288,6 +288,15 @@ def main() -> int:
                 sub_lines.append(f"- {esc(s)}")
         sub_text = "\n".join(sub_lines) if sub_lines else "—"
 
+        # Family gate: zero linked kernels means nothing built for this
+        # family (every sublevel failed) - skip the card entirely instead
+        # of posting an all-❌ notice. Families with at least one built
+        # kernel still post, failures shown per-sublevel.
+        if not sub_links:
+            print(f"telegram-digest: {fname}: no AnyKernel3 artifacts "
+                  f"(no kernels built); skipping card", file=sys.stderr)
+            continue
+
         # Flavors, each linking its manager APK when the run uploaded one.
         # The flavor name links the stock manager; KernelSU-Next gets a
         # trailing "spoofed" link for its second variant.
