@@ -474,7 +474,7 @@ jobs:
                   "$flavor" "$owner" "$repo" "$run_id" "$stock"
                 ;;
               bakasu)
-                owner="BakaSU"; repo="BakaSU"; wf="build-manager.yml"
+                owner="Baka-SU"; repo="BakaSU"; wf="build-manager.yml"
                 stock=$(git ls-remote https://github.com/Baka-SU/BakaSU.git refs/heads/main | awk '{print $1; exit}')
                 run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   --jq '.workflow_runs[0].id // empty')
@@ -694,12 +694,12 @@ jobs:
             )
           done
           # Filter BakaSU to only release universal and universal spoofed (drop debug/non-universal)
-          if grep -q "BakaSU|BakaSU|" "$MANIFEST" 2>/dev/null; then
+          if grep -q "Baka-SU|BakaSU|" "$MANIFEST" 2>/dev/null; then
             tmp_manifest="${MANIFEST}.filtered"
             : > "$tmp_manifest"
             while IFS='|' read -r o r n; do
               [ -n "$n" ] || continue
-              if [ "$o" = "BakaSU" ] && [ "$r" = "BakaSU" ]; then
+              if [ "$o" = "Baka-SU" ] && [ "$r" = "BakaSU" ]; then
                 ln=$(echo "$n" | tr '[:upper:]' '[:lower:]')
                 # keep only universal apks, drop debug
                 if [[ "$ln" != *universal* ]]; then echo "Dropping BakaSU non-universal $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi

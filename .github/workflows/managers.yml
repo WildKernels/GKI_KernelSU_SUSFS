@@ -243,7 +243,7 @@ jobs:
                 ;;
 
               bakasu)
-                owner="BakaSU"; repo="BakaSU"; wf="build-manager.yml"
+                owner="Baka-SU"; repo="BakaSU"; wf="build-manager.yml"
                 if [[ -n "${INPUT_BAKASU_COMMIT:-}" ]]; then
                   stock="$INPUT_BAKASU_COMMIT"
                   if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
@@ -430,12 +430,12 @@ jobs:
             )
           done
           # Filter BakaSU to only release universal and universal spoofed
-          if grep -q "BakaSU|BakaSU|" "$MANIFEST" 2>/dev/null; then
+          if grep -q "Baka-SU|BakaSU|" "$MANIFEST" 2>/dev/null; then
             tmp_manifest="${MANIFEST}.filtered"
             : > "$tmp_manifest"
             while IFS='|' read -r o r n; do
               [ -n "$n" ] || continue
-              if [ "$o" = "BakaSU" ] && [ "$r" = "BakaSU" ]; then
+              if [ "$o" = "Baka-SU" ] && [ "$r" = "BakaSU" ]; then
                 ln=$(echo "$n" | tr '[:upper:]' '[:lower:]')
                 if [[ "$ln" != *universal* ]]; then echo "Dropping BakaSU non-universal $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
                 if [[ "$ln" == *debug* ]]; then echo "Dropping BakaSU debug $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
