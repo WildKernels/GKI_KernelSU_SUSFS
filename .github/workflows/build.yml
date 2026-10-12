@@ -375,7 +375,13 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: DroidSpaces-OSS Patches
-      if: contains(inputs.feature_set, 'DS') || inputs.feature_set == 'All'
+      # android15-6.6 is excluded: the 6.6 burst state uses ALL of
+      # task_struct's free KABI slots 3-8 inline (DroidSpaces method, see
+      # bore66_state.py) and DS's SYSVIPC needs 3 of those same slots - the
+      # two cannot coexist (84 bytes of payload vs an 80-byte budget).
+      if: >-
+        (contains(inputs.feature_set, 'DS') || inputs.feature_set == 'All') &&
+        inputs.version != 'android15-6.6'
       uses: ./.github/actions/droidspaces
       with:
         version: ${{ inputs.version }}
@@ -410,6 +416,12 @@ jobs:
 
     - name: Setup Misc Configs
       uses: ./.github/actions/misc
+
+    - name: Apply BORE Scheduler
+      uses: ./.github/actions/bore
+      with:
+        kernel_version: ${{ inputs.kernel_version }}
+        sublevel: ${{ inputs.sublevel }}
 
     - name: Enable BPF Stack (BTF + eBPF + FUSE-BPF)
       if: contains(inputs.feature_set, 'BPF')
