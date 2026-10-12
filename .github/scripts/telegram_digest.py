@@ -252,12 +252,11 @@ def main() -> int:
         sub_lines = []
         sub_links = {}
         for s in subs:
-            sj = e["sub_jobs"].get(s, {})
-            bad = sj.get("failure", 0) + sj.get("cancelled", 0) + \
-                sj.get("startup_failure", 0)
-            if bad:
-                sub_lines.append(f"- ❌ {esc(s)}")
-                continue
+            # Link-first: a sublevel is ❌ only when NO flavor produced an
+            # AnyKernel3 for it (run 38232596744: one failed flavor leg per
+            # sublevel marked every line ❌ and the family gate then dropped
+            # the whole card despite 39 built kernels). Partial failures
+            # stay visible in the Jobs line and in which flavors link.
             link_id = None
             for fl in ("KernelSU-Next", "KernelSU", "BakaSU"):
                 art_name = f"{s}-{fl}-AnyKernel3"
@@ -285,7 +284,7 @@ def main() -> int:
                 sub_lines.append(f"- <a href=\"{html.escape(url, quote=True)}\">"
                                  f"{esc(s)}</a>")
             else:
-                sub_lines.append(f"- {esc(s)}")
+                sub_lines.append(f"- ❌ {esc(s)}")
         sub_text = "\n".join(sub_lines) if sub_lines else "—"
 
         # Family gate: zero linked kernels means nothing built for this
