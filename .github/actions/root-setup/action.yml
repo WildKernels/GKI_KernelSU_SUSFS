@@ -153,3 +153,23 @@ runs:
             echo "Softened BakaSU submodule check in $d/Kbuild"
           fi
         done
+
+    - name: Soften BakaSU susfs_compat gate for susfs-inline builds
+      if: inputs.flavor == 'bakasu'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        # BakaSU's kernel/tools/susfs_compat.mk ends with an UNCONDITIONAL
+        # $(error "Please wait susfs update.") that fires on every
+        # CONFIG_KSU_SUSFS=y build (run 38221374132: the 6.1 BakaSU leg).
+        # The file's real work - the grep-based KSU_COMPAT_HAS_* defines
+        # above the gate - adapts the code to both old and new susfs
+        # layouts, so the hard stop is overcautious for our builds. Strip
+        # the tail (both $(info) lines and the $(error)), keep the shims.
+        F="BakaSU/kernel/tools/susfs_compat.mk"
+        if [ -f "$F" ] && grep -q 'Please wait susfs update' "$F"; then
+          sed -i '/susfs has NOT update with latest KernelSU source/,$d' "$F"
+          echo "Stripped susfs_compat hard stop from $F"
+        else
+          echo "No susfs_compat gate present; nothing to do"
+        fi
