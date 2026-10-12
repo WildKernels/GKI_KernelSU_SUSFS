@@ -51,6 +51,11 @@ on:
         required: false
         type: string
         default: ""
+      produce_stock_configs:
+        description: "false = another leg of this run produces the stock-configs artifact"
+        required: false
+        type: boolean
+        default: true
       brand_name:
         description: "Kernel branding text appended to the version string (empty = stock)"
         required: false
@@ -92,6 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.final.outputs.matrix }}
+      version_slug: ${{ steps.final.outputs.version_slug }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -167,9 +173,16 @@ jobs:
           fi
 
           echo "matrix=$FINAL" >> "$GITHUB_OUTPUT"
+          echo "version_slug=$(jq -r '.include[0].version' <<< "$FINAL" | tr '._' '-')" >> "$GITHUB_OUTPUT"
 
   stock-configs:
+    # Produces the stock GKI configs ONCE per family. main.yml sets
+    # produce_stock_configs=false for the non-first flavor legs of an
+    # All run - they consume the artifact the first leg uploaded
+    # (with a live-download fallback if they get there too early).
+    # Branches that call prepare.yml directly keep the default (true).
     needs: generate-matrix
+    if: inputs.produce_stock_configs != 'false'
     runs-on: ubuntu-latest
     outputs:
       version_slug: ${{ steps.prep.outputs.version_slug }}
@@ -299,7 +312,9 @@ jobs:
           if-no-files-found: warn
 
   build:
+    # stock-configs may be skipped on non-producer legs (produce_stock_configs=false)
     needs: [generate-matrix, stock-configs]
+    if: ${{ !cancelled() && needs.generate-matrix.result == 'success' }}
     concurrency:
       # Must include every matrix field that varies. The old key was only
       # root_flavor + version, so every patch level of a family shared one
@@ -332,5 +347,5 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size }}
-      stock_config_artifact: stock-configs-${{ needs.stock-configs.outputs.version_slug }}
+      stock_config_artifact: stock-configs-${{ needs.generate-matrix.outputs.version_slug }}
     secrets: inherit
