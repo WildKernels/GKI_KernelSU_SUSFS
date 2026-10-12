@@ -1133,7 +1133,7 @@ jobs:
               --data-urlencode "disable_web_page_preview=true" \
               --data-urlencode "text=${html_msg}" \
               "${MK[@]}") \
-              || { echo "WARN: telegram send to chat ${chat} topic ${topic} failed"; continue; }
+              || { echo "WARN: telegram send to chat ${chat} topic ${topic} failed: $(printf '%s' "${RESP:-}" | head -c 300)"; continue; }
             sent=$((sent + 1))
             MID=$(printf '%s' "$RESP" | jq -r '.result.message_id // empty' 2>/dev/null)
             # Remember the in-group t.me link for the combined testing card
