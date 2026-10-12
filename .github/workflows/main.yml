@@ -242,7 +242,7 @@ jobs:
 
           # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
           PIN_NOMOUNT="5a610db7649a59eb3e3d710653618d594941f8da"
-          PIN_KERNELSU="0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d"
+          PIN_KERNELSU="08a3b087e49227c8a6731c5f1114998b5e25255b"
           PIN_BAKASU="f6cb7e70c10ebde149f3121ae68b945514fd0801"
           PIN_SUKISU_ULTRA="b20dee702035af09cb2ecb5f35443bbc1747f3e6"
           declare -A PIN_SUSFS=(
