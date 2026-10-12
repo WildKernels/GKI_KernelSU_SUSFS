@@ -1,0 +1,117 @@
+name: 'Spoof /proc/config.gz With Stock Config'
+description: >-
+  Embeds an official stock GKI kernel config into the built kernel so that
+  /proc/config.gz reports a clean stock config instead of the build .config
+  (hides KSU/SUSFS/BORE options). Source priority: committed
+  config/stock_defconfig, else the latest official GKI prebuilt kernel for the
+  family's kernel version downloaded from android.googlesource.com
+  (kernel/prebuilts/<kver>/arm64, 16k/ subdir for page_size=16k), with the
+  embedded config extracted via the synced tree's scripts/extract-ikconfig.
+  Best-effort: on any failure the build continues unspoofed with a warning
+  annotation.
+
+inputs:
+  version:
+    description: 'Kernel family (e.g., android14-6.1)'
+    required: true
+  page_size:
+    description: 'ARM64 page size (4k or 16k) to pick the matching stock config'
+    required: false
+    default: '4k'
+  stock_config_dir:
+    description: 'Directory with prefetched stock_<kver>[_16k].config files (empty = auto-fetch)'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Embed Stock Config and Patch kernel/Makefile
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        PAGE_SIZE: ${{ inputs.page_size }}
+        STOCK_CONFIG_DIR: ${{ inputs.stock_config_dir }}
+      run: |
+        set -uo pipefail
+        WORKSPACE="${{ github.workspace }}"
+        COMMON="$WORKSPACE/kernel/common"
+        KVER="${VERSION#*-}"   # android14-6.1 -> 6.1
+
+        echo "[*] stock-config: family=${VERSION} kernel=${KVER} page_size=${PAGE_SIZE}"
+
+        TMP="$(mktemp -d)"
+        STOCK="$TMP/stock_defconfig"
+        cleanup() { rm -rf "$TMP"; }
+        trap cleanup EXIT
+
+        skip() {
+          echo "::warning title=stock-config skipped::$1"
+          echo "[!] stock-config: $1 — /proc/config.gz keeps the real build config"
+          exit 0
+        }
+
+        # 1) Produce the stock config. Priority: committed override, then the
+        #    prefetched configs from the run's stock-configs artifact, then a
+        #    live download of the latest official GKI prebuilt kernel for this
+        #    kernel version (extract its embedded config — full resolved
+        #    config, same format /proc/config.gz serves).
+        SUFFIX=""
+        [ "$PAGE_SIZE" = "16k" ] && SUFFIX="_16k"
+        if [ -f "$WORKSPACE/config/stock_defconfig" ]; then
+          echo "[+] Using committed config/stock_defconfig"
+          cp "$WORKSPACE/config/stock_defconfig" "$STOCK" || skip "could not read committed config/stock_defconfig"
+        elif [ -n "$STOCK_CONFIG_DIR" ] && [ -f "$STOCK_CONFIG_DIR/stock_${KVER}${SUFFIX}.config" ]; then
+          echo "[+] Using prefetched stock config: stock_${KVER}${SUFFIX}.config"
+          cp "$STOCK_CONFIG_DIR/stock_${KVER}${SUFFIX}.config" "$STOCK" || skip "could not copy prefetched stock config"
+        else
+          SUBDIR=""
+          case "${KVER}-${PAGE_SIZE}" in
+            6.1-16k|6.6-16k|6.12-16k|6.18-16k) SUBDIR="/16k" ;;
+          esac
+          MAJ="${VERSION%%-*}"; MAJ="${MAJ#android}"   # android17-6.18 -> 17
+          BASE="https://android.googlesource.com/kernel/prebuilts/${KVER}/arm64"
+          IMG="$TMP/kernel-${KVER}-gz"
+          # Newer kernels land on an android<NN>-release branch first; main
+          # can be an empty tree until AOSP promotes them (6.18 today).
+          # 16k page-size kernels live in a 16k/ subdir under the same ref.
+          for REF in "refs/heads/main" "refs/heads/android${MAJ}-release"; do
+            URL="${BASE}/+/${REF}${SUBDIR}/kernel-${KVER}-gz?format=TEXT"
+            echo "[*] Downloading official GKI prebuilt kernel: kernel-${KVER}-gz${SUBDIR} @ ${REF}"
+            if curl -fsSL --retry 3 --retry-delay 5 --max-time 600 "$URL" | base64 -d > "$IMG" && [ -s "$IMG" ]; then
+              break
+            fi
+            rm -f "$IMG"
+          done
+          [ -s "$IMG" ] || skip "could not download kernel-${KVER}-gz${SUBDIR} from main or android${MAJ}-release"
+          echo "[*] Extracting embedded config with scripts/extract-ikconfig"
+          sh "$COMMON/scripts/extract-ikconfig" "$IMG" > "$STOCK" 2>"$TMP/extract.err" \
+            || { cat "$TMP/extract.err" >&2 || true; skip "extract-ikconfig failed on kernel-${KVER}-gz"; }
+        fi
+
+        # 2) Sanity: non-empty, kernel-config header, no root markers.
+        [ -s "$STOCK" ] && head -n 5 "$STOCK" | grep -q "Kernel Configuration" \
+          || skip "extracted config is empty or has no kernel-config header"
+        BAD="$(grep -cE 'CONFIG_KSU|SCHED_BORE|SUSFS' "$STOCK" || true)"
+        if [ "${BAD:-0}" != "0" ]; then
+          echo "::warning title=stock-config::stock config contains ${BAD} KSU/SUSFS/BORE marker(s) — verify the source"
+        fi
+        LINES="$(wc -l < "$STOCK" | tr -d ' ')"
+        echo "[+] Stock config: ${LINES} lines"
+
+        # 3) Install it and switch the config_data rule to it so the embedded
+        #    IKCONFIG blob (and therefore /proc/config.gz) is built from the
+        #    stock config instead of $(KCONFIG_CONFIG).
+        mkdir -p "$COMMON/arch/arm64/configs" || skip "kernel tree missing at $COMMON"
+        cp "$STOCK" "$COMMON/arch/arm64/configs/stock_defconfig" || skip "could not install stock_defconfig"
+
+        MK="$COMMON/kernel/Makefile"
+        [ -f "$MK" ] || skip "$MK not found"
+        grep -qF '$(obj)/config_data:' "$MK" || skip "no \$(obj)/config_data rule in kernel/Makefile"
+        sed -i 's|$(obj)/config_data: $(KCONFIG_CONFIG) FORCE|$(obj)/config_data: arch/arm64/configs/stock_defconfig FORCE|' "$MK"
+        grep -qF 'config_data: arch/arm64/configs/stock_defconfig FORCE' "$MK" \
+          || skip "config_data rule did not match the expected pattern"
+
+        echo "[+] Patched kernel/Makefile:"
+        grep -nF 'config_data:' "$MK" | sed 's/^/    /'
+        echo "[+] /proc/config.gz will report the stock GKI config"

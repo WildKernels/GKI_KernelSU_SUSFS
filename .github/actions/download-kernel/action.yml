@@ -75,13 +75,37 @@ runs:
           echo "tag_fallback=$TAG_FALLBACK" >> $GITHUB_OUTPUT
         }
 
-        MAX_RETRIES=3
-        RETRY_DELAY_SHORT=15
+        # Retry policy: googlesource periodically serves deprecated branches
+        # at ZERO progress - the fetch hangs with no bytes and only dies when
+        # the timeout wrapper kills it 15 minutes later (run 37814552622,
+        # android13-5.10-2022-05: 3 x 15m stalls, all dead time). Two fixes:
+        #   1. git's own lowSpeed abort (http.lowSpeedLimit/lowSpeedTime):
+        #      die after 60s below 1KB/s instead of idling to the wall clock,
+        #      so a stalled attempt costs ~1-2 min, not 15.
+        #   2. With cheap attempts, afford 5 rounds instead of 3 - the first
+        #      stalled fetch often triggers upstream rehydration of the cold
+        #      branch, so a later attempt can catch the warmed cache (the
+        #      2022-05 branch's neighbours in the same run all synced fine).
+        # Backoff graduates 15s/30s/60s/120s/240s so a genuinely bad serving
+        # window gets spaced-out retries rather than rapid-fire reruns.
+        MAX_RETRIES=5
         SYNC_TIMEOUT="15m"
+        RETRY_DELAYS=(15 30 60 120 240)
         attempt=1
         # Always shallow: the build only needs the branch tip. Deeper retries
         # just download more data into a strained runner (slower + more disk).
-        DEPTHS=(1 1 1)
+        DEPTHS=(1 1 1 1 1)
+
+        # Applied via git's env-config mechanism (GIT_CONFIG_KEY/VALUE pairs,
+        # inherited by every git repo sync spawns - repo has no -c passthrough
+        # of its own; verified against the repo launcher source). The lowSpeed
+        # pair only fires on transfer stalls (no server progress), never on a
+        # legitimately slow-but-moving fetch of a big repo.
+        export GIT_CONFIG_COUNT=2
+        export GIT_CONFIG_KEY_0=http.lowSpeedLimit
+        export GIT_CONFIG_VALUE_0=1024
+        export GIT_CONFIG_KEY_1=http.lowSpeedTime
+        export GIT_CONFIG_VALUE_1=60
 
         clean_workspace() {
           echo "Disk before cleanup:"
@@ -96,11 +120,15 @@ runs:
 
         while [ $attempt -le $MAX_RETRIES ]; do
           CURRENT_DEPTH="${DEPTHS[$((attempt-1))]}"
-          echo "Attempt $attempt/$MAX_RETRIES: initialize and sync kernel repository (depth=${CURRENT_DEPTH}, sync timeout $SYNC_TIMEOUT)..."
+          echo "Attempt $attempt/$MAX_RETRIES: initialize and sync kernel repository (depth=${CURRENT_DEPTH}, sync timeout $SYNC_TIMEOUT, stall abort: <1KB/s for 60s)..."
           df -h "$PWD" | tail -n +2 || true
           if init_repo "$CURRENT_DEPTH"; then
             # Use minimal-shallow variant: current-branch, shallow init done above, reduce files downloaded
             # Tag revisions are not fetched when --no-tags is set.
+            # GIT_CONFIG_* env vars (exported above) are inherited by repo's
+            # inner git: the lowSpeed pair turns the zero-progress
+            # deprecated-branch stall into a fast failure (~60s) instead of
+            # idling until the 15m wall.
             SYNC_TAG_FLAGS="--no-tags"
             if [ -n "$TAG_FALLBACK" ]; then SYNC_TAG_FLAGS=""; fi
             if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle $SYNC_TAG_FLAGS --jobs-checkout=4 -j4; then
@@ -109,7 +137,7 @@ runs:
             else
               rc=$?
               if [ $rc -eq 124 ]; then
-                echo "repo sync timed out after $SYNC_TIMEOUT."
+                echo "repo sync timed out after $SYNC_TIMEOUT (no stall-abort fired: transfer was progressing, just slow)."
               else
                 echo "repo sync failed with exit code $rc."
               fi
@@ -120,9 +148,10 @@ runs:
           fi
 
           if [ $attempt -lt $MAX_RETRIES ]; then
-            echo "Cleaning workspace and retrying after ${RETRY_DELAY_SHORT}s..."
+            DELAY="${RETRY_DELAYS[$((attempt-1))]}"
+            echo "Cleaning workspace and retrying after ${DELAY}s..."
             clean_workspace || true
-            sleep $RETRY_DELAY_SHORT
+            sleep "$DELAY"
           else
             echo "All $MAX_RETRIES attempts failed." >&2
             exit $rc

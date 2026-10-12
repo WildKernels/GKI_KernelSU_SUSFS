@@ -6,7 +6,7 @@ description: >-
 
 inputs:
   owner:
-    description: Owner of the upstream repo (e.g. KernelSU-Next, tiann, ReSukiSU)
+    description: Owner of the upstream repo (e.g. KernelSU-Next, tiann, BakaSU)
     required: true
   repo:
     description: Upstream repo name

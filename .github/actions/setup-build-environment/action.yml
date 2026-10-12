@@ -64,10 +64,9 @@ runs:
           [ "$(git -C "${{ github.workspace }}/AnyKernel3" rev-parse HEAD)" = "${{ inputs.anykernel3_commit }}" ] || { echo "AnyKernel3 pin mismatch" >&2; exit 1; }
         fi
 
-    - name: Install build deps for BTF generation (android12-5.10)
-      shell: bash
-      if: inputs.version == 'android12-5.10'
-      run: |
-        set -euo pipefail
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq dwarves libelf-dev
+    # NOTE: the old 'Install build deps for BTF generation (android12-5.10)'
+    # step (apt-get dwarves + libelf-dev) was removed. It was a leftover
+    # duplicate: the btf action installs its own build deps and builds
+    # pahole 1.31 from source, which shadows anything apt provides. Its only
+    # effect was a second apt call that once shipped broken on a runner
+    # image ('dpkg was interrupted', run 37814552622) and killed a job.

@@ -22,7 +22,7 @@ on:
         type: string
         default: ""
       root_flavor:
-        description: "Mutually exclusive root implementation (kernelsu, next, resukisu, sukisu-ultra, or none)"
+        description: "Mutually exclusive root implementation (kernelsu, next, bakasu, sukisu-ultra, or none)"
         required: false
         type: string
         default: ""
@@ -168,8 +168,138 @@ jobs:
 
           echo "matrix=$FINAL" >> "$GITHUB_OUTPUT"
 
-  build:
+  stock-configs:
     needs: generate-matrix
+    runs-on: ubuntu-latest
+    outputs:
+      version_slug: ${{ steps.prep.outputs.version_slug }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Derive Family and Kernel Versions
+        id: prep
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_SLUG="$(jq -r '.include[0].version' <<< '${{ needs.generate-matrix.outputs.matrix }}' | tr '._' '-')"
+          KVERS="$(jq -r '[.include[].kernel_version] | unique | join(" ")' <<< '${{ needs.generate-matrix.outputs.matrix }}')"
+          jq -r '[.include[] | .kernel_version + " " + (.android_version | sub("^android"; ""))] | unique | .[]' \
+            <<< '${{ needs.generate-matrix.outputs.matrix }}' > "${RUNNER_TEMP}/stock-pairs.txt"
+          {
+            echo "version_slug=${VERSION_SLUG}"
+            echo "kvers=${KVERS}"
+          } >> "$GITHUB_OUTPUT"
+          echo "[*] stock-configs: family=${VERSION_SLUG} kvers=${KVERS}"
+
+      - name: Resolve Upstream Prebuilt Revisions
+        id: heads
+        shell: bash
+        run: |
+          set -euo pipefail
+          HASH_INPUT=""
+          : > "${RUNNER_TEMP}/stock-heads.txt"
+          # gitiles JSON payloads start with a )]}' prefix line — strip it.
+          while read -r KVER ANDROID_NUM; do
+            [ -n "$KVER" ] || continue
+            BASE="https://android.googlesource.com/kernel/prebuilts/${KVER}/arm64"
+            MAIN_HEAD="$(curl -fsSL --retry 3 --max-time 30 "${BASE}/+refs/heads/main?format=JSON" | tail -n +2 | jq -r --arg r "refs/heads/main" '.[$r].value // empty' || true)"
+            REL_HEAD="$(curl -fsSL --retry 3 --max-time 30 "${BASE}/+refs/heads/android${ANDROID_NUM}-release?format=JSON" | tail -n +2 | jq -r --arg r "refs/heads/android${ANDROID_NUM}-release" '.[$r].value // empty' || true)"
+            HASH_INPUT="${HASH_INPUT}${KVER}:${MAIN_HEAD}:${REL_HEAD}"$'\n'
+            echo "${KVER}=${MAIN_HEAD}${REL_HEAD}" >> "${RUNNER_TEMP}/stock-heads.txt"
+            echo "[*] ${KVER} (android${ANDROID_NUM}): main=${MAIN_HEAD:0:12} release=${REL_HEAD:0:12}"
+          done < "${RUNNER_TEMP}/stock-pairs.txt"
+          CACHE_KEY="stock-configs-v1-$(printf '%s' "$HASH_INPUT" | sha256sum | cut -d' ' -f1)"
+          echo "cache_key=${CACHE_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Stock Config Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/stock-configs
+          key: ${{ steps.heads.outputs.cache_key }}
+          restore-keys: |
+            stock-configs-v1-
+
+      - name: Fetch Missing Stock Kernels and Extract Configs
+        shell: bash
+        env:
+          PAGE_SIZE: ${{ inputs.page_size }}
+        run: |
+          set -uo pipefail
+          STOCK_DIR="${RUNNER_TEMP}/stock-configs"
+          mkdir -p "$STOCK_DIR"
+
+          fetch_one() {
+            # $1 = kernel version, $2 = subdir suffix ("" or /16k), $3 = output .config path
+            local KVER="$1" SUBDIR="$2" OUT="$3" MAJ REF URL BASE
+            MAJ="$(awk -v k="$KVER" '$1 == k { print $2; exit }' "${RUNNER_TEMP}/stock-pairs.txt")"
+            BASE="https://android.googlesource.com/kernel/prebuilts/${KVER}/arm64"
+            # Newer kernels land on an android<NN>-release branch first; main
+            # can be an empty tree until AOSP promotes them (6.18 today).
+            for REF in "refs/heads/main" "refs/heads/android${MAJ}-release"; do
+              URL="${BASE}/+/${REF}${SUBDIR}/kernel-${KVER}-gz?format=TEXT"
+              echo "[*] Downloading kernel-${KVER}-gz${SUBDIR} @ ${REF}"
+              if curl -fsSL --retry 3 --retry-delay 5 --max-time 600 "$URL" | base64 -d > "${OUT}.img" && [ -s "${OUT}.img" ]; then
+                if sh .github/scripts/extract-ikconfig "${OUT}.img" > "$OUT" && [ -s "$OUT" ]; then
+                  rm -f "${OUT}.img"
+                  return 0
+                fi
+                echo "[!] extract-ikconfig failed for kernel-${KVER}-gz${SUBDIR}" >&2
+              fi
+              rm -f "${OUT}.img"
+            done
+            return 1
+          }
+
+          for KVER in ${{ steps.prep.outputs.kvers }}; do
+            CUR_HEAD="$(grep -m1 "^${KVER}=" "${RUNNER_TEMP}/stock-heads.txt" | cut -d= -f2- || true)"
+            OUT4="${STOCK_DIR}/stock_${KVER}.config"
+            if [ -f "$OUT4" ] && [ -n "$CUR_HEAD" ] \
+               && [ "$(cat "${STOCK_DIR}/heads/${KVER}.head" 2>/dev/null || true)" = "$CUR_HEAD" ]; then
+              echo "[+] ${KVER}: cache hit, upstream unchanged"
+            else
+              echo "[*] ${KVER}: fetching stock config (missing or upstream moved)"
+              if fetch_one "$KVER" "" "$OUT4"; then
+                mkdir -p "${STOCK_DIR}/heads"
+                printf '%s' "$CUR_HEAD" > "${STOCK_DIR}/heads/${KVER}.head"
+              else
+                echo "::warning title=stock-configs::could not fetch stock config for ${KVER} — build legs will fall back to a live download"
+              fi
+            fi
+            if [ "$PAGE_SIZE" = "16k" ]; then
+              OUT16="${STOCK_DIR}/stock_${KVER}_16k.config"
+              if [ -f "$OUT16" ] && [ -n "$CUR_HEAD" ] \
+                 && [ "$(cat "${STOCK_DIR}/heads/${KVER}_16k.head" 2>/dev/null || true)" = "$CUR_HEAD" ]; then
+                echo "[+] ${KVER}: 16k cache hit, upstream unchanged"
+              else
+                echo "[*] ${KVER}: fetching 16k stock config"
+                if fetch_one "$KVER" "/16k" "$OUT16"; then
+                  mkdir -p "${STOCK_DIR}/heads"
+                  printf '%s' "$CUR_HEAD" > "${STOCK_DIR}/heads/${KVER}_16k.head"
+                else
+                  echo "::warning title=stock-configs::could not fetch 16k stock config for ${KVER} — build legs will fall back to a live download"
+                fi
+              fi
+            fi
+          done
+
+      - name: Save Stock Config Cache
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/stock-configs
+          key: ${{ steps.heads.outputs.cache_key }}
+
+      - name: Upload Stock Configs Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: stock-configs-${{ steps.prep.outputs.version_slug }}
+          path: ${{ runner.temp }}/stock-configs/stock_*.config
+          if-no-files-found: warn
+
+  build:
+    needs: [generate-matrix, stock-configs]
     concurrency:
       # Must include every matrix field that varies. The old key was only
       # root_flavor + version, so every patch level of a family shared one
@@ -202,4 +332,5 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size }}
+      stock_config_artifact: stock-configs-${{ needs.stock-configs.outputs.version_slug }}
     secrets: inherit

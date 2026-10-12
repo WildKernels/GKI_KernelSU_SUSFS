@@ -21,7 +21,7 @@ inputs:
     description: 'Kernel sublevel'
     required: true
   root_flavor:
-    description: 'Selected root implementation (kernelsu / next / resukisu / sukisu-ultra). KernelSU (tiann main) needs the 10_enable_susfs_for_ksu patch; other flavors already ship SUSFS.'
+    description: 'Selected root implementation (kernelsu / next / bakasu / sukisu-ultra). KernelSU (tiann main) needs the 10_enable_susfs_for_ksu patch; other flavors already ship SUSFS.'
     required: false
     default: ""
 
@@ -38,7 +38,7 @@ runs:
     - name: Enable SUSFS for KernelSU (tiann)
       # tiann/KernelSU main does NOT carry SUSFS, so for the kernelsu flavor we
       # apply the enable patch from susfs4ksu onto the KernelSU checkout.
-      # pershoot dev-susfs (next) and ReSukiSU already include SUSFS, so this is
+      # pershoot dev-susfs (next) and BakaSU already include SUSFS, so this is
       # a no-op for those flavors.
       if: inputs.root_flavor == 'kernelsu'
       shell: bash

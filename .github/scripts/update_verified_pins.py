@@ -22,7 +22,7 @@ MAIN = os.path.join(REPO, ".github/workflows/main.yml")
 PINS = [
     ("PIN_NOMOUNT", "NOMOUNT_SHA", "APPROVE_NOMOUNT"),
     ("PIN_KERNELSU", "KERNELSU_SHA", "APPROVE_KERNELSU"),
-    ("PIN_RESUKISU", "RESUKISU_SHA", "APPROVE_RESUKISU"),
+    ("PIN_BAKASU", "BAKASU_SHA", "APPROVE_BAKASU"),
     ("PIN_SUKISU_ULTRA", "SUKISU_ULTRA_SHA", "APPROVE_SUKISU_ULTRA"),
     # SUSFS is intentionally excluded: it is always resolved at latest so it
     # stays API-matched to the always-latest KernelSU-Next tree.

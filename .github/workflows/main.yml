@@ -81,12 +81,12 @@ on:
         options:
           - KernelSU-Next
           - KernelSU
-          - ReSukiSU
+          - BakaSU
           - SukiSU-Ultra
           - KowSU
           - No Root
-          - All (KernelSU-Next + KernelSU + ReSukiSU)
-        default: All (KernelSU-Next + KernelSU + ReSukiSU)
+          - All (KernelSU-Next + KernelSU + BakaSU)
+        default: All (KernelSU-Next + KernelSU + BakaSU)
       use_susfs:
         description: "SUSFS"
         type: boolean
@@ -151,13 +151,13 @@ jobs:
       susfs_commit_android14_6_1: ${{ steps.resolve.outputs.susfs_commit_android14_6_1 }}
       susfs_commit_android15_6_6: ${{ steps.resolve.outputs.susfs_commit_android15_6_6 }}
       susfs_commit_android16_6_12: ${{ steps.resolve.outputs.susfs_commit_android16_6_12 }}
-      susfs_commit_android12_5_10_resukisu: ${{ steps.resolve.outputs.susfs_commit_android12_5_10_resukisu }}
-      susfs_commit_android13_5_10_resukisu: ${{ steps.resolve.outputs.susfs_commit_android13_5_10_resukisu }}
-      susfs_commit_android13_5_15_resukisu: ${{ steps.resolve.outputs.susfs_commit_android13_5_15_resukisu }}
-      susfs_commit_android14_5_15_resukisu: ${{ steps.resolve.outputs.susfs_commit_android14_5_15_resukisu }}
-      susfs_commit_android14_6_1_resukisu: ${{ steps.resolve.outputs.susfs_commit_android14_6_1_resukisu }}
-      susfs_commit_android15_6_6_resukisu: ${{ steps.resolve.outputs.susfs_commit_android15_6_6_resukisu }}
-      susfs_commit_android16_6_12_resukisu: ${{ steps.resolve.outputs.susfs_commit_android16_6_12_resukisu }}
+      susfs_commit_android12_5_10_bakasu: ${{ steps.resolve.outputs.susfs_commit_android12_5_10_bakasu }}
+      susfs_commit_android13_5_10_bakasu: ${{ steps.resolve.outputs.susfs_commit_android13_5_10_bakasu }}
+      susfs_commit_android13_5_15_bakasu: ${{ steps.resolve.outputs.susfs_commit_android13_5_15_bakasu }}
+      susfs_commit_android14_5_15_bakasu: ${{ steps.resolve.outputs.susfs_commit_android14_5_15_bakasu }}
+      susfs_commit_android14_6_1_bakasu: ${{ steps.resolve.outputs.susfs_commit_android14_6_1_bakasu }}
+      susfs_commit_android15_6_6_bakasu: ${{ steps.resolve.outputs.susfs_commit_android15_6_6_bakasu }}
+      susfs_commit_android16_6_12_bakasu: ${{ steps.resolve.outputs.susfs_commit_android16_6_12_bakasu }}
       susfs_commit_android12_5_10_sukisu_ultra: ${{ steps.resolve.outputs.susfs_commit_android12_5_10_sukisu_ultra }}
       susfs_commit_android13_5_10_sukisu_ultra: ${{ steps.resolve.outputs.susfs_commit_android13_5_10_sukisu_ultra }}
       susfs_commit_android13_5_15_sukisu_ultra: ${{ steps.resolve.outputs.susfs_commit_android13_5_15_sukisu_ultra }}
@@ -166,7 +166,7 @@ jobs:
       susfs_commit_android15_6_6_sukisu_ultra: ${{ steps.resolve.outputs.susfs_commit_android15_6_6_sukisu_ultra }}
       susfs_commit_android16_6_12_sukisu_ultra: ${{ steps.resolve.outputs.susfs_commit_android16_6_12_sukisu_ultra }}
       ksu_commit: ${{ steps.resolve.outputs.ksu_commit }}
-      resukisu_commit: ${{ steps.resolve.outputs.resukisu_commit }}
+      bakasu_commit: ${{ steps.resolve.outputs.bakasu_commit }}
       sukisu_ultra_commit: ${{ steps.resolve.outputs.sukisu_ultra_commit }}
       kowsu_commit: ${{ steps.resolve.outputs.kowsu_commit }}
       kernel_patches_commit: ${{ steps.resolve.outputs.kernel_patches_commit }}
@@ -179,16 +179,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Scheduled (nightly) runs carry no inputs; default them the same
+          # as the workflow_dispatch defaults below.
           PAGE_SIZE="${{ inputs.page_size || '4k' }}"
+          KVER="${{ inputs.kernel_build_version || 'All' }}"
           [ "$PAGE_SIZE" = "16k" ] || exit 0
           # Only these GKI families use a Kleaf build branch exposing
           # --page_size (main-kernel-build-2023/2024, main-kernel-2025).
-          case "${{ inputs.kernel_build_version }}" in
+          case "$KVER" in
             6.1.x-android14|6.6.x-android15|6.12.x-android16) ;;
             *)
               echo "ERROR: page_size=16k requires kernel_build_version to be one of:" >&2
               echo "  6.1.x-android14, 6.6.x-android15, 6.12.x-android16" >&2
-              echo "Got: '${{ inputs.kernel_build_version }}'." >&2
+              echo "Got: '${KVER}'." >&2
               exit 1
               ;;
           esac
@@ -201,7 +204,7 @@ jobs:
 
           # Commit resolution mode. 'latest' (default) resolves branch tips at
           # run time via git ls-remote. 'verified' uses the audited pins below for
-          # NoMount, kernelsu/resukisu roots, and SUSFS; KernelSU-Next stays latest.
+          # NoMount, kernelsu/bakasu roots, and SUSFS; KernelSU-Next stays latest.
           # Scheduled (nightly) runs use latest by default.
           if [ "${{ github.event_name }}" = "schedule" ]; then
             COMMIT_MODE="${{ inputs.commit_mode || 'latest' }}"
@@ -235,36 +238,36 @@ jobs:
 
           # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
           PIN_NOMOUNT="5a610db7649a59eb3e3d710653618d594941f8da"
-          PIN_KERNELSU="08a3b087e49227c8a6731c5f1114998b5e25255b"
-          PIN_RESUKISU="94dd3c93c2053a84fd752df6eb85db99b7d70ab8"
+          PIN_KERNELSU="0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d"
+          PIN_BAKASU="f6cb7e70c10ebde149f3121ae68b945514fd0801"
           PIN_SUKISU_ULTRA="b20dee702035af09cb2ecb5f35443bbc1747f3e6"
           declare -A PIN_SUSFS=(
-            [susfs_commit_android12_5_10]="9892175b4acec7ee844e113b8d02c0f4d12cdfac"
-            [susfs_commit_android13_5_10]="5326e21a7eb232f9e21debdd5164e99bee3d1e2f"
-            [susfs_commit_android13_5_15]="687d2d18d94cb2e3e72d1074778d58384d58e379"
-            [susfs_commit_android14_5_15]="6ba6ca79f85b8873b54573842093a9ae2df56cf9"
-            [susfs_commit_android14_6_1]="24743360ea08d98f6ad72b856851abed8de5854f"
+            [susfs_commit_android12_5_10]="82f08351fadb8b19dd6591bd14634d02ad832145"
+            [susfs_commit_android13_5_10]="14c45388ec8cb3ca72f2ac8bf83097b9285a8418"
+            [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
+            [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
+            [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
             [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
             [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
           )
-          # ReSukiSU keeps its own SUSFS pin set (currently the shared values,
+          # BakaSU keeps its own SUSFS pin set (currently the shared values,
           # including 6.1 = 0ff93279). KernelSU's set above already diverges on 6.1.
-          declare -A PIN_SUSFS_RESUKISU=(
-            [susfs_commit_android12_5_10]="9892175b4acec7ee844e113b8d02c0f4d12cdfac"
-            [susfs_commit_android13_5_10]="5326e21a7eb232f9e21debdd5164e99bee3d1e2f"
-            [susfs_commit_android13_5_15]="687d2d18d94cb2e3e72d1074778d58384d58e379"
-            [susfs_commit_android14_5_15]="6ba6ca79f85b8873b54573842093a9ae2df56cf9"
-            [susfs_commit_android14_6_1]="24743360ea08d98f6ad72b856851abed8de5854f"
+          declare -A PIN_SUSFS_BAKASU=(
+            [susfs_commit_android12_5_10]="82f08351fadb8b19dd6591bd14634d02ad832145"
+            [susfs_commit_android13_5_10]="14c45388ec8cb3ca72f2ac8bf83097b9285a8418"
+            [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
+            [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
+            [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
             [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
             [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
-            [susfs_commit_android12_5_10]="9892175b4acec7ee844e113b8d02c0f4d12cdfac"
-            [susfs_commit_android13_5_10]="5326e21a7eb232f9e21debdd5164e99bee3d1e2f"
-            [susfs_commit_android13_5_15]="687d2d18d94cb2e3e72d1074778d58384d58e379"
-            [susfs_commit_android14_5_15]="6ba6ca79f85b8873b54573842093a9ae2df56cf9"
-            [susfs_commit_android14_6_1]="24743360ea08d98f6ad72b856851abed8de5854f"
+            [susfs_commit_android12_5_10]="82f08351fadb8b19dd6591bd14634d02ad832145"
+            [susfs_commit_android13_5_10]="14c45388ec8cb3ca72f2ac8bf83097b9285a8418"
+            [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
+            [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
+            [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
             [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
             [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
           )
@@ -288,33 +291,40 @@ jobs:
           echo "kernelsu_branch=dev" >> "$GITHUB_OUTPUT"
 
           # Selected root implementation(s). Maps the human-facing choice
-          # (KernelSU-Next / KernelSU / ReSukiSU / SukiSU-Ultra / KowSU /
+          # (KernelSU-Next / KernelSU / BakaSU / SukiSU-Ultra / KowSU /
           # No Root / All) to internal root-setup flavors (next / kernelsu /
-          # resukisu / sukisu-ultra / kowsu / none). 'All' emits a matrix of
+          # bakasu / sukisu-ultra / kowsu / none). 'All' emits a matrix of
           # the three core root flavors plus each pinned commit; SukiSU-Ultra,
           # KowSU, and No Root are opt-in only and never part of 'All'.
           #
-          # kernelsu, resukisu, and sukisu-ultra pin in verified mode;
+          # kernelsu, bakasu, and sukisu-ultra pin in verified mode;
           # KernelSU-Next (next) always builds at latest.
           # With SUSFS off, every root tracks latest instead of pins:
           # SukiSU-Ultra follows main (builtin only matters for SUSFS builds).
-          if [ "${{ inputs.use_susfs }}" = "true" ]; then
+          # Scheduled runs default SUSFS on (all features on, see the
+          # feature_set computation) - a nightly is a full-featured build.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            SCHED_SUSFS=true
+          else
+            SCHED_SUSFS="${{ inputs.use_susfs }}"
+          fi
+          if [ "$SCHED_SUSFS" = "true" ]; then
             KERNELSU_COMMIT="$(pick "$PIN_KERNELSU" https://github.com/tiann/KernelSU.git refs/heads/main)"
-            RESUKISU_COMMIT="$(pick "$PIN_RESUKISU" https://github.com/ReSukiSU/ReSukiSU.git refs/heads/main)"
+            BAKASU_COMMIT="$(pick "$PIN_BAKASU" https://github.com/Baka-SU/BakaSU.git refs/heads/main)"
             SUKISU_ULTRA_COMMIT="$(pick "$PIN_SUKISU_ULTRA" https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin)"
           else
             KERNELSU_COMMIT="$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)"
-            RESUKISU_COMMIT="$(resolve_sha https://github.com/ReSukiSU/ReSukiSU.git refs/heads/main)"
+            BAKASU_COMMIT="$(resolve_sha https://github.com/Baka-SU/BakaSU.git refs/heads/main)"
             SUKISU_ULTRA_COMMIT="$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)"
           fi
           emit ksu_commit "$KERNELSU_COMMIT"
-          emit resukisu_commit "$RESUKISU_COMMIT"
+          emit bakasu_commit "$BAKASU_COMMIT"
           emit sukisu_ultra_commit "$SUKISU_ULTRA_COMMIT"
           # KowSU has no SUSFS support, so it always tracks latest on master
           # (it can only ever run with SUSFS off — enforced below).
           KOWSU_COMMIT="$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)"
           emit kowsu_commit "$KOWSU_COMMIT"
-          if [ "${{ inputs.use_susfs }}" = "true" ]; then
+          if [ "$SCHED_SUSFS" = "true" ]; then
             NEXT_COMMIT="$(resolve_sha https://github.com/pershoot/KernelSU-Next.git refs/heads/dev-susfs)"
           else
             NEXT_COMMIT="$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)"
@@ -328,7 +338,7 @@ jobs:
           # label the "All" arm matches below — a bare 'All' fell through to *)
           # and failed the whole job, yet the manager step's All* glob still
           # matched, so the two steps disagreed. Keep these in sync.
-          case "${{ inputs.root_flavor || 'All (KernelSU-Next + KernelSU + ReSukiSU)' }}" in
+          case "${{ inputs.root_flavor || 'All (KernelSU-Next + KernelSU + BakaSU)' }}" in
             KernelSU)
               echo "root_flavor=kernelsu" >> "$GITHUB_OUTPUT"
               emit root_commit "$KERNELSU_COMMIT"
@@ -339,10 +349,10 @@ jobs:
               emit root_commit "$NEXT_COMMIT"
               ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT")]"
               ;;
-            ReSukiSU)
-              echo "root_flavor=resukisu" >> "$GITHUB_OUTPUT"
-              emit root_commit "$RESUKISU_COMMIT"
-              ROOT_MATRIX="[$(mk_entry resukisu ReSukiSU "$RESUKISU_COMMIT")]"
+            BakaSU)
+              echo "root_flavor=bakasu" >> "$GITHUB_OUTPUT"
+              emit root_commit "$BAKASU_COMMIT"
+              ROOT_MATRIX="[$(mk_entry bakasu BakaSU "$BAKASU_COMMIT")]"
               ;;
             SukiSU-Ultra)
               echo "root_flavor=sukisu-ultra" >> "$GITHUB_OUTPUT"
@@ -363,9 +373,9 @@ jobs:
               echo "root_commit=" >> "$GITHUB_OUTPUT"
               ROOT_MATRIX='[{"root_flavor":"none","variant":"NoRoot","root_commit":""}]'
               ;;
-            "All (KernelSU-Next + KernelSU + ReSukiSU)")
+            "All (KernelSU-Next + KernelSU + BakaSU)")
               # Fan out to all three root variants, each with its pinned commit.
-              ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT"),$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT"),$(mk_entry resukisu ReSukiSU "$RESUKISU_COMMIT")]"
+              ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT"),$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT"),$(mk_entry bakasu BakaSU "$BAKASU_COMMIT")]"
               echo "root_flavor=" >> "$GITHUB_OUTPUT"
               echo "root_commit=" >> "$GITHUB_OUTPUT"
               ;;
@@ -390,8 +400,8 @@ jobs:
           )
           for key in "${!SUSFS_BRANCHES[@]}"; do
             emit "$key" "$(pick "${PIN_SUSFS[$key]}" https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/${SUSFS_BRANCHES[$key]})"
-            # Per-flavor ReSukiSU SUSFS pin (same branch, own pin set).
-            emit "${key}_resukisu" "$(pick "${PIN_SUSFS_RESUKISU[$key]}" https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/${SUSFS_BRANCHES[$key]})"
+            # Per-flavor BakaSU SUSFS pin (same branch, own pin set).
+            emit "${key}_bakasu" "$(pick "${PIN_SUSFS_BAKASU[$key]}" https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/${SUSFS_BRANCHES[$key]})"
             # Per-flavor SukiSU-Ultra SUSFS pin (same branch, own pin set).
             emit "${key}_sukisu_ultra" "$(pick "${PIN_SUSFS_SUKISU_ULTRA[$key]}" https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/${SUSFS_BRANCHES[$key]})"
           done
@@ -416,7 +426,7 @@ jobs:
           # commit ae9a341 (nullptr-t-oss/composite_actions fetch_ksu_manager).
           # Each selected root must ship ALL manager APK builds. KernelSU-Next publishes
           # its manager APKs (manager + manager-spoofed) from the official dev-tip
-          # build-manager-ci run; kernelsu (KernelSU), ReSukiSU, SukiSU-Ultra,
+          # build-manager-ci run; kernelsu (KernelSU), BakaSU, SukiSU-Ultra,
           # and KowSU expose theirs as CI-run artifacts. All are pinned to an exact commit.
           # No Root ships no manager.
           resolve_one() { # flavor
@@ -463,9 +473,9 @@ jobs:
                 printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager"}' \
                   "$flavor" "$owner" "$repo" "$run_id" "$stock"
                 ;;
-              resukisu)
-                owner="ReSukiSU"; repo="ReSukiSU"; wf="build-manager.yml"
-                stock=$(git ls-remote https://github.com/ReSukiSU/ReSukiSU.git refs/heads/main | awk '{print $1; exit}')
+              bakasu)
+                owner="BakaSU"; repo="BakaSU"; wf="build-manager.yml"
+                stock=$(git ls-remote https://github.com/Baka-SU/BakaSU.git refs/heads/main | awk '{print $1; exit}')
                 run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
@@ -531,10 +541,10 @@ jobs:
           echo "Root flavor: ${FLAVORS}"
           LIST=""
           case "${FLAVORS}" in
-            All*) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)"$'\n'"$(resolve_one kernelsu)"$'\n'"$(resolve_one resukisu)") ;;
+            All*) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)"$'\n'"$(resolve_one kernelsu)"$'\n'"$(resolve_one bakasu)") ;;
             KernelSU-Next) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)") ;;
             KernelSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kernelsu)") ;;
-            ReSukiSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one resukisu)") ;;
+            BakaSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one bakasu)") ;;
             SukiSU-Ultra) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one sukisu-ultra)") ;;
             KowSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kowsu)") ;;
             *) echo "Skipping manager resolution (no root flavor / none)." ;;
@@ -557,21 +567,37 @@ jobs:
 
           # A Release/Pre-Release ships whichever manger build(s) were resolved
           # in the manager step above (exact match per root flavor). No root
-          # restriction applies here anymore -- KernelSU-Next, KernelSU, ReSukiSU,
+          # restriction applies here anymore -- KernelSU-Next, KernelSU, BakaSU,
           # SukiSU-Ultra, KowSU, or 'All' are all valid release targets ('No Root'
           # ships no manager).
 
+          # Scheduled (nightly) runs carry NO inputs - the use_* booleans are
+          # empty strings, not true - so read them with schedule defaults:
+          # every feature ON (matching the dispatch defaults) except Perf,
+          # which is opt-in on dispatch and stays off for nightlies.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            F_SUSFS=true;  F_NOMOUNT=true; F_BBG=true;  F_NET=true
+            F_DS=true;     F_NTSYNC=true;  F_PTRACE=true; F_UNICODE=true
+            F_BPF=true;    F_PERF=false
+          else
+            F_SUSFS="${{ inputs.use_susfs }}";   F_NOMOUNT="${{ inputs.use_nomount }}"
+            F_BBG="${{ inputs.use_bbg }}";        F_NET="${{ inputs.use_net }}"
+            F_DS="${{ inputs.use_ds }}";          F_NTSYNC="${{ inputs.use_ntsync }}"
+            F_PTRACE="${{ inputs.use_ptrace }}";  F_UNICODE="${{ inputs.use_unicode }}"
+            F_BPF="${{ inputs.use_bpf }}";        F_PERF="${{ inputs.use_perf }}"
+          fi
+
           FEATURES=""
-          [ "${{ inputs.use_susfs }}" = "true" ] && FEATURES="${FEATURES}SUSFS+"
-          [ "${{ inputs.use_nomount }}" = "true" ] && FEATURES="${FEATURES}NoMount+"
-          [ "${{ inputs.use_bbg }}" = "true" ] && FEATURES="${FEATURES}BBG+"
-          [ "${{ inputs.use_net }}" = "true" ] && FEATURES="${FEATURES}NET+"
-          [ "${{ inputs.use_ds }}" = "true" ] && FEATURES="${FEATURES}DS+"
-          [ "${{ inputs.use_ntsync }}" = "true" ] && FEATURES="${FEATURES}NTSync+"
-          [ "${{ inputs.use_ptrace }}" = "true" ] && FEATURES="${FEATURES}Ptrace+"
-          [ "${{ inputs.use_unicode }}" = "true" ] && FEATURES="${FEATURES}Unicode+"
-          [ "${{ inputs.use_bpf }}" = "true" ] && FEATURES="${FEATURES}BPF+"
-          [ "${{ inputs.use_perf }}" = "true" ] && FEATURES="${FEATURES}Perf+"
+          [ "$F_SUSFS" = "true" ] && FEATURES="${FEATURES}SUSFS+"
+          [ "$F_NOMOUNT" = "true" ] && FEATURES="${FEATURES}NoMount+"
+          [ "$F_BBG" = "true" ] && FEATURES="${FEATURES}BBG+"
+          [ "$F_NET" = "true" ] && FEATURES="${FEATURES}NET+"
+          [ "$F_DS" = "true" ] && FEATURES="${FEATURES}DS+"
+          [ "$F_NTSYNC" = "true" ] && FEATURES="${FEATURES}NTSync+"
+          [ "$F_PTRACE" = "true" ] && FEATURES="${FEATURES}Ptrace+"
+          [ "$F_UNICODE" = "true" ] && FEATURES="${FEATURES}Unicode+"
+          [ "$F_BPF" = "true" ] && FEATURES="${FEATURES}BPF+"
+          [ "$F_PERF" = "true" ] && FEATURES="${FEATURES}Perf+"
           echo "feature_set=${FEATURES%+}" >> "$GITHUB_OUTPUT"
 
       - name: Clone shared source repos once
@@ -667,17 +693,17 @@ jobs:
               fi
             )
           done
-          # Filter ReSukiSU to only release universal and universal spoofed (drop debug/non-universal)
-          if grep -q "ReSukiSU|ReSukiSU|" "$MANIFEST" 2>/dev/null; then
+          # Filter BakaSU to only release universal and universal spoofed (drop debug/non-universal)
+          if grep -q "BakaSU|BakaSU|" "$MANIFEST" 2>/dev/null; then
             tmp_manifest="${MANIFEST}.filtered"
             : > "$tmp_manifest"
             while IFS='|' read -r o r n; do
               [ -n "$n" ] || continue
-              if [ "$o" = "ReSukiSU" ] && [ "$r" = "ReSukiSU" ]; then
+              if [ "$o" = "BakaSU" ] && [ "$r" = "BakaSU" ]; then
                 ln=$(echo "$n" | tr '[:upper:]' '[:lower:]')
                 # keep only universal apks, drop debug
-                if [[ "$ln" != *universal* ]]; then echo "Dropping ReSukiSU non-universal $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
-                if [[ "$ln" == *debug* ]]; then echo "Dropping ReSukiSU debug $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
+                if [[ "$ln" != *universal* ]]; then echo "Dropping BakaSU non-universal $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
+                if [[ "$ln" == *debug* ]]; then echo "Dropping BakaSU debug $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
                 # now only universal release and universal spoofed remain
               fi
               echo "$o|$r|$n" >> "$tmp_manifest"
@@ -729,15 +755,22 @@ jobs:
 
   build-nomount-module:
     needs: resolve-sources
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes"
+    # Scheduled (nightly) runs carry NO inputs at all - inputs.use_nomount is
+    # empty, not true - so the inner steps' `if: inputs.use_nomount` gates
+    # would skip everything and produce no metamodule artifact. Compute the
+    # effective flag once here and have the steps key off the job-level
+    # env instead of the raw input.
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes"
+    env:
+      NOMOUNT_WANTED: ${{ inputs.use_nomount || (github.event_name == 'schedule' && true) || false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        if: inputs.use_nomount
+        if: env.NOMOUNT_WANTED == 'true'
 
       - name: Clone NoMount source at pinned commit
         id: clone
-        if: inputs.use_nomount
+        if: env.NOMOUNT_WANTED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -750,14 +783,14 @@ jobs:
           echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
 
       - name: Build NoMount metamodule (nm only, no .ko)
-        if: inputs.use_nomount
+        if: env.NOMOUNT_WANTED == 'true'
         id: buildmod
         uses: ./.github/actions/nomount-metamodule
         with:
           commit: ${{ steps.clone.outputs.commit }}
 
       - name: Upload NoMount metamodule
-        if: inputs.use_nomount
+        if: env.NOMOUNT_WANTED == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: NoMount-Metamodule
@@ -769,7 +802,7 @@ jobs:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.10.x-android12')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.10.x-android12')"
     strategy:
       fail-fast: false
       matrix:
@@ -778,7 +811,7 @@ jobs:
     with:
       config_file: .github/config/android12-5.10.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
-      susfs_commit: ${{ matrix.root.root_flavor == 'resukisu' && needs.resolve-sources.outputs.susfs_commit_android12_5_10_resukisu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android12_5_10_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android12_5_10) }}
+      susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android12_5_10_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android12_5_10_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android12_5_10) }}
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
@@ -787,19 +820,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android13-5-10:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.10.x-android13')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.10.x-android13')"
     strategy:
       fail-fast: false
       matrix:
@@ -808,7 +841,7 @@ jobs:
     with:
       config_file: .github/config/android13-5.10.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
-      susfs_commit: ${{ matrix.root.root_flavor == 'resukisu' && needs.resolve-sources.outputs.susfs_commit_android13_5_10_resukisu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android13_5_10_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android13_5_10) }}
+      susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android13_5_10_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android13_5_10_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android13_5_10) }}
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
@@ -817,19 +850,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android13-5-15:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.15.x-android13')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.15.x-android13')"
     strategy:
       fail-fast: false
       matrix:
@@ -838,7 +871,7 @@ jobs:
     with:
       config_file: .github/config/android13-5.15.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
-      susfs_commit: ${{ matrix.root.root_flavor == 'resukisu' && needs.resolve-sources.outputs.susfs_commit_android13_5_15_resukisu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android13_5_15_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android13_5_15) }}
+      susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android13_5_15_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android13_5_15_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android13_5_15) }}
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
@@ -847,19 +880,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android14-5-15:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.15.x-android14')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '5.15.x-android14')"
     strategy:
       fail-fast: false
       matrix:
@@ -868,7 +901,7 @@ jobs:
     with:
       config_file: .github/config/android14-5.15.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
-      susfs_commit: ${{ matrix.root.root_flavor == 'resukisu' && needs.resolve-sources.outputs.susfs_commit_android14_5_15_resukisu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android14_5_15_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android14_5_15) }}
+      susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android14_5_15_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android14_5_15_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android14_5_15) }}
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
@@ -877,19 +910,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android14-6-1:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.1.x-android14')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.1.x-android14')"
     strategy:
       fail-fast: false
       matrix:
@@ -898,7 +931,7 @@ jobs:
     with:
       config_file: .github/config/android14-6.1.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
-      susfs_commit: ${{ matrix.root.root_flavor == 'resukisu' && needs.resolve-sources.outputs.susfs_commit_android14_6_1_resukisu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android14_6_1_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android14_6_1) }}
+      susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android14_6_1_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android14_6_1_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android14_6_1) }}
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
@@ -907,19 +940,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android15-6-6:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.6.x-android15')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.6.x-android15')"
     strategy:
       fail-fast: false
       matrix:
@@ -928,7 +961,7 @@ jobs:
     with:
       config_file: .github/config/android15-6.6.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
-      susfs_commit: ${{ matrix.root.root_flavor == 'resukisu' && needs.resolve-sources.outputs.susfs_commit_android15_6_6_resukisu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android15_6_6_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android15_6_6) }}
+      susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android15_6_6_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android15_6_6_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android15_6_6) }}
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
@@ -937,19 +970,19 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
   build-android16-6-12:
     needs:
     - resolve-sources
     - build-nomount-module
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && (inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.12.x-android16')"
+    if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes && ((github.event_name == 'schedule' && inputs.kernel_build_version == '') || inputs.kernel_build_version == 'All' || inputs.kernel_build_version == '6.12.x-android16')"
     strategy:
       fail-fast: false
       matrix:
@@ -958,7 +991,7 @@ jobs:
     with:
       config_file: .github/config/android16-6.12.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
-      susfs_commit: ${{ matrix.root.root_flavor == 'resukisu' && needs.resolve-sources.outputs.susfs_commit_android16_6_12_resukisu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android16_6_12_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android16_6_12) }}
+      susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android16_6_12_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android16_6_12_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android16_6_12) }}
       nomount_commit: ${{ needs.resolve-sources.outputs.nomount_commit }}
       kernel_patches_commit: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
       root_flavor: ${{ matrix.root.root_flavor }}
@@ -967,13 +1000,168 @@ jobs:
       ksu_branch: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
       anykernel3_commit: ${{ needs.resolve-sources.outputs.anykernel3_commit }}
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
-      brand_name: ${{ inputs.brand_name }}
-      keep_kmi: ${{ inputs.keep_kmi }}
-      os_patch_level: ${{ inputs.os_patch_level }}
-      allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
-      page_size: ${{ inputs.page_size }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: ${{ inputs.keep_kmi || false }}
+      os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
+      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
+
+  telegram-announce:
+    # Per-family mini-release digests posted into the Wild Kernels Testing
+    # forum topics (one topic per kernel branch). Skipped families (gated
+    # off by a single-family dispatch) are dropped; ran families post even
+    # when some jobs failed - the counts carry the bad news. Non-fatal by
+    # design: a Telegram outage must never fail a build.
+    name: Telegram Announce
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+    needs:
+    - resolve-sources
+    - build-android12-5-10
+    - build-android13-5-10
+    - build-android13-5-15
+    - build-android14-5-15
+    - build-android14-6-1
+    - build-android15-6-6
+    - build-android16-6-12
+    runs-on: ubuntu-latest
+    env:
+      TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+      # Testing-release group: gets one combined "new testing release"
+      # card per run (chat id + forum topic id - edit here to re-route).
+      TG_TEST_CHAT: "-1002358137390"
+      TG_TEST_TOPIC: "245705"
+      # Component pins for the card's Root/Features block (release-notes
+      # parity). Empty on a failed resolve-sources - the digest degrades.
+      NOMOUNT_COMMIT: ${{ needs.resolve-sources.outputs.nomount_commit }}
+      KERNEL_PATCHES_COMMIT: ${{ needs.resolve-sources.outputs.kernel_patches_commit }}
+      DROIDSPACES_COMMIT: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
+      SUSFS_ANDROID12_5_10: ${{ needs.resolve-sources.outputs.susfs_commit_android12_5_10 }}
+      SUSFS_ANDROID13_5_10: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_10 }}
+      SUSFS_ANDROID13_5_15: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_15 }}
+      SUSFS_ANDROID14_5_15: ${{ needs.resolve-sources.outputs.susfs_commit_android14_5_15 }}
+      SUSFS_ANDROID14_6_1: ${{ needs.resolve-sources.outputs.susfs_commit_android14_6_1 }}
+      SUSFS_ANDROID15_6_6: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6 }}
+      SUSFS_ANDROID16_6_12: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12 }}
+      DIGEST_FEATURES: "susfs,nomount,bbg,ds,net,ntsync,ptrace,unicode,bpf"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Post per-family digests to Telegram topics
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set; skipping announce."
+            exit 0
+          fi
+          RUN_ID="${{ github.run_id }}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}"
+          NIGHTLY_URL="https://nightly.link/${{ github.repository }}/actions/runs/${RUN_ID}"
+          # Collect every page of the run's jobs (large runs exceed one page).
+          gh api --paginate \
+            "repos/${{ github.repository }}/actions/runs/${RUN_ID}/jobs?per_page=100" \
+            > /tmp/jobs.json || { echo "jobs fetch failed; skipping announce"; exit 0; }
+          gh api --paginate \
+            "repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
+            > /tmp/artifacts.json || true
+          python3 .github/scripts/telegram_digest.py \
+            --run-id "$RUN_ID" \
+            --branch "${{ github.ref_name }}" \
+            --event "${{ github.event_name }}" \
+            --run-url "$RUN_URL" \
+            --nightly-url "$NIGHTLY_URL" \
+            --chat-id "$TG_CHAT" \
+            --test-chat "$TG_TEST_CHAT" \
+            --test-topic "$TG_TEST_TOPIC" \
+            --artifacts-file /tmp/artifacts.json \
+            < /tmp/jobs.json > /tmp/digest.out
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "digest build failed (rc=$rc); skipping announce"
+            exit 0
+          fi
+          sent=0
+          FAMILY_LINKS=""
+          FAMILY_BTN_ROWS=""
+          while IFS= read -r -d $'\x1e' rec; do
+            [ -z "$rec" ] && continue
+            chat="${rec%%$'\t'*}"; rest="${rec#*$'\t'}"
+            topic="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
+            famname="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
+            html_msg="${rest%%$'\t'*}"
+            buttons="${rest#*$'\t'}"
+            MK=( )
+            [ -n "$buttons" ] && MK=(--data-urlencode "reply_markup=${buttons}")
+            RESP=$(curl -sf --max-time 30 \
+              "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${chat}" \
+              --data-urlencode "message_thread_id=${topic}" \
+              --data-urlencode "parse_mode=HTML" \
+              --data-urlencode "disable_web_page_preview=true" \
+              --data-urlencode "text=${html_msg}" \
+              "${MK[@]}") \
+              || { echo "WARN: telegram send to chat ${chat} topic ${topic} failed"; continue; }
+            sent=$((sent + 1))
+            MID=$(printf '%s' "$RESP" | jq -r '.result.message_id // empty' 2>/dev/null)
+            # Remember the in-group t.me link for the combined testing card
+            TME_USER=$(printf '%s' "$RESP" | jq -r '.result.chat.username // empty' 2>/dev/null)
+            if [ -n "$MID" ] && [ -n "$TME_USER" ]; then
+              TME_URL="https://t.me/${TME_USER}/${topic}/${MID}"
+              FAMILY_LINKS="${FAMILY_LINKS}<li><a href=\"${TME_URL}\">${famname}</a></li>"
+              # One button row per family card, for the combined card.
+              ROW=$(jq -nc --arg t "🔨 ${famname}" --arg u "${TME_URL}" \
+                '[{text:$t,url:$u}]' 2>/dev/null || true)
+              [ -n "$ROW" ] && FAMILY_BTN_ROWS="${FAMILY_BTN_ROWS}${ROW},"
+            fi
+            # Pin the digest in its topic so the latest build stays on top.
+            if [ -n "$MID" ]; then
+              curl -sf --max-time 30 \
+                "https://api.telegram.org/bot${TG_TOKEN}/pinChatMessage" \
+                -d "chat_id=${chat}" -d "message_id=${MID}" \
+                -d "disable_notification=true" > /dev/null \
+                || echo "WARN: could not pin in chat ${chat} topic ${topic} (needs pin permission)"
+            fi
+          done < /tmp/digest.out
+
+          # Combined testing-release card: one message in the testing group
+          # linking each family's digest post in the announcement group,
+          # with a t.me button row per family + the all-artifacts button.
+          if [ -n "$TG_TEST_CHAT" ] && [ -n "$TG_TEST_TOPIC" ] && [ -n "$FAMILY_LINKS" ]; then
+            COMBINED=$(printf '%s' \
+              "👋 <b>Hello, new testing release here:</b><br>🔨 <b>Wild Kernels</b> — <code>${{ github.ref_name }}</code><br><b>Run</b>: <a href=\"${RUN_URL}\">#${RUN_ID}</a><br><ul>${FAMILY_LINKS}</ul>")
+            ALL_ROW=$(jq -nc --arg u "${NIGHTLY_URL}" \
+              '[{text:"📦 All artifacts",url:$u}]' 2>/dev/null || true)
+            TEST_BTN_ROWS="${FAMILY_BTN_ROWS}${ALL_ROW}"
+            MK=( )
+            if [ -n "$TEST_BTN_ROWS" ]; then
+              TEST_BUTTONS=$(jq -nc --argjson rows "[${TEST_BTN_ROWS%,}]" \
+                '{inline_keyboard:$rows}' 2>/dev/null || true)
+              [ -n "$TEST_BUTTONS" ] && MK=(--data-urlencode "reply_markup=${TEST_BUTTONS}")
+            fi
+            TRESP=$(curl -sf --max-time 30 \
+              "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TG_TEST_CHAT}" \
+              --data-urlencode "message_thread_id=${TG_TEST_TOPIC}" \
+              --data-urlencode "parse_mode=HTML" \
+              --data-urlencode "disable_web_page_preview=true" \
+              --data-urlencode "text=${COMBINED}" \
+              "${MK[@]}") \
+              || echo "WARN: combined testing card send failed"
+            TMID=$(printf '%s' "${TRESP:-}" | jq -r '.result.message_id // empty' 2>/dev/null)
+            if [ -n "$TMID" ]; then
+              curl -sf --max-time 30 \
+                "https://api.telegram.org/bot${TG_TOKEN}/pinChatMessage" \
+                -d "chat_id=${TG_TEST_CHAT}" -d "message_id=${TMID}" \
+                -d "disable_notification=true" > /dev/null \
+                || echo "WARN: could not pin in the testing group (needs pin permission)"
+            fi
+            sent=$((sent + 1))
+          fi
+          echo "announced ${sent} message(s)"
 
   update-verified-pins:
     concurrency:
@@ -1010,11 +1198,11 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         NOMOUNT_SHA: ${{ needs.resolve-sources.outputs.nomount_commit }}
         KERNELSU_SHA: ${{ needs.resolve-sources.outputs.ksu_commit }}
-        RESUKISU_SHA: ${{ needs.resolve-sources.outputs.resukisu_commit }}
+        BAKASU_SHA: ${{ needs.resolve-sources.outputs.bakasu_commit }}
         SUKISU_ULTRA_SHA: ${{ needs.resolve-sources.outputs.sukisu_ultra_commit }}
         APPROVE_NOMOUNT: ${{ inputs.use_nomount }}
         APPROVE_KERNELSU: ${{ (inputs.root_flavor == 'KernelSU' || startsWith(inputs.root_flavor, 'All')) }}
-        APPROVE_RESUKISU: ${{ (inputs.root_flavor == 'ReSukiSU' || startsWith(inputs.root_flavor, 'All')) }}
+        APPROVE_BAKASU: ${{ (inputs.root_flavor == 'BakaSU' || startsWith(inputs.root_flavor, 'All')) }}
         APPROVE_SUKISU_ULTRA: ${{ inputs.root_flavor == 'SukiSU-Ultra' }}
 
     - name: Commit promoted pins
@@ -1586,22 +1774,26 @@ jobs:
           FEATURE_SET: ${{ needs.resolve-sources.outputs.feature_set }}
           MANAGER_LIST: ${{ needs.resolve-sources.outputs.manager_list }}
           ROOT_MATRIX: ${{ needs.resolve-sources.outputs.root_matrix }}
-          USE_SUSFS: ${{ inputs.use_susfs }}
-          USE_NOMOUNT: ${{ inputs.use_nomount }}
-          USE_BBG: ${{ inputs.use_bbg }}
-          USE_DS: ${{ inputs.use_ds }}
-          USE_NET: ${{ inputs.use_net }}
-          USE_NTSYNC: ${{ inputs.use_ntsync }}
-          USE_PTRACE: ${{ inputs.use_ptrace }}
-          USE_UNICODE: ${{ inputs.use_unicode }}
-          USE_BPF: ${{ inputs.use_bpf }}
-          USE_PERF: ${{ inputs.use_perf }}
-          USE_CACHE: ${{ inputs.use_cache }}
-          PAGE_SIZE: ${{ inputs.page_size }}
-          KERNEL_BUILD_VERSION: ${{ inputs.kernel_build_version }}
+          # Scheduled (nightly) runs carry no inputs; fall back to the same
+          # all-features-on defaults the resolve-sources feature computation
+          # uses, so the rendered notes list the features actually built.
+          IS_SCHEDULE: ${{ github.event_name == 'schedule' }}
+          USE_SUSFS: ${{ inputs.use_susfs || (github.event_name == 'schedule' && true) || false }}
+          USE_NOMOUNT: ${{ inputs.use_nomount || (github.event_name == 'schedule' && true) || false }}
+          USE_BBG: ${{ inputs.use_bbg || (github.event_name == 'schedule' && true) || false }}
+          USE_DS: ${{ inputs.use_ds || (github.event_name == 'schedule' && true) || false }}
+          USE_NET: ${{ inputs.use_net || (github.event_name == 'schedule' && true) || false }}
+          USE_NTSYNC: ${{ inputs.use_ntsync || (github.event_name == 'schedule' && true) || false }}
+          USE_PTRACE: ${{ inputs.use_ptrace || (github.event_name == 'schedule' && true) || false }}
+          USE_UNICODE: ${{ inputs.use_unicode || (github.event_name == 'schedule' && true) || false }}
+          USE_BPF: ${{ inputs.use_bpf || (github.event_name == 'schedule' && true) || false }}
+          USE_PERF: ${{ inputs.use_perf || false }}
+          USE_CACHE: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+          PAGE_SIZE: ${{ inputs.page_size || '4k' }}
+          KERNEL_BUILD_VERSION: ${{ inputs.kernel_build_version || 'All' }}
           NOMOUNT_COMMIT: ${{ needs.resolve-sources.outputs.nomount_commit }}
           KSU_COMMIT: ${{ needs.resolve-sources.outputs.ksu_commit }}
-          RESUKISU_COMMIT: ${{ needs.resolve-sources.outputs.resukisu_commit }}
+          BAKASU_COMMIT: ${{ needs.resolve-sources.outputs.bakasu_commit }}
           SUKISU_ULTRA_COMMIT: ${{ needs.resolve-sources.outputs.sukisu_ultra_commit }}
           KOWSU_COMMIT: ${{ needs.resolve-sources.outputs.kowsu_commit }}
           KERNELSU_COMMIT: ${{ needs.resolve-sources.outputs.kernelsu_commit }}
@@ -1615,13 +1807,13 @@ jobs:
           SUSFS_ANDROID14_6_1: ${{ needs.resolve-sources.outputs.susfs_commit_android14_6_1 }}
           SUSFS_ANDROID15_6_6: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6 }}
           SUSFS_ANDROID16_6_12: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12 }}
-          SUSFS_ANDROID12_5_10_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android12_5_10_resukisu }}
-          SUSFS_ANDROID13_5_10_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_10_resukisu }}
-          SUSFS_ANDROID13_5_15_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_15_resukisu }}
-          SUSFS_ANDROID14_5_15_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android14_5_15_resukisu }}
-          SUSFS_ANDROID14_6_1_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android14_6_1_resukisu }}
-          SUSFS_ANDROID15_6_6_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6_resukisu }}
-          SUSFS_ANDROID16_6_12_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12_resukisu }}
+          SUSFS_ANDROID12_5_10_BAKASU: ${{ needs.resolve-sources.outputs.susfs_commit_android12_5_10_bakasu }}
+          SUSFS_ANDROID13_5_10_BAKASU: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_10_bakasu }}
+          SUSFS_ANDROID13_5_15_BAKASU: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_15_bakasu }}
+          SUSFS_ANDROID14_5_15_BAKASU: ${{ needs.resolve-sources.outputs.susfs_commit_android14_5_15_bakasu }}
+          SUSFS_ANDROID14_6_1_BAKASU: ${{ needs.resolve-sources.outputs.susfs_commit_android14_6_1_bakasu }}
+          SUSFS_ANDROID15_6_6_BAKASU: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6_bakasu }}
+          SUSFS_ANDROID16_6_12_BAKASU: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12_bakasu }}
           SUSFS_ANDROID12_5_10_SUKISU_ULTRA: ${{ needs.resolve-sources.outputs.susfs_commit_android12_5_10_sukisu_ultra }}
           SUSFS_ANDROID13_5_10_SUKISU_ULTRA: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_10_sukisu_ultra }}
           SUSFS_ANDROID13_5_15_SUKISU_ULTRA: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_15_sukisu_ultra }}
@@ -1660,7 +1852,7 @@ jobs:
           ksun_branch=env("KSUN_BRANCH","dev-susfs")
           ksun_commit=env("KSUN_COMMIT","")
           ksu_commit=env("KSU_COMMIT","")
-          resukisu_commit=env("RESUKISU_COMMIT","")
+          bakasu_commit=env("BAKASU_COMMIT","")
           sukisu_ultra_commit=env("SUKISU_ULTRA_COMMIT","")
           kowsu_commit=env("KOWSU_COMMIT","")
           kernelsu_commit=env("KERNELSU_COMMIT","")
@@ -1675,12 +1867,12 @@ jobs:
               _next_url="https://github.com/pershoot/KernelSU-Next/commit/"
           else:
               _next_url="https://github.com/KernelSU-Next/KernelSU-Next/commit/"
-          _root_urls={"next":_next_url,"kernelsu":"https://github.com/tiann/KernelSU/commit/","resukisu":"https://github.com/ReSukiSU/ReSukiSU/commit/","sukisu-ultra":"https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/","kowsu":"https://github.com/KOWX712/KernelSU/commit/"}
-          _root_commits={"next":_rmatrix.get("next","") or kernelsu_commit,"kernelsu":_rmatrix.get("kernelsu","") or ksu_commit,"resukisu":_rmatrix.get("resukisu","") or resukisu_commit,"sukisu-ultra":_rmatrix.get("sukisu-ultra","") or sukisu_ultra_commit,"kowsu":_rmatrix.get("kowsu","") or kowsu_commit}
+          _root_urls={"next":_next_url,"kernelsu":"https://github.com/tiann/KernelSU/commit/","bakasu":"https://github.com/Baka-SU/BakaSU/commit/","sukisu-ultra":"https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/","kowsu":"https://github.com/KOWX712/KernelSU/commit/"}
+          _root_commits={"next":_rmatrix.get("next","") or kernelsu_commit,"kernelsu":_rmatrix.get("kernelsu","") or ksu_commit,"bakasu":_rmatrix.get("bakasu","") or bakasu_commit,"sukisu-ultra":_rmatrix.get("sukisu-ultra","") or sukisu_ultra_commit,"kowsu":_rmatrix.get("kowsu","") or kowsu_commit}
           _flavors0=[m.get("flavor","") for m in parse_managers(env("MANAGER_LIST","")) if m.get("flavor","")]
           if not _flavors0:
-              _flavors0={"KernelSU-Next":["next"],"KernelSU":["kernelsu"],"ReSukiSU":["resukisu"],"SukiSU-Ultra":["sukisu-ultra"],"KowSU":["kowsu"],"No Root":[],"All":["next","kernelsu","resukisu"]}.get(root,["next","kernelsu","resukisu"])
-          _labels0={"next":"KernelSU-Next","kernelsu":"KernelSU","resukisu":"ReSukiSU","sukisu-ultra":"SukiSU-Ultra","kowsu":"KowSU"}
+              _flavors0={"KernelSU-Next":["next"],"KernelSU":["kernelsu"],"BakaSU":["bakasu"],"SukiSU-Ultra":["sukisu-ultra"],"KowSU":["kowsu"],"No Root":[],"All":["next","kernelsu","bakasu"]}.get(root,["next","kernelsu","bakasu"])
+          _labels0={"next":"KernelSU-Next","kernelsu":"KernelSU","bakasu":"BakaSU","sukisu-ultra":"SukiSU-Ultra","kowsu":"KowSU"}
           _rc=[]
           for _fl0 in _flavors0:
               _c=_root_commits.get(_fl0,"")
@@ -1715,12 +1907,12 @@ jobs:
           _sel=kbv_to_variant(kbv)
           variants=[_sel] if _sel else list(all_variants)
           sus_map={"android12-5.10":env("SUSFS_ANDROID12_5_10",""),"android13-5.10":env("SUSFS_ANDROID13_5_10",""),"android13-5.15":env("SUSFS_ANDROID13_5_15",""),"android14-5.15":env("SUSFS_ANDROID14_5_15",""),"android14-6.1":env("SUSFS_ANDROID14_6_1",""),"android15-6.6":env("SUSFS_ANDROID15_6_6",""),"android16-6.12":env("SUSFS_ANDROID16_6_12","")}
-          sus_map_resukisu={"android12-5.10":env("SUSFS_ANDROID12_5_10_RESUKISU",""),"android13-5.10":env("SUSFS_ANDROID13_5_10_RESUKISU",""),"android13-5.15":env("SUSFS_ANDROID13_5_15_RESUKISU",""),"android14-5.15":env("SUSFS_ANDROID14_5_15_RESUKISU",""),"android14-6.1":env("SUSFS_ANDROID14_6_1_RESUKISU",""),"android15-6.6":env("SUSFS_ANDROID15_6_6_RESUKISU",""),"android16-6.12":env("SUSFS_ANDROID16_6_12_RESUKISU","")}
+          sus_map_bakasu={"android12-5.10":env("SUSFS_ANDROID12_5_10_BAKASU",""),"android13-5.10":env("SUSFS_ANDROID13_5_10_BAKASU",""),"android13-5.15":env("SUSFS_ANDROID13_5_15_BAKASU",""),"android14-5.15":env("SUSFS_ANDROID14_5_15_BAKASU",""),"android14-6.1":env("SUSFS_ANDROID14_6_1_BAKASU",""),"android15-6.6":env("SUSFS_ANDROID15_6_6_BAKASU",""),"android16-6.12":env("SUSFS_ANDROID16_6_12_BAKASU","")}
           sus_map_sukisu_ultra={"android12-5.10":env("SUSFS_ANDROID12_5_10_SUKISU_ULTRA",""),"android13-5.10":env("SUSFS_ANDROID13_5_10_SUKISU_ULTRA",""),"android13-5.15":env("SUSFS_ANDROID13_5_15_SUKISU_ULTRA",""),"android14-5.15":env("SUSFS_ANDROID14_5_15_SUKISU_ULTRA",""),"android14-6.1":env("SUSFS_ANDROID14_6_1_SUKISU_ULTRA",""),"android15-6.6":env("SUSFS_ANDROID15_6_6_SUKISU_ULTRA",""),"android16-6.12":env("SUSFS_ANDROID16_6_12_SUKISU_ULTRA","")}
           _flavors=[m.get("flavor","") for m in parse_managers(env("MANAGER_LIST","")) if m.get("flavor","")]
           if not _flavors:
-              _flavors={"KernelSU-Next":["next"],"KernelSU":["kernelsu"],"ReSukiSU":["resukisu"],"SukiSU-Ultra":["sukisu-ultra"],"KowSU":["kowsu"],"No Root":[],"All":["next","kernelsu","resukisu"]}.get(root,["next","kernelsu","resukisu"])
-          _labels={"next":"KernelSU-Next","kernelsu":"KernelSU","resukisu":"ReSukiSU","sukisu-ultra":"SukiSU-Ultra","kowsu":"KowSU"}
+              _flavors={"KernelSU-Next":["next"],"KernelSU":["kernelsu"],"BakaSU":["bakasu"],"SukiSU-Ultra":["sukisu-ultra"],"KowSU":["kowsu"],"No Root":[],"All":["next","kernelsu","bakasu"]}.get(root,["next","kernelsu","bakasu"])
+          _labels={"next":"KernelSU-Next","kernelsu":"KernelSU","bakasu":"BakaSU","sukisu-ultra":"SukiSU-Ultra","kowsu":"KowSU"}
           _susfs_url="https://gitlab.com/simonpunk/susfs4ksu"
           lines.append("| SUSFS branch |" + "".join(f" {_labels.get(_fl,_fl)} |" for _fl in _flavors))
           lines.append("|---" * (len(_flavors) + 1) + "|")
@@ -1728,7 +1920,7 @@ jobs:
               _row=f"| gki-{v} |"
               for _fl in _flavors:
                   # KowSU never ships SUSFS: render n/a rather than shared pins.
-                  _sm={} if _fl=="kowsu" else (sus_map_sukisu_ultra if _fl=="sukisu-ultra" else (sus_map_resukisu if _fl=="resukisu" else sus_map))
+                  _sm={} if _fl=="kowsu" else (sus_map_sukisu_ultra if _fl=="sukisu-ultra" else (sus_map_bakasu if _fl=="bakasu" else sus_map))
                   sha=_sm.get(v,"")
                   sha_s=f"[`{sha[:7]}`]({_susfs_url}/-/commit/{sha})" if sha else "_n/a_"
                   _row+=f" {sha_s} |"
@@ -1776,9 +1968,83 @@ jobs:
           {
             echo ""
             echo "- **Nightly artifacts:** https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            echo "- **Note:** not every kernel version is necessarily built in a nightly run — the link above lists exactly what this run produced."
+            echo "- **Note:** kernels that built successfully this run are attached below; failed families are simply absent. The link above lists everything this run produced."
           } >> nightly/release_body.md
           cat nightly/release_body.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Publish-everything-that-built: download each family's AnyKernel3
+      # artifacts and attach them to the nightly release. A family whose
+      # builds all failed (or that was skipped) simply contributes nothing -
+      # the release still publishes with whatever succeeded. One
+      # download-artifact step per family, same as the release job: a single
+      # broad pattern silently truncates on runs this large
+      # (run 34015449465: 495/591 artifacts).
+      - name: Download AnyKernel3 (5.10 android12)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '5.10.*-android12-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (5.10 android13)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '5.10.*-android13-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (5.15 android13)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '5.15.*-android13-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (5.15 android14)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '5.15.*-android14-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (6.1 android14)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '6.1.*-android14-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (6.6 android15)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '6.6.*-android15-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download AnyKernel3 (6.12 android16)
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '6.12.*-android16-*-AnyKernel3'
+          merge-multiple: false
+
+      - name: Download NoMount metamodule
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          pattern: '*NoMount-Metamodule'
+          merge-multiple: false
+
+      - name: Zip artifacts for Release
+        run: |
+          set -e
+          shopt -s nullglob
+          for dir in release-assets/*-AnyKernel3 release-assets/*NoMount-Metamodule; do
+            zip_name="${dir}.zip"
+            rm -f "$zip_name"
+            (cd "$dir" && zip -r -q -9 "../$(basename "$zip_name")" .)
+          done
+          ls release-assets/*.zip 2>/dev/null | wc -l | xargs -I{} echo "{} zips ready"
 
       - name: Replace nightly prerelease
         env:
@@ -1794,4 +2060,44 @@ jobs:
             --prerelease \
             --title "Nightly (${{ github.ref_name }} $(date -u +%Y-%m-%d))" \
             --notes-file nightly/release_body.md
+
+      # Sequential uploads with per-file retries, non-fatal per file: a
+      # single failed asset must not unpublish the nightly (the kernels it
+      # shipped are still valid for testers). Missing/failed counts land
+      # in the step summary instead. This runs AFTER the release exists.
+      - name: Upload kernel assets to nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(release-assets/*.zip)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No kernel artifacts this run; nightly published with notes only." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Uploading ${#files[@]} kernel assets..." >> "$GITHUB_STEP_SUMMARY"
+          failed=0
+          for f in "${files[@]}"; do
+            ok=false
+            for attempt in 1 2 3; do
+              if gh release upload nightly "$f" --clobber; then
+                ok=true
+                break
+              fi
+              echo "Attempt $attempt/3 failed for: $(basename "$f")" >&2
+              if [ "$attempt" -lt 3 ]; then sleep 10; fi
+            done
+            if [ "$ok" = false ]; then
+              echo "ERROR: giving up on $(basename "$f")" >&2
+              failed=$((failed + 1))
+            fi
+          done
+          {
+            echo ""
+            echo "### Nightly assets"
+            echo "- uploaded: $(( ${#files[@]} - failed )) / ${#files[@]}"
+            if [ "$failed" -ne 0 ]; then
+              echo "- failed uploads: $failed (see job log)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 

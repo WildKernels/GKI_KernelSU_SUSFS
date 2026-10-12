@@ -2,7 +2,7 @@ name: Setup pinned root implementation
 description: Clone exactly one supported root implementation at a verified commit
 inputs:
   flavor:
-    description: 'kernelsu, next, resukisu, sukisu-ultra, or kowsu'
+    description: 'kernelsu, next, bakasu, sukisu-ultra, or kowsu'
     required: true
   commit:
     description: 'Full immutable commit SHA'
@@ -30,10 +30,10 @@ runs:
             directory="KernelSU-Next"
             manager="KernelSU Next Manager"
             ;;
-          resukisu)
-            repo="https://github.com/ReSukiSU/ReSukiSU.git"
-            directory="ReSukiSU"
-            manager="ReSukiSU Manager"
+          bakasu)
+            repo="https://github.com/Baka-SU/BakaSU.git"
+            directory="BakaSU"
+            manager="BakaSU Manager"
             ;;
           sukisu-ultra)
             repo="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"
@@ -56,7 +56,7 @@ runs:
           exit 2
         fi
 
-        for candidate in KernelSU KernelSU-Next ReSukiSU SukiSU-Ultra KowSU; do
+        for candidate in KernelSU KernelSU-Next BakaSU SukiSU-Ultra KowSU; do
           if [ "$candidate" != "$directory" ] && [ -e "$candidate" ]; then
             echo "Refusing mixed root implementations: found $candidate." >&2
             exit 1
@@ -131,25 +131,25 @@ runs:
           fi
         done
 
-    - name: Disable multi-manager for ReSukiSU
-      if: inputs.flavor == 'resukisu'
+    - name: Disable multi-manager for BakaSU
+      if: inputs.flavor == 'bakasu'
       uses: ./.github/actions/set-kernel-config
       with:
         config_list: |
           CONFIG_KSU_MULTI_MANAGER_SUPPORT=n
           CONFIG_KSU_TOOLKIT_SUPPORT=y
 
-    - name: Soften ReSukiSU Kbuild submodule check for bazel builds
-      if: inputs.flavor == 'resukisu'
+    - name: Soften BakaSU Kbuild submodule check for bazel builds
+      if: inputs.flavor == 'bakasu'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
         # Fallback: demote the git submodule check from error to warning.
-        # Modify the Kbuild in the ReSukiSU checkout so the change propagates
+        # Modify the Kbuild in the BakaSU checkout so the change propagates
         # through the symlink into bazel sandbox.
-        for d in ReSukiSU/kernel; do
+        for d in BakaSU/kernel; do
           if [ -f "$d/Kbuild" ] && grep -q 'You should use \$(REPO_NAME) as a git submodule instead of copying code directly' "$d/Kbuild"; then
             sed -i 's/\$(error You should use \$(REPO_NAME) as a git submodule instead of copying code directly)/\$(warning You should use \$(REPO_NAME) as a git submodule instead of copying code directly)/' "$d/Kbuild"
-            echo "Softened ReSukiSU submodule check in $d/Kbuild"
+            echo "Softened BakaSU submodule check in $d/Kbuild"
           fi
         done

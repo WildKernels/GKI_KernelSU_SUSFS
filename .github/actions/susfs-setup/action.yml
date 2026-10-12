@@ -50,11 +50,24 @@ runs:
         echo "SUSFS_COMMIT=$SUSFS_COMMIT" >> "$GITHUB_ENV"
         echo "Using SUSFS commit: $SUSFS_COMMIT"
 
-        # Pershoot's latest two gki-android14-6.1-dev commits (currently the
-        # no-features core build + Toolkit coexistence fixes) only apply to
-        # KernelSU-Next (dev-susfs fork). Other flavors use the simonpunk
-        # checkout as-is.
+        # Pershoot's KernelSU-Next (dev-susfs fork) SUSFS fixes. Other flavors use
+        # the simonpunk checkout as-is.
+        #
+        # Two specific commits, in order (verified clean by rehearsal):
+        #   6387756 fs/susfs: Allow core to be built with no features
+        #   161c058 fs/susfs: Implement SuSFS and Toolkit coexistence
+        #     -> cherry-picked for ALL families: they touch only
+        #        kernel_patches/fs/susfs.c and apply cleanly on 6.1, 6.6
+        #        and 6.12 (tested per-branch).
+        #   (35b2a01, the SELinux time side-channel 50_add rewrite, was
+        #        REMOVED per owner decision - it conflicted on every branch
+        #        and its file-overwrite workaround is no longer wanted.)
+        # Fail-loud: a failed pick must kill the job, never march on with a
+        # half-merged tree.
         if [ "${{ inputs.root_flavor }}" = "next" ]; then
-          git fetch https://gitlab.com/pershoot/susfs4ksu.git gki-android14-6.1-dev || true
-          git log ..FETCH_HEAD --oneline -n 2 | awk '{print $1}' | tac | xargs git cherry-pick 2>/dev/null || true
+          git fetch https://gitlab.com/pershoot/susfs4ksu.git \
+            6387756d64b3ab9ececefc4523627a9ee05a7519 \
+            161c058fed5544a6573d87124f346dadd5c4962d
+          git cherry-pick 6387756d64b3ab9ececefc4523627a9ee05a7519
+          git cherry-pick 161c058fed5544a6573d87124f346dadd5c4962d
         fi
