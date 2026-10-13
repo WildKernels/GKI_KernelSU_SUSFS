@@ -401,54 +401,62 @@ def main() -> int:
         feat_text = "\n".join(flines2)
         feat_rich = "\n".join(rlines2)
 
-        # Inline keyboard buttons (URL buttons only - no backend needed):
-        # the newest passing sublevel's kernel zip, manager APKs, and the
-        # whole-run download. Emitted as the record's 5th field for the
-        # workflow to pass as reply_markup.
-        kb_rows = []
-        for s in reversed(subs):
-            if s in sub_links:
-                kb_rows.append([{"text": "⬇️ Download Kernel",
-                                 "url": sub_links[s]}])
-                break
+        # Buttons (URL only - no backend needed), one source for both the
+        # JSON inline keyboard (cloud fallback) and the rich card:
+        #   - one download button per BUILT kernel version (2 per row)
+        #   - manager APK buttons, one row per flavor (name + spoofed)
+        #   - all-artifacts row
+        def short_tag(tag: str) -> str:
+            t = re.sub(r"-android\d+", "", tag)
+            t = re.sub(r"^([\d.]+X?)-", r"\1 · ", t)
+            return t
+
+        dl_btns = [(f"⬇️ {short_tag(s)}", sub_links[s])
+                   for s in reversed(subs) if s in sub_links]
+        mgr_rows = []
         for f in sorted(e["flavors"]):
             links = manager_links(f)
-            if links:
-                row = [{"text": f"🧩 {f}",
-                        "url": links[0]}]
-                if len(links) > 1:
-                    row.append({"text": "spoofed", "url": links[1]})
-                kb_rows.append(row)
-                break
-        kb_rows.append([{"text": "📦 All artifacts",
-                         "url": args.nightly_url}])
+            if not links:
+                continue
+            row = [(f"🧩 {f}", links[0])]
+            row += [("spoofed", u) for u in links[1:]]
+            mgr_rows.append(row)
+
+        kb_rows = []
+        for i in range(0, len(dl_btns), 2):
+            kb_rows.append([{"text": t, "url": u}
+                            for t, u in dl_btns[i:i + 2]])
+        kb_rows += [[{"text": t, "url": u} for t, u in row]
+                    for row in mgr_rows]
+        kb_rows.append([{"text": "📦 All artifacts", "url": args.nightly_url}])
         buttons = json.dumps({"inline_keyboard": kb_rows},
                              separators=(",", ":"), ensure_ascii=False)
 
         # ---- Rich-markdown variant (Bot API 10.x sendRichMessage) ----
         # Table / button-row / expandable-quote vocabulary adapted from
         # nullptr-t-oss/Dragonw1nd-Kernels (.github/telegram/telegram.py).
-        # Values are html-escaped like their script does; the markup
-        # itself is emitted raw. No files attached - kernels stay on
-        # nightly.link (button links), so no local uploads are needed.
+        # Only proven-rendering constructs are used: links live in plain
+        # markdown positions (list items, standalone lines) - never inside
+        # table cells; table cells carry plain text only. No credit footer
+        # in the message (attribution lives in this header).
         rich_parts = [f"# {icon} Wild Kernels"]
         trows = [
             ("Branch", esc(args.branch)),
             ("Trigger", esc(args.event)),
-            ("Run", f"[#{args.run_id}]({args.run_url})"),
             ("Jobs", esc(counts)),
         ]
-        if e.get("root"):
-            rid, rlabel, rsha = e["root"]
-            rurl = ROOT_URLS.get(rid)
-            if rurl:
-                trows.append(("Root", f"[{esc(rlabel)} {rsha[:7]}]({rurl}{rsha})"))
-            else:
-                trows.append(("Root", f"{esc(rlabel)} {rsha[:7]}"))
         tbody = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in trows)
         rich_parts.append(
             f'<table bordered><tr><th colspan="2" align="center">'
             f"{esc(fname)}</th></tr>{tbody}</table>")
+        rich_parts.append(f"Run: [#{args.run_id}]({args.run_url})")
+        if e.get("root"):
+            rid, rlabel, rsha = e["root"]
+            rurl = ROOT_URLS.get(rid)
+            if rurl:
+                rich_parts.append(f"Root: [{esc(rlabel)} {rsha[:7]}]({rurl}{rsha})")
+            else:
+                rich_parts.append(f"Root: {esc(rlabel)} {rsha[:7]}")
         if feat_text:
             rich_parts.append(f"**Features**\n{feat_rich}")
         rich_parts.append(
@@ -456,15 +464,17 @@ def main() -> int:
             "<blockquote expandable>\n"
             + rich_subs + "\n</blockquote>")
         rich_parts.append(f"**Flavors**\n{rich_flavors}")
-        for row in kb_rows:
+        # Buttons: per-version downloads (success), managers (primary).
+        for i in range(0, len(dl_btns), 2):
             cells = "".join(
-                f'<tg-button type="url" style="primary" url="{b["url"]}">'
-                f'{b["text"]}</tg-button>' for b in row)
+                f'<tg-button type="url" style="success" url="{u}">{t}</tg-button>'
+                for t, u in dl_btns[i:i + 2])
             rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
-        rich_parts.append(
-            "<blockquote>Rich card format adapted from "
-            "[Dragonw1nd-Kernels](https://github.com/nullptr-t-oss/"
-            "Dragonw1nd-Kernels) \U0001F409</blockquote>")
+        for row in mgr_rows:
+            cells = "".join(
+                f'<tg-button type="url" style="primary" url="{u}">{t}</tg-button>'
+                for t, u in row)
+            rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
         rich = "\n\n".join(rich_parts)
         if len(rich) > RICH_MAX_LEN:
             rich = rich[:RICH_MAX_LEN - 1] + "…"
