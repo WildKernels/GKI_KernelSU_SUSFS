@@ -242,7 +242,12 @@ jobs:
 
           # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
           PIN_NOMOUNT="5a610db7649a59eb3e3d710653618d594941f8da"
-          PIN_KERNELSU="08a3b087e49227c8a6731c5f1114998b5e25255b"
+          # KernelSU: synced with official main (0c0fdb96, 2026-10-12).
+          # simonpunk's susfs sync commits (2026-10-12, all branches) rebased
+          # 10_enable_susfs_for_ksu.patch onto this layout - it fails with 17
+          # rejected hunks at the old 08a3b087 pin (run 38337419484) and
+          # applies clean at 0c0fdb96. BBG is kernel-side and unaffected.
+          PIN_KERNELSU="0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d"
           PIN_BAKASU="f6cb7e70c10ebde149f3121ae68b945514fd0801"
           PIN_SUKISU_ULTRA="b20dee702035af09cb2ecb5f35443bbc1747f3e6"
           declare -A PIN_SUSFS=(
@@ -251,8 +256,8 @@ jobs:
             [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
             [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
             [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
-            [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
-            [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
+            [susfs_commit_android15_6_6]="bd7d199ac87808001127e8a6d076832e2938cf0d"
+            [susfs_commit_android16_6_12]="5e0b2b925865000ca7dce993ecf1d281ee312887"
           )
           # BakaSU keeps its own SUSFS pin set (currently the shared values,
           # including 6.1 = 0ff93279). KernelSU's set above already diverges on 6.1.
@@ -262,8 +267,8 @@ jobs:
             [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
             [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
             [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
-            [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
-            [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
+            [susfs_commit_android15_6_6]="bd7d199ac87808001127e8a6d076832e2938cf0d"
+            [susfs_commit_android16_6_12]="5e0b2b925865000ca7dce993ecf1d281ee312887"
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
@@ -272,8 +277,8 @@ jobs:
             [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
             [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
             [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
-            [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
-            [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
+            [susfs_commit_android15_6_6]="bd7d199ac87808001127e8a6d076832e2938cf0d"
+            [susfs_commit_android16_6_12]="5e0b2b925865000ca7dce993ecf1d281ee312887"
           )
 
           pick() { # pinned repo ref  -> pinned when verified, else latest
