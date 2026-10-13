@@ -105,7 +105,11 @@ FLAVOR_MANAGERS = {
     "KernelSU": [("KernelSU_v*", None)],
     "KernelSU-Next": [("KernelSU_Next_v*", "spoofed"),
                       ("KernelSU_Next_v*spoofed*", None)],
-    "BakaSU": [("BakaSU_v*", None)],
+    # BakaSU ships a spoofed manager too (Spoofed-Manager-release in
+    # their Build Manager CI; our publish filter keeps the universal
+    # pair) - link it like KernelSU-Next's.
+    "BakaSU": [("BakaSU_v*", "spoofed"),
+               ("BakaSU_v*spoofed*", None)],
 }
 
 
