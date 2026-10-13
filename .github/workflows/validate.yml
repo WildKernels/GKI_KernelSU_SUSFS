@@ -1,5 +1,4 @@
 name: Validate
-
 on:
   push:
     branches: [main, dev]
