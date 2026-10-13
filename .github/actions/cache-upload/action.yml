@@ -1,30 +1,28 @@
-name: 'Upload Cache to GitHub Releases'
-description: 'Upload cache archive(s) to GitHub Releases with retry logic'
+name: "Upload Cache to GitHub Releases"
+description: "Upload cache archive(s) to GitHub Releases with retry logic"
 inputs:
   cache_key:
-    description: 'Unique key for the cache'
+    description: "Unique key for the cache"
     required: true
-    type: string
   cache_bucket:
-    description: 'The tag name for the release'
+    description: "The tag name for the release"
     required: true
-    default: 'general-cache'
+    default: "general-cache"
   github_token:
-    description: 'GitHub Token'
+    description: "GitHub Token"
     required: true
   compression_level:
-    description: 'Compression level (0-9)'
+    description: "Compression level (0-9)"
     required: false
     type: number
     default: 6
   debug:
-    description: 'Enable Logs'
+    description: "Enable Logs"
     required: false
-    type: boolean
     default: false
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Upload Cache Asset(s)
       shell: bash

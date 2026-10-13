@@ -22,7 +22,7 @@ on:
         type: string
         default: ""
       root_flavor:
-        description: "Mutually exclusive root implementation (kernelsu, next, bakasu, sukisu-ultra, or none)"
+        description: "Mutually exclusive root implementation (kernelsu, next, bakasu, finasu, sukisu-ultra, or none)"
         required: false
         type: string
         default: ""

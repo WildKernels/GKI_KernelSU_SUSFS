@@ -1,25 +1,19 @@
-name: 'Extract Sublevel and File Name'
-description: 'Reads Makefile sublevel and composes FILE_NAME'
+name: "Extract Sublevel and File Name"
+description: "Reads Makefile sublevel and composes FILE_NAME"
 inputs:
   kernel_version:
     required: true
-    type: string
   android_version:
     required: true
-    type: string
   os_patch_level:
     required: true
-    type: string
   variant:
     required: true
-    type: string
   sublevel:
     required: true
-    type: string
   page_size:
     required: false
-    type: string
-    default: '4k'
+    default: "4k"
 outputs:
   file_name:
     value: ${{ steps.extract.outputs.file_name }}

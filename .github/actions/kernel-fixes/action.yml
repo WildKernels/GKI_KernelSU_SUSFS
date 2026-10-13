@@ -1,26 +1,21 @@
-name: 'Kernel Fixes'
-description: 'Applies compatibility fixes based on android/kernel/sublevel'
+name: "Kernel Fixes"
+description: "Applies compatibility fixes based on android/kernel/sublevel"
 inputs:
   version:
     required: true
-    type: string
   android_version:
     required: true
-    type: string
   kernel_version:
     required: true
-    type: string
   sublevel:
     required: true
-    type: string
   os_patch_level:
     required: true
-    type: string
 
 runs:
   using: composite
   steps:
-    - name: 'Apply Makefile and parse-options.c fixes for GLIBC >= 2.38'
+    - name: "Apply Makefile and parse-options.c fixes for GLIBC >= 2.38"
       working-directory: ${{ github.workspace }}/kernel/common
       shell: bash
       run: |
@@ -58,7 +53,7 @@ runs:
           echo "[-] GLIBC version < 2.38, skipping Makefile fix."
         fi
 
-    - name: 'Apply mmap.c fix for specific versions'
+    - name: "Apply mmap.c fix for specific versions"
       shell: bash
       if: inputs.version == 'android15-6.6' && inputs.sublevel <= '58'
       working-directory: ${{ github.workspace }}/kernel/common
@@ -77,7 +72,7 @@ runs:
           fi
         fi
 
-    - name: 'Apply mmap.c fix for specific versions'
+    - name: "Apply mmap.c fix for specific versions"
       shell: bash
       if: (inputs.version == 'android12-5.10' && inputs.sublevel == 226) || (inputs.version == 'android13-5.10' && inputs.sublevel == 223) || (inputs.version == 'android13-5.15' && inputs.sublevel == 167) || (inputs.version == 'android14-5.15' && inputs.sublevel == 167)
       working-directory: ${{ github.workspace }}/kernel/common
@@ -86,7 +81,7 @@ runs:
         sed -i 's/\s*vm_flags_clear(new_vma, VM_PAD_MASK);/                new_vma->vm_flags \&= ~VM_PAD_MASK;/' mm/mmap.c
         echo "MMAP_VM_FLAGS_FIX=true" >> "$GITHUB_ENV"
 
-    - name: 'Final Kernel Fixes Summary'
+    - name: "Final Kernel Fixes Summary"
       shell: bash
       run: |
         SUMMARY_FILE="/tmp/kernel-fixes-summary.md"

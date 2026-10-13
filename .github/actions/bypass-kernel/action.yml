@@ -5,12 +5,11 @@ description: >
   Disabled by default; enable by passing allow_version_mismatch: true at the workflow level.
 inputs:
   allow_version_mismatch:
-    description: 'Whether to force-load version-mismatched modules'
+    description: "Whether to force-load version-mismatched modules"
     required: false
-    type: boolean
     default: false
   version:
-    description: 'Kernel config version (e.g., android14-6.1)'
+    description: "Kernel config version (e.g., android14-6.1)"
     required: true
 runs:
   using: composite

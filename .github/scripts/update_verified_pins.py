@@ -24,6 +24,7 @@ PINS = [
     ("PIN_KERNELSU", "KERNELSU_SHA", "APPROVE_KERNELSU"),
     ("PIN_BAKASU", "BAKASU_SHA", "APPROVE_BAKASU"),
     ("PIN_SUKISU_ULTRA", "SUKISU_ULTRA_SHA", "APPROVE_SUKISU_ULTRA"),
+    ("PIN_FINASU", "FINASU_SHA", "APPROVE_FINASU"),
     # SUSFS is intentionally excluded: it is always resolved at latest so it
     # stays API-matched to the always-latest KernelSU-Next tree.
 ]
@@ -37,8 +38,11 @@ def approved(env):
 
 def read_pins():
     """Return dict {var_name: sha} from the current PIN_* block in main.yml."""
-    with open(MAIN, "r", encoding="utf-8", newline="") as fh:
-        text = fh.read()
+    try:
+        with open(MAIN, "r", encoding="utf-8", newline="") as fh:
+            text = fh.read()
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot read {MAIN}: {exc}")
     pins = {}
     for var, _, _ in PINS:
         pattern = re.compile(
@@ -78,7 +82,10 @@ def build_changes():
 def history_path():
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
     d = os.path.join(REPO, ".github/pins/history")
-    os.makedirs(d, exist_ok=True)
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot create {d}: {exc}")
     return os.path.join(d, f"{ts}-{uuid4().hex[:8]}.json")
 
 
@@ -87,15 +94,21 @@ def write_history(changes, path):
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "previous_verified": {key: (old or "") for key, old, _ in changes},
     }
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(record, fh, indent=2)
-        fh.write("\n")
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(record, fh, indent=2)
+            fh.write("\n")
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot write history {path}: {exc}")
     print(f"  history written: {os.path.relpath(path, REPO)}")
 
 
 def apply_pins(promoted):
-    with open(MAIN, "r", encoding="utf-8", newline="") as fh:
-        text = fh.read()
+    try:
+        with open(MAIN, "r", encoding="utf-8", newline="") as fh:
+            text = fh.read()
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot read {MAIN}: {exc}")
     replacements = []
     for key, sha in promoted.items():
         pattern = re.compile(
@@ -117,8 +130,11 @@ def apply_pins(promoted):
     for start, end, replacement in reversed(replacements):
         text = text[:start] + replacement + text[end:]
 
-    with open(MAIN, "w", encoding="utf-8", newline="") as fh:
-        fh.write(text)
+    try:
+        with open(MAIN, "w", encoding="utf-8", newline="") as fh:
+            fh.write(text)
+    except OSError as exc:
+        raise SystemExit(f"ERROR: cannot write {MAIN}: {exc}")
     return True
 
 

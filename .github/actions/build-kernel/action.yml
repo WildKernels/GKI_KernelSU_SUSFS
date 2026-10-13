@@ -1,18 +1,16 @@
-name: 'Build Kernel'
-description: 'Builds kernel using legacy build.sh or Bazel (kleaf)'
+name: "Build Kernel"
+description: "Builds kernel using legacy build.sh or Bazel (kleaf)"
 inputs:
   version:
-    description: 'Kernel config version (e.g., android14-6.1)'
+    description: "Kernel config version (e.g., android14-6.1)"
     required: true
   page_size:
-    description: 'ARM64 page size: 4k (default, unchanged behaviour) or 16k'
+    description: "ARM64 page size: 4k (default, unchanged behaviour) or 16k"
     required: false
-    type: string
-    default: '4k'
+    default: "4k"
   allow_version_mismatch:
-    description: 'Whether to force-load version-mismatched modules'
+    description: "Whether to force-load version-mismatched modules"
     required: false
-    type: boolean
     default: false
 runs:
   using: composite
@@ -50,7 +48,7 @@ runs:
     #       exit 1
     #     fi
 
-    - name: 'Build Kernel'
+    - name: "Build Kernel"
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
@@ -88,7 +86,7 @@ runs:
             //common:kernel_aarch64/Image
         fi
 
-    - name: 'Verify Page Size in Generated .config'
+    - name: "Verify Page Size in Generated .config"
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
@@ -140,7 +138,7 @@ runs:
         fi
         echo "Page size verified: ${PAGE_SIZE}"
 
-    - name: 'Gather Build Artifacts'
+    - name: "Gather Build Artifacts"
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
