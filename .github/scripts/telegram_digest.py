@@ -494,11 +494,9 @@ def main() -> int:
                 rich_parts.append(f"Root: {esc(rlabel)} {rsha[:7]}")
         if feat_text:
             rich_parts.append(f"**Features**\n{feat_rich}")
-        rich_parts.append(
-            f"**Sublevels** ({len(sub_flav)} built)\n"
-            "<blockquote expandable>\n"
-            + rich_subs + "\n</blockquote>")
-        rich_parts.append(f"**Flavors**\n{rich_flavors}")
+        # No Sublevels/Flavors sections here: the button rows below carry
+        # the same info (one download button per kernel, manager buttons
+        # per flavor) - the user asked for the leaner card.
         # Buttons: per-kernel downloads (success; multi-flavor sublevels
         # get flavor-suffixed rows), managers (primary).
         for row in btn_rows:
