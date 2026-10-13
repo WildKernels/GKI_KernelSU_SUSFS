@@ -543,6 +543,26 @@ jobs:
                 printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"Manager,Spoofed-Manager"}' \
                   "$flavor" "$owner" "$repo" "$run_id" "$stock"
                 ;;
+              finasu)
+                owner="LyraVoid"; repo="FinaSU"; wf="build-manager.yml"
+                stock="${{ steps.resolve.outputs.finasu_commit }}"
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  --jq '.workflow_runs[0].id // empty')
+                if [[ -z "${run_id}" ]]; then
+                  echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
+                  fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=master&status=success&per_page=1")
+                  run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
+                  stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
+                  if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
+                  if [[ -z "${run_id}" ]]; then
+                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
+                    exit 1
+                  fi
+                fi
+                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager"}' \
+                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
+                ;;
+
               kowsu)
                 owner="KOWX712"; repo="KernelSU"; wf="build-manager.yml"
                 stock=$(git ls-remote https://github.com/KOWX712/KernelSU.git refs/heads/master | awk '{print $1; exit}')
@@ -579,6 +599,7 @@ jobs:
             BakaSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one bakasu)") ;;
             SukiSU-Ultra) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one sukisu-ultra)") ;;
             KowSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kowsu)") ;;
+            FinaSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one finasu)") ;;
             *) echo "Skipping manager resolution (no root flavor / none)." ;;
           esac
           if [ -n "$LIST" ]; then
