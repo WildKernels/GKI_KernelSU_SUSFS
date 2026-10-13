@@ -161,7 +161,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_NEXT_COMMIT:-}" ]]; then
@@ -191,7 +191,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_KSU_COMMIT:-}" ]]; then
@@ -225,7 +225,7 @@ jobs:
                     stock=$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev-susfs)
                   fi
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_NEXT_SUSFS_COMMIT:-}" ]]; then
@@ -265,7 +265,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/Baka-SU/BakaSU.git refs/heads/main)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_BAKASU_COMMIT:-}" ]]; then
@@ -295,7 +295,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
@@ -325,7 +325,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/LyraVoid/FinaSU.git refs/heads/master)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_FINASU_COMMIT:-}" ]]; then
@@ -348,7 +348,7 @@ jobs:
                 # KowSU has no SUSFS support and always tracks latest master.
                 owner="KOWX712"; repo="KernelSU"; wf="build-manager.yml"
                 stock=$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for stock ${stock}, falling back to latest successful run" >&2

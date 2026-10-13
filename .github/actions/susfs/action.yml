@@ -1,27 +1,27 @@
-name: 'Setup SUSFS'
-description: 'Clone and apply SUSFS patches with version-specific fixes'
+name: "Setup SUSFS"
+description: "Clone and apply SUSFS patches with version-specific fixes"
 inputs:
   susfs_commit:
-    description: 'SUSFS commit hash (empty = latest on auto-derived gki-{version} branch)'
+    description: "SUSFS commit hash (empty = latest on auto-derived gki-{version} branch)"
     required: false
     default: ""
   version:
-    description: 'Kernel config version (e.g., android15-6.6)'
+    description: "Kernel config version (e.g., android15-6.6)"
     required: true
   android_version:
-    description: 'Android version (e.g., android15)'
+    description: "Android version (e.g., android15)"
     required: true
   kernel_version:
-    description: 'Kernel version (e.g., 6.6)'
+    description: "Kernel version (e.g., 6.6)"
     required: true
   os_patch_level:
-    description: 'OS patch level (e.g., 2024-07)'
+    description: "OS patch level (e.g., 2024-07)"
     required: true
   sublevel:
-    description: 'Kernel sublevel'
+    description: "Kernel sublevel"
     required: true
   root_flavor:
-    description: 'Selected root implementation (kernelsu / next / bakasu / sukisu-ultra). KernelSU (tiann main) needs the 10_enable_susfs_for_ksu patch; other flavors already ship SUSFS.'
+    description: "Selected root implementation (kernelsu / next / bakasu / sukisu-ultra). KernelSU (tiann main) needs the 10_enable_susfs_for_ksu patch; other flavors already ship SUSFS."
     required: false
     default: ""
 

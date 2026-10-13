@@ -469,7 +469,7 @@ jobs:
                 owner="KernelSU-Next"; repo="KernelSU-Next"; wf="build-manager-ci.yml"
                 # Manager is built from the official dev-tip commit (grabbed at run start).
                 stock="${{ steps.resolve.outputs.kernelsu_commit }}"
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for dev tip ${stock}, falling back to latest successful run" >&2
@@ -489,7 +489,7 @@ jobs:
               kernelsu)
                 owner="tiann"; repo="KernelSU"; wf="build-manager.yml"
                 stock=$(git ls-remote https://github.com/tiann/KernelSU.git refs/heads/main | awk '{print $1; exit}')
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
@@ -508,7 +508,7 @@ jobs:
               bakasu)
                 owner="Baka-SU"; repo="BakaSU"; wf="build-manager.yml"
                 stock=$(git ls-remote https://github.com/Baka-SU/BakaSU.git refs/heads/main | awk '{print $1; exit}')
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
@@ -527,7 +527,7 @@ jobs:
               sukisu-ultra)
                 owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
                 stock=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main | awk '{print $1; exit}')
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
@@ -546,7 +546,7 @@ jobs:
               finasu)
                 owner="LyraVoid"; repo="FinaSU"; wf="build-manager.yml"
                 stock="${{ steps.resolve.outputs.finasu_commit }}"
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
@@ -566,7 +566,7 @@ jobs:
               kowsu)
                 owner="KOWX712"; repo="KernelSU"; wf="build-manager.yml"
                 stock=$(git ls-remote https://github.com/KOWX712/KernelSU.git refs/heads/master | awk '{print $1; exit}')
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for stock ${stock}, falling back to latest successful run" >&2

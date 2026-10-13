@@ -18,12 +18,18 @@ SUSFS4KSU="${SUSFS4KSU:-$KERNEL_ROOT/susfs4ksu}"
 KSU_VARIANT="FinaSU"
 
 UPSTREAM_PATCH="$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-[ -f "$UPSTREAM_PATCH" ] || { echo "::error::未找到 susfs4ksu KSU 侧补丁: $UPSTREAM_PATCH" >&2; exit 1; }
-[ -d "$KERNEL_ROOT/$KSU_DIR/.git" ] || { echo "::error::$KSU_DIR 不是 git 仓库检出，无法应用补丁" >&2; exit 1; }
+[ -f "$UPSTREAM_PATCH" ] || {
+  echo "::error::未找到 susfs4ksu KSU 侧补丁: $UPSTREAM_PATCH" >&2
+  exit 1
+}
+[ -d "$KERNEL_ROOT/$KSU_DIR/.git" ] || {
+  echo "::error::$KSU_DIR 不是 git 仓库检出，无法应用补丁" >&2
+  exit 1
+}
 
 echo "步骤 1/2: 应用 susfs4ksu 10_enable_susfs_for_ksu.patch（patch --forward，允许部分失败）..."
 cp "$UPSTREAM_PATCH" "$KERNEL_ROOT/$KSU_DIR/10_enable_susfs_for_ksu.patch"
-( cd "$KERNEL_ROOT/$KSU_DIR" && patch -p1 --forward < 10_enable_susfs_for_ksu.patch ) || true
+(cd "$KERNEL_ROOT/$KSU_DIR" && patch -p1 --forward <10_enable_susfs_for_ksu.patch) || true
 rm -f "$KERNEL_ROOT/$KSU_DIR/10_enable_susfs_for_ksu.patch"
 
 echo "步骤 2/2: FinaSU 内联适配修复..."
@@ -38,7 +44,7 @@ if [ "$KSU_VARIANT" == "FinaSU" ]; then
   fi
 
   # 0) 回退 selinux_hide.c，并恢复其依赖的基础模块进入编译列表
-  if git -C "$KERNEL_ROOT/$KSU_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+  if git -C "$KERNEL_ROOT/$KSU_DIR" rev-parse --git-dir >/dev/null 2>&1; then
     git -C "$KERNEL_ROOT/$KSU_DIR" checkout -- kernel/feature/selinux_hide.c
     if ! git -C "$KERNEL_ROOT/$KSU_DIR" diff --quiet -- kernel/feature/selinux_hide.c; then
       echo "::error::FinaSU selinux_hide.c 未能回退为原始版本" >&2
@@ -139,9 +145,9 @@ PYEOF
   #     setuid_hook.c 里的 ksu_seccomp_allow_cache(__NR_reboot) 改成了无条件 disable_seccomp()，
   #     于是管理器首页 Seccomp 状态显示“未开启”（0）。BakaSU 的做法是 >=5.10 保留过滤模式、
   #     仅把 reboot 加入 seccomp 白名单；这里改回 BakaSU 的逻辑。
-  if [ -f "$FINASU_KSU/hook/setuid_hook.c" ] \
-    && ! grep -q 'FINASU_SECCOMP_KEEP_FILTER' "$FINASU_KSU/hook/setuid_hook.c" \
-    && grep -q '^        disable_seccomp();$' "$FINASU_KSU/hook/setuid_hook.c"; then
+  if [ -f "$FINASU_KSU/hook/setuid_hook.c" ] &&
+    ! grep -q 'FINASU_SECCOMP_KEEP_FILTER' "$FINASU_KSU/hook/setuid_hook.c" &&
+    grep -q '^        disable_seccomp();$' "$FINASU_KSU/hook/setuid_hook.c"; then
     python3 - "$FINASU_KSU/hook/setuid_hook.c" <<'PYEOF'
 import sys
 
@@ -328,7 +334,7 @@ PYEOF
   #      drivers/kernelsu/core/init.o: unknown warning option '-Werror=unused-but-set-variable'
   #    cc-option 探测后，不支持的告警会被自动丢弃（5.15/6.6 的较新 clang 仍会保留）。
   if ! grep -q 'Wno-error=unused-variable' "$FINASU_KSU/Kbuild"; then
-    cat >> "$FINASU_KSU/Kbuild" << 'KSU_KBUILD_EOF'
+    cat >>"$FINASU_KSU/Kbuild" <<'KSU_KBUILD_EOF'
 
 # FinaSU: SUSFS 补丁部分应用后的残留代码允许 unused 类告警。
 # 用 cc-option 探测，避免把编译器不认识的告警选项在 -Werror=unknown-warning-option 下变成硬错误。
@@ -346,27 +352,27 @@ KSU_KBUILD_EOF
   fi
 
   # 结果校验，防止上游代码结构变化后静默失效
-  if ! grep -q 'susfs_init();' "$FINASU_INIT" \
-    || ! grep -q 'ksu_sucompat_init();' "$FINASU_INIT" \
-    || ! grep -q 'ksu_setuid_hook_init();' "$FINASU_INIT" \
-    || ! grep -q 'ksu_init_symbol_resolver();' "$FINASU_INIT" \
-    || ! grep -q 'ksu_lsm_hook_init();' "$FINASU_INIT" \
-    || ! grep -q 'ksu_lsm_hook_exit();' "$FINASU_INIT" \
-    || ! grep -q '#include "hook/lsm_hook.h"' "$FINASU_INIT" \
-    || ! grep -q '^bool ksu_late_loaded;' "$FINASU_INIT" \
-    || ! grep -q 'extern bool ksu_late_loaded;' "$FINASU_KSU_H" \
-    || ! grep -q 'hook/lsm_hook.o' "$FINASU_KSU/Kbuild" \
-    || ! grep -q 'infra/symbol_resolver.o' "$FINASU_KSU/Kbuild" \
-    || ! grep -q '^bool ksu_selinux_hide_enabled ' "$FINASU_SELINUX_HIDE" \
-    || ! grep -q '^bool ksu_selinux_hide_running ' "$FINASU_SELINUX_HIDE" \
-    || ! { [ "${NEW_MODEL:-0}" = 1 ] || grep -q '^struct selinux_state fake_state;' "$FINASU_SELINUX_HIDE"; } \
-    || ! grep -q '^DEFINE_STATIC_KEY_FALSE(fake_status_initialize_key);' "$FINASU_SELINUX_HIDE" \
-    || ! grep -q '^struct page \*fake_status = NULL;' "$FINASU_SELINUX_HIDE" \
-    || ! grep -q '^void initialize_fake_status(void)$' "$FINASU_SELINUX_HIDE" \
-    || ! grep -q '^int security_context_to_sid_with_policy' "$FINASU_SELINUX_HIDE" \
-    || ! grep -q '^int security_sid_to_context_with_policy' "$FINASU_SELINUX_HIDE" \
-    || ! grep -q '^void security_compute_av_user_with_policy' "$FINASU_SELINUX_HIDE" \
-    || ! grep -q '^int ksu_handle_execveat_ksud(int \*fd, struct filename \*\*filename_ptr,' "$FINASU_KSI"; then
+  if ! grep -q 'susfs_init();' "$FINASU_INIT" ||
+    ! grep -q 'ksu_sucompat_init();' "$FINASU_INIT" ||
+    ! grep -q 'ksu_setuid_hook_init();' "$FINASU_INIT" ||
+    ! grep -q 'ksu_init_symbol_resolver();' "$FINASU_INIT" ||
+    ! grep -q 'ksu_lsm_hook_init();' "$FINASU_INIT" ||
+    ! grep -q 'ksu_lsm_hook_exit();' "$FINASU_INIT" ||
+    ! grep -q '#include "hook/lsm_hook.h"' "$FINASU_INIT" ||
+    ! grep -q '^bool ksu_late_loaded;' "$FINASU_INIT" ||
+    ! grep -q 'extern bool ksu_late_loaded;' "$FINASU_KSU_H" ||
+    ! grep -q 'hook/lsm_hook.o' "$FINASU_KSU/Kbuild" ||
+    ! grep -q 'infra/symbol_resolver.o' "$FINASU_KSU/Kbuild" ||
+    ! grep -q '^bool ksu_selinux_hide_enabled ' "$FINASU_SELINUX_HIDE" ||
+    ! grep -q '^bool ksu_selinux_hide_running ' "$FINASU_SELINUX_HIDE" ||
+    ! { [ "${NEW_MODEL:-0}" = 1 ] || grep -q '^struct selinux_state fake_state;' "$FINASU_SELINUX_HIDE"; } ||
+    ! grep -q '^DEFINE_STATIC_KEY_FALSE(fake_status_initialize_key);' "$FINASU_SELINUX_HIDE" ||
+    ! grep -q '^struct page \*fake_status = NULL;' "$FINASU_SELINUX_HIDE" ||
+    ! grep -q '^void initialize_fake_status(void)$' "$FINASU_SELINUX_HIDE" ||
+    ! grep -q '^int security_context_to_sid_with_policy' "$FINASU_SELINUX_HIDE" ||
+    ! grep -q '^int security_sid_to_context_with_policy' "$FINASU_SELINUX_HIDE" ||
+    ! grep -q '^void security_compute_av_user_with_policy' "$FINASU_SELINUX_HIDE" ||
+    ! grep -q '^int ksu_handle_execveat_ksud(int \*fd, struct filename \*\*filename_ptr,' "$FINASU_KSI"; then
     echo "::error::FinaSU 适配修复失败，代码结构可能已变化" >&2
     exit 1
   fi
