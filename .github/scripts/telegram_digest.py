@@ -403,15 +403,11 @@ def main() -> int:
 
         # Buttons (URL only - no backend needed), one source for both the
         # JSON inline keyboard (cloud fallback) and the rich card:
-        #   - one download button per BUILT kernel version (2 per row)
+        #   - one download button per BUILT kernel version (2 per row),
+        #     full kernel string as the label (6.1.157-android14-2025-12)
         #   - manager APK buttons, one row per flavor (name + spoofed)
         #   - all-artifacts row
-        def short_tag(tag: str) -> str:
-            t = re.sub(r"-android\d+", "", tag)
-            t = re.sub(r"^([\d.]+X?)-", r"\1 · ", t)
-            return t
-
-        dl_btns = [(f"⬇️ {short_tag(s)}", sub_links[s])
+        dl_btns = [(f"⬇️ {s}", sub_links[s])
                    for s in reversed(subs) if s in sub_links]
         mgr_rows = []
         for f in sorted(e["flavors"]):
