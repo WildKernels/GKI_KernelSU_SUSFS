@@ -241,15 +241,30 @@ jobs:
           }
 
           # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
-          PIN_NOMOUNT="5a610db7649a59eb3e3d710653618d594941f8da"
+          # NoMount: dev tip (2026-10-13, webui fix; module-side only, no kernel contract).
+          PIN_NOMOUNT="682f7b20bc3c177871c80bbd02c600e472f0df46"
           # KernelSU: synced with official main (0c0fdb96, 2026-10-12).
           # simonpunk's susfs sync commits (2026-10-12, all branches) rebased
           # 10_enable_susfs_for_ksu.patch onto this layout - it fails with 17
           # rejected hunks at the old 08a3b087 pin (run 38337419484) and
           # applies clean at 0c0fdb96. BBG is kernel-side and unaffected.
           PIN_KERNELSU="0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d"
-          PIN_BAKASU="f4435f007b16f61705089ff982e3f981a6017979"
-          PIN_SUKISU_ULTRA="b20dee702035af09cb2ecb5f35443bbc1747f3e6"
+          # BakaSU: fa12ffd (2026-10-11, tiann #3877 selinux_hide refactor)
+          # REMOVED `struct selinux_state fake_state` from their tree, but the
+          # fs patches (50_add_susfs) on 12-5.10/13-5.10/13-5.15/14-5.15/14-6.1
+          # still reference it under CONFIG_KSU_SUSFS, and BakaSU does not get
+          # the 10_enable glue that carries it for the kernelsu flavor -> every
+          # susfs >= 2026-05 (no susfs_def.h no_su API before that) links
+          # `fake_state` undefined with latest BakaSU on those 5 branches
+          # (run 38376968944, 183 BakaSU legs). 9097b1a = fa12ffd^ = the
+          # newest BakaSU that still defines+populates fake_state. 6.6/6.12 fs
+          # patches have no fake_state hunks, but a per-family root split isn't
+          # worth the root_matrix plumbing for 3 selinux_hide commits. Flip to
+          # latest when BakaSU upstream restores the contract.
+          PIN_BAKASU="9097b1a1c6c889756201bbc5713a84a9b23f7908"
+          # SukiSU-Ultra: builtin tip (2026-10-09, adds missing arch.h);
+          # defines fake_state itself, calls the susfs_def.h no_su API -> OK on tips.
+          PIN_SUKISU_ULTRA="6c284e957feaa9a388a9f1c37dc4ec80d95e434b"
           declare -A PIN_SUSFS=(
             [susfs_commit_android12_5_10]="82f08351fadb8b19dd6591bd14634d02ad832145"
             [susfs_commit_android13_5_10]="14c45388ec8cb3ca72f2ac8bf83097b9285a8418"
@@ -259,23 +274,25 @@ jobs:
             [susfs_commit_android15_6_6]="bd7d199ac87808001127e8a6d076832e2938cf0d"
             [susfs_commit_android16_6_12]="5e0b2b925865000ca7dce993ecf1d281ee312887"
           )
-          # BakaSU keeps its own SUSFS pin set: their selinux_hide implements
-          # the PRE-May-2026 contract - their tree has fake_status but does
-          # NOT define `fake_state`, which the synced fs patches (50_add_,
-          # since 5900f1a3 et al., 2026-05-12) reference and only the
-          # 10_enable patch (kernelsu flavor) defines. Run 38347077072: the
-          # BakaSU 6.1 leg died with ld.lld "undefined symbol: fake_state".
-          # Each pin = the last susfs commit on that branch BEFORE fake_state
-          # entered the fs patch (6.6's fs patch never gained it - tip is
-          # fine). SukiSU-Ultra defines fake_state itself -> stays on tips.
+          # BakaSU keeps its own SUSFS pin set (kept separate so it can diverge
+          # again). Values = the same verified branch tips as PIN_SUSFS:
+          # 9097b1a (see PIN_BAKASU) defines+populates fake_state, exactly like
+          # the 10_enable patch does for the kernelsu flavor, so tips link fine.
+          # History: the 2026-10-11 first attempt pinned "pre-fake_state"
+          # April-era commits - wrong on BOTH ends: those predate
+          # include/linux/susfs_def.h (the susfs_*_no_su API every modern root
+          # calls) -> run 38376968944 died with `undefined symbol:
+          # susfs_set_current_proc_no_su` on 183 BakaSU legs. There is NO susfs
+          # commit that satisfies post-fa12ffd BakaSU on the 5 older branches
+          # (fake_state hunks arrived 2026-05 together with susfs_def.h).
           declare -A PIN_SUSFS_BAKASU=(
-            [susfs_commit_android12_5_10]="e1681bc4d6fa90203a1fd86f26a8583baa4433dc"
-            [susfs_commit_android13_5_10]="6a47d9a4717a4d72244f4ec7197a69596f029730"
-            [susfs_commit_android13_5_15]="349ed52eea1be5c9590289a76a90d78710d4bba0"
-            [susfs_commit_android14_5_15]="16a22b6a608b3f124c64f70829657871eee3af37"
-            [susfs_commit_android14_6_1]="ef16cbce5c5195988b9b630de85466148cbbcdef"
+            [susfs_commit_android12_5_10]="82f08351fadb8b19dd6591bd14634d02ad832145"
+            [susfs_commit_android13_5_10]="14c45388ec8cb3ca72f2ac8bf83097b9285a8418"
+            [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
+            [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
+            [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
             [susfs_commit_android15_6_6]="bd7d199ac87808001127e8a6d076832e2938cf0d"
-            [susfs_commit_android16_6_12]="fd03bb9c3cb4ee07b16806e0528e06486ab1be2b"
+            [susfs_commit_android16_6_12]="5e0b2b925865000ca7dce993ecf1d281ee312887"
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
@@ -1125,9 +1142,32 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}"
           NIGHTLY_URL="https://nightly.link/${{ github.repository }}/actions/runs/${RUN_ID}"
           # Collect every page of the run's jobs (large runs exceed one page).
-          gh api --paginate \
-            "repos/${{ github.repository }}/actions/runs/${RUN_ID}/jobs?per_page=100" \
-            > /tmp/jobs.json || { echo "jobs fetch failed; skipping announce"; exit 0; }
+          # Page-by-page with per-page retries: a monolithic `gh api
+          # --paginate` 504s on 600+ job runs and used to exit 0 silently -
+          # run 38376968944 posted NOTHING despite green families. Keep the
+          # concatenated-pages format the digest parser already tolerates.
+          : > /tmp/jobs.json
+          for page in $(seq 1 12); do
+            got=""
+            for try in 1 2 3 4 5; do
+              if gh api \
+                "repos/${{ github.repository }}/actions/runs/${RUN_ID}/jobs?per_page=100&page=${page}" \
+                > /tmp/jobs_page.json; then got=1; break; fi
+              echo "WARN: jobs page ${page} fetch attempt ${try} failed; retrying in $((try*10))s"
+              sleep $((try*10))
+            done
+            if [ -z "$got" ]; then
+              if [ "$page" -gt 1 ]; then
+                echo "jobs fetch still failing at page ${page}; posting with partial job data (pages 1-$((page-1)))"
+                break
+              fi
+              echo "jobs fetch failed; no job data at all; skipping announce"
+              exit 0
+            fi
+            cat /tmp/jobs_page.json >> /tmp/jobs.json
+            n=$(jq '.jobs | length' /tmp/jobs_page.json)
+            [ "$n" -lt 100 ] && break
+          done
           gh api --paginate \
             "repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
             > /tmp/artifacts.json || true
