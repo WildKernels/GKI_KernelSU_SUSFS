@@ -65,6 +65,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       env:
         SUSFS4KSU: ${{ github.workspace }}/susfs4ksu
+        GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
         bash "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/apply.sh" FinaSU
@@ -88,7 +89,7 @@ runs:
         REL_APK="$(mktemp -d)/manager.apk"
         REL_JSON=""
         for ATTEMPT in 1 2 3; do
-          REL_JSON="$(curl -s --fail --max-time 30 \
+          REL_JSON="$(curl -s --fail --max-time 30 -H "Authorization: Bearer ${GH_TOKEN:-}" \
             "https://api.github.com/repos/LyraVoid/FinaSU/releases/latest")" \
             && [ -n "$REL_JSON" ] && break
           echo "release lookup failed, retry ($ATTEMPT/3)..." >&2
@@ -97,7 +98,7 @@ runs:
         REL_URL="$(printf '%s' "$REL_JSON" | python3 -c \
           "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d.get('assets',[]) if a['name'].endswith('.apk')))" 2>/dev/null || true)"
         [ -n "$REL_URL" ] || { echo "ERROR: no apk asset on FinaSU latest release; cannot derive manager cert" >&2; exit 1; }
-        curl -sL --fail --retry 3 --max-time 300 -o "$REL_APK" "$REL_URL"
+        curl -sL --fail --retry 3 --max-time 300 -H "Authorization: Bearer ${GH_TOKEN:-}" -o "$REL_APK" "$REL_URL"
         CERT_INFO="$(python3 "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/extract_manager_cert.py" "$REL_APK" | head -n1)"
         [ -n "$CERT_INFO" ] || { echo "ERROR: cert extraction failed" >&2; exit 1; }
         CERT_SIZE="$(echo "$CERT_INFO" | awk '{print $1}')"
