@@ -1,35 +1,30 @@
-name: 'Archive Cache'
-description: 'Create cache archive and prepare for upload'
+name: "Archive Cache"
+description: "Create cache archive and prepare for upload"
 inputs:
   cache_path:
-    description: 'Path where cache is saved'
+    description: "Path where cache is saved"
     required: true
-    type: string
   cache_key:
-    description: 'Unique key for the cache'
+    description: "Unique key for the cache"
     required: true
-    type: string
   cache_bucket:
-    description: 'The tag name for the release'
+    description: "The tag name for the release"
     required: true
-    default: 'general-cache'
+    default: "general-cache"
   compression_level:
-    description: 'Compression level (0-9)'
+    description: "Compression level (0-9)"
     required: false
-    type: number
     default: 6
   working_dir:
-    description: 'Path where .git folder exists'
+    description: "Path where .git folder exists"
     required: false
-    type: string
   debug:
-    description: 'Enable Logs'
+    description: "Enable Logs"
     required: false
-    type: boolean
     default: false
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Archive and Split Cache
       shell: bash
