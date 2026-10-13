@@ -215,16 +215,20 @@ def main() -> int:
         if not fam.startswith("build-android") or fam in EXCLUDED:
             continue  # resolve-sources, nomount, rej, release, ...
         e = fams.setdefault(fam, {"sublevels": [], "flavors": [],
-                                  "counts": {}, "sub_jobs": {}, "root": None})
+                                  "counts": {}, "sub_jobs": {}, "roots": {}})
         # The matrix parent part embeds the root: "build-android15-6-6
         # (next, KernelSU-Next, <40-hex-sha>) / <sublevel> (<flavor>)".
-        if e["root"] is None:
+        # A run can dispatch MULTIPLE roots - collect one entry per root
+        # (1:1 with the release notes' per-flavor Root lines).
+        if " / " in name or "(" in name.split(" / ")[0]:
             parent = name.split(" / ")[0]
             if "(" in parent:
                 inner = parent[parent.index("(") + 1:parent.rindex(")")]
                 bits = [b.strip() for b in inner.split(",")]
                 if len(bits) >= 3 and len(bits[2]) == 40:
-                    e["root"] = (bits[0], bits[1], bits[2])
+                    rid, rlabel, rsha = bits[0], bits[1], bits[2]
+                    if rid not in e["roots"]:
+                        e["roots"][rid] = (rlabel, rsha)
         last = name.split(" / ")[-1]
         if " / " in name and "(" in last:
             tag = last.rsplit(" (", 1)[0]
@@ -359,16 +363,28 @@ def main() -> int:
         # component commits + the SUSFS pin per family arrive via env vars
         # fed from resolve-sources outputs. Empty env = the line is skipped,
         # so a failed resolve-sources degrades gracefully.
+        # Root(s): every root implementation this run built for the
+        # family, each with its manager-repo commit link - 1:1 with the
+        # release notes' per-flavor Root lines.
         root_line = ""
-        if e.get("root"):
-            rid, rlabel, rsha = e["root"]
+        roots_sorted = [r for r in ("next", "kernelsu", "bakasu",
+                                    "sukisu-ultra", "kowsu") if r in e["roots"]]
+        roots_sorted += [r for r in sorted(e["roots"]) if r not in roots_sorted]
+        rlines = []
+        rlines_rich = []
+        for rid in roots_sorted:
+            rlabel, rsha = e["roots"][rid]
             rurl = ROOT_URLS.get(rid)
             if rurl:
-                root_line = (f"<b>Root</b>: {esc(rlabel)} "
-                             f"<a href=\"{rurl}{rsha}\">{esc(rsha[:7])}</a>")
+                rlines.append(f"{esc(rlabel)} "
+                              f"<a href=\"{rurl}{rsha}\">{esc(rsha[:7])}</a>")
+                rlines_rich.append(f"[{esc(rlabel)} {rsha[:7]}]({rurl}{rsha})")
             else:
-                root_line = (f"<b>Root</b>: {esc(rlabel)} "
-                             f"<code>{esc(rsha[:7])}</code>")
+                rlines.append(f"{esc(rlabel)} <code>{esc(rsha[:7])}</code>")
+                rlines_rich.append(f"{esc(rlabel)} {rsha[:7]}")
+        if rlines:
+            root_line = "<b>Roots</b>: " + "  ·  ".join(rlines)
+        roots_rich = "Roots: " + " · ".join(rlines_rich) if rlines_rich else ""
 
         # Features: exactly what THIS run's feature_set carried (the
         # resolve-sources output feeds DIGEST_FEATURES, "+"-separated;
@@ -485,13 +501,8 @@ def main() -> int:
             f'<table bordered><tr><th colspan="2" align="center">'
             f"{esc(fname)}</th></tr>{tbody}</table>")
         rich_parts.append(f"Run: [#{args.run_id}]({args.run_url})")
-        if e.get("root"):
-            rid, rlabel, rsha = e["root"]
-            rurl = ROOT_URLS.get(rid)
-            if rurl:
-                rich_parts.append(f"Root: [{esc(rlabel)} {rsha[:7]}]({rurl}{rsha})")
-            else:
-                rich_parts.append(f"Root: {esc(rlabel)} {rsha[:7]}")
+        if roots_rich:
+            rich_parts.append(roots_rich)
         if feat_text:
             rich_parts.append(f"**Features**\n{feat_rich}")
         # No Sublevels/Flavors sections here: the button rows below carry
