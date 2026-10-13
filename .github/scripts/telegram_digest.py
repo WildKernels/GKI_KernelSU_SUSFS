@@ -270,18 +270,17 @@ def main() -> int:
         # artifact (KernelSU-Next preferred, then KernelSU, then BakaSU);
         # sublevels with any failed/cancelled job get a ❌ mark and no link.
         art_base = args.nightly_url.rsplit("/actions/runs/", 1)[0]
-        sub_lines = []
-        rich_subs_list = []
-        sub_links = {}
+        # Per-(sublevel, flavor) artifact links: every root flavor that
+        # built a sublevel gets its own link (a KernelSU-Next + BakaSU
+        # dispatch produces two kernels per version - both link).
+        FLAVOR_ORDER = ["KernelSU-Next", "KernelSU", "BakaSU",
+                        "SukiSU-Ultra", "KowSU"]
+        flav_order = [f for f in FLAVOR_ORDER if f in e["flavors"]] + \
+                     sorted(f for f in e["flavors"] if f not in FLAVOR_ORDER)
+        sub_flav = {}  # (tag, flavor) -> nightly.link url
         for s in subs:
-            # Link-first: a sublevel is ❌ only when NO flavor produced an
-            # AnyKernel3 for it (run 38232596744: one failed flavor leg per
-            # sublevel marked every line ❌ and the family gate then dropped
-            # the whole card despite 39 built kernels). Partial failures
-            # stay visible in the Jobs line and in which flavors link.
-            link_id = None
-            for fl in ("KernelSU-Next", "KernelSU", "BakaSU"):
-                art_name = f"{s}-{fl}-AnyKernel3"
+            for f in flav_order:
+                art_name = f"{s}-{f}-AnyKernel3"
                 # LTS runs build a REAL kernel version, so the artifact is
                 # named e.g. 6.6.144-android15-lts-... while the job tag is
                 # 6.6.X-android15-lts (run 38210657645 posted the lts line
@@ -296,16 +295,22 @@ def main() -> int:
                     if "id" not in a:
                         continue
                     if aname == art_name or (pat and fnmatch.fnmatch(aname, pat)):
-                        link_id = a["id"]
+                        sub_flav[(s, f)] = f"{art_base}/actions/artifacts/{a['id']}.zip"
                         break
-                if link_id:
-                    break
-            if link_id:
-                url = f"{art_base}/actions/artifacts/{link_id}.zip"
-                sub_links[s] = url
-                sub_lines.append(f"- <a href=\"{html.escape(url, quote=True)}\">"
-                                 f"{esc(s)}</a>")
-                rich_subs_list.append(f"- [{esc(s)}]({url})")
+
+        # Per-sublevel lines: every built flavor links separately.
+        sub_lines = []
+        rich_subs_list = []
+        for s in subs:
+            links = [(f, sub_flav[(s, f)]) for f in flav_order
+                     if (s, f) in sub_flav]
+            if links:
+                h = "  ·  ".join(
+                    f"<a href=\"{html.escape(u, quote=True)}\">{esc(f)}</a>"
+                    for f, u in links)
+                sub_lines.append(f"- {esc(s)} — {h}")
+                r = " · ".join(f"[{f}]({u})" for f, u in links)
+                rich_subs_list.append(f"- {esc(s)} — {r}")
             else:
                 sub_lines.append(f"- ❌ {esc(s)}")
                 rich_subs_list.append(f"- ❌ {esc(s)}")
@@ -316,7 +321,7 @@ def main() -> int:
         # family (every sublevel failed) - skip the card entirely instead
         # of posting an all-❌ notice. Families with at least one built
         # kernel still post, failures shown per-sublevel.
-        if not sub_links:
+        if not sub_flav:
             print(f"telegram-digest: {fname}: no AnyKernel3 artifacts "
                   f"(no kernels built); skipping card", file=sys.stderr)
             continue
@@ -361,9 +366,13 @@ def main() -> int:
                 root_line = (f"<b>Root</b>: {esc(rlabel)} "
                              f"<code>{esc(rsha[:7])}</code>")
 
-        feats_on = {f.strip().lower()
-                    for f in os.environ.get("DIGEST_FEATURES", "").split(",")
-                    if f.strip()}
+        # Features: exactly what THIS run's feature_set carried (the
+        # resolve-sources output feeds DIGEST_FEATURES, "+"-separated;
+        # the old comma form is accepted too). One line per feature -
+        # NTSync/Ptrace/Unicode are their own features, not a group.
+        feats_on = {s.strip().lower()
+                    for s in re.split(r"[+,]", os.environ.get("DIGEST_FEATURES", ""))
+                    if s.strip()}
         variant = VARIANT_OF_FAM.get(fam, "")
         susfs_sha = os.environ.get(
             "SUSFS_" + variant.replace(".", "_").replace("-", "_").upper(), "")
@@ -390,25 +399,55 @@ def main() -> int:
         if "ds" in feats_on and (c := os.environ.get("DROIDSPACES_COMMIT", "")):
             flines2.append(f"- DroidSpaces-OSS <a href=\"{ds_url}{c}\">{esc(c[:7])}</a>")
             rlines2.append(f"- **DroidSpaces-OSS**: [{c[:7]}]({ds_url}{c})")
-        net_bits = [b for b, k in (("NTSync", "ntsync"), ("Ptrace Leak Fix", "ptrace"),
-                                   ("Unicode Fix", "unicode")) if k in feats_on]
-        if net_bits:
-            flines2.append("- Networking: " + " · ".join(net_bits))
-            rlines2.append("- **Networking**: " + " · ".join(net_bits))
+        if "net" in feats_on:
+            flines2.append("- Networking")
+            rlines2.append("- **Networking**")
+        if "ntsync" in feats_on:
+            flines2.append("- NTSync")
+            rlines2.append("- **NTSync**")
+        if "ptrace" in feats_on:
+            flines2.append("- Ptrace Leak Fix")
+            rlines2.append("- **Ptrace Leak Fix**")
+        if "unicode" in feats_on:
+            flines2.append("- Unicode Fix")
+            rlines2.append("- **Unicode Fix**")
         if "bpf" in feats_on:
             flines2.append("- BTF / eBPF / FUSE-BPF")
             rlines2.append("- **BTF / eBPF / FUSE-BPF**")
+        if "perf" in feats_on:
+            flines2.append("- Performance patches")
+            rlines2.append("- **Performance patches**")
         feat_text = "\n".join(flines2)
         feat_rich = "\n".join(rlines2)
 
         # Buttons (URL only - no backend needed), one source for both the
         # JSON inline keyboard (cloud fallback) and the rich card:
-        #   - one download button per BUILT kernel version (2 per row),
-        #     full kernel string as the label (6.1.157-android14-2025-12)
+        #   - one download button per BUILT kernel, full kernel string as
+        #     the label (6.1.157-android14-2025-12); sublevels built by
+        #     MULTIPLE flavors get one button per flavor (suffixed), on
+        #     their own row. Single-flavor sublevels pack 2 per row.
         #   - manager APK buttons, one row per flavor (name + spoofed)
         #   - all-artifacts row
-        dl_btns = [(f"⬇️ {s}", sub_links[s])
-                   for s in reversed(subs) if s in sub_links]
+        btn_rows = []  # list of rows; each row = list[(text, url)]
+        pool = []
+        for s in reversed(subs):
+            ls = [(f, sub_flav[(s, f)]) for f in flav_order
+                  if (s, f) in sub_flav]
+            if not ls:
+                continue
+            if len(ls) == 1:
+                pool.append((f"⬇️ {s}", ls[0][1]))
+                if len(pool) == 2:
+                    btn_rows.append(pool)
+                    pool = []
+            else:
+                if pool:
+                    btn_rows.append(pool)
+                    pool = []
+                for f, u in ls:  # one button per row: full string + flavor
+                    btn_rows.append([(f"⬇️ {s} · {f}", u)])
+        if pool:
+            btn_rows.append(pool)
         mgr_rows = []
         for f in sorted(e["flavors"]):
             links = manager_links(f)
@@ -418,12 +457,8 @@ def main() -> int:
             row += [("spoofed", u) for u in links[1:]]
             mgr_rows.append(row)
 
-        kb_rows = []
-        for i in range(0, len(dl_btns), 2):
-            kb_rows.append([{"text": t, "url": u}
-                            for t, u in dl_btns[i:i + 2]])
-        kb_rows += [[{"text": t, "url": u} for t, u in row]
-                    for row in mgr_rows]
+        kb_rows = [[{"text": t, "url": u} for t, u in row]
+                   for row in btn_rows + mgr_rows]
         kb_rows.append([{"text": "📦 All artifacts", "url": args.nightly_url}])
         buttons = json.dumps({"inline_keyboard": kb_rows},
                              separators=(",", ":"), ensure_ascii=False)
@@ -456,15 +491,16 @@ def main() -> int:
         if feat_text:
             rich_parts.append(f"**Features**\n{feat_rich}")
         rich_parts.append(
-            f"**Sublevels** ({len(sub_links)} built)\n"
+            f"**Sublevels** ({len(sub_flav)} built)\n"
             "<blockquote expandable>\n"
             + rich_subs + "\n</blockquote>")
         rich_parts.append(f"**Flavors**\n{rich_flavors}")
-        # Buttons: per-version downloads (success), managers (primary).
-        for i in range(0, len(dl_btns), 2):
+        # Buttons: per-kernel downloads (success; multi-flavor sublevels
+        # get flavor-suffixed rows), managers (primary).
+        for row in btn_rows:
             cells = "".join(
                 f'<tg-button type="url" style="success" url="{u}">{t}</tg-button>'
-                for t, u in dl_btns[i:i + 2])
+                for t, u in row)
             rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
         for row in mgr_rows:
             cells = "".join(

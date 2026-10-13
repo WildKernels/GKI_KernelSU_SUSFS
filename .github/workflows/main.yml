@@ -1063,7 +1063,11 @@ jobs:
       SUSFS_ANDROID14_6_1: ${{ needs.resolve-sources.outputs.susfs_commit_android14_6_1 }}
       SUSFS_ANDROID15_6_6: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6 }}
       SUSFS_ANDROID16_6_12: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12 }}
-      DIGEST_FEATURES: "susfs,nomount,bbg,ds,net,ntsync,ptrace,unicode,bpf"
+      # The run's ACTUAL feature set (resolve-sources composes it from the
+      # dispatch toggles, or all-on for nightlies) - the card lists exactly
+      # what was built, one line per feature. Empty on resolve failure =
+      # the features section is skipped, cards still post.
+      DIGEST_FEATURES: ${{ needs.resolve-sources.outputs.feature_set }}
       # Local Bot API 10.x server (rich cards: real tables, styled button
       # rows, expandable quotes). Optional - without these secrets the job
       # falls back to the cloud API and the plain HTML cards.
