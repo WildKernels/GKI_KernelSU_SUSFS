@@ -100,6 +100,18 @@ runs:
         fi
         root_version="$(git -C "$directory" describe --tags --always --dirty)"
 
+        # FinaSU's restructured Kbuild inherits tiann's manager-cert defaults
+        # (0x33b/c371061b...), which do NOT match the cert the FinaSU release/CI
+        # managers are signed with (CN=FolkSU, 720-byte RSA, sha256 below —
+        # verified against both the v0.1.0-dev1 release APK and the CI-runner
+        # artifact at the pinned era). Without this the manager is never
+        # recognized and the home screen shows "Not installed".
+        if [ "$flavor" = "finasu" ]; then
+          sed -i 's/^KSU_EXPECTED_SIZE := .*/KSU_EXPECTED_SIZE := 0x2d0/' "$directory/kernel/Kbuild"
+          sed -i 's/^KSU_EXPECTED_HASH := .*/KSU_EXPECTED_HASH := cb3a7a12e780fe9cff0b8f13b9aaa933a17dd256a6d5ba82c219dcedeb4776c7/' "$directory/kernel/Kbuild"
+          grep -E '^KSU_EXPECTED_(SIZE|HASH) :=' "$directory/kernel/Kbuild"
+        fi
+
         relative_kernel="$(realpath --relative-to="$drivers_dir" "$PWD/$directory/kernel")"
         ln -s "$relative_kernel" "$drivers_dir/kernelsu"
         grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" ||
