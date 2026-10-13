@@ -69,6 +69,18 @@ runs:
         set -euo pipefail
         bash "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/apply.sh" FinaSU
 
+        # Old-model completion: when the 10_enable selinux_hide rewrite partially
+        # applies, the file can end up without fake_state entirely, while the
+        # susfs kernel patch's security/selinux/selinuxfs.c externs it (and
+        # expects it backed by the sepolicy backup, per the 10_enable old-model
+        # design). Define it globally and initialise it from backup_sepolicy in
+        # enable(), and globalise the fake_status trio for the patch's externs.
+        SEL="FinaSU/kernel/feature/selinux_hide.c"
+        if ! grep -q 'fake_state' "$SEL"; then
+          python3 "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/fix_old_model.py" "$SEL"
+          grep -n '^struct selinux_state fake_state;' "$SEL"
+        fi
+
         # Manager-cert injection: derive size/sha256 from the current FinaSU
         # release APK (matches the manager flavour our release ships) and
         # inject as the second trusted signature. Falls back loudly if the
