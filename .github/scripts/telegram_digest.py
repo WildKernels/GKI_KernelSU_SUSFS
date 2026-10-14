@@ -453,34 +453,15 @@ def main() -> int:
         feat_rich = "\n".join(rlines2)
 
         # Buttons (URL only - no backend needed), one source for both the
-        # JSON inline keyboard (cloud fallback) and the rich card:
-        #   - one download button per BUILT kernel, full kernel string as
-        #     the label (6.1.157-android14-2025-12); sublevels built by
-        #     MULTIPLE flavors get one button per flavor (suffixed), on
-        #     their own row. Single-flavor sublevels pack 2 per row.
-        #   - manager APK buttons, one row per flavor (name + spoofed)
-        #   - all-artifacts row
-        btn_rows = []  # list of rows; each row = list[(text, url)]
-        pool = []
-        for s in reversed(subs):
-            ls = [(f, sub_flav[(s, f)]) for f in flav_order
-                  if (s, f) in sub_flav]
-            if not ls:
-                continue
-            if len(ls) == 1:
-                pool.append((f"⬇️ {s}", ls[0][1]))
-                if len(pool) == 2:
-                    btn_rows.append(pool)
-                    pool = []
-            else:
-                if pool:
-                    btn_rows.append(pool)
-                    pool = []
-                for f, u in ls:  # one button per row: full string + flavor
-                    btn_rows.append([(f"⬇️ {s} · {f}", u)])
-        if pool:
-            btn_rows.append(pool)
-        mgr_rows = []
+        # JSON inline keyboard (cloud fallback) and the rich card.
+        # 2026-10-14: the per-kernel download buttons are GONE - big
+        # families (40+ sublevels x flavors) blew past Telegram's
+        # 100-button inline-keyboard cap and posts got cut off before
+        # everything linked. Every kernel link now lives as a TEXT link
+        # in the expandable Sublevels quote; the only buttons are the
+        # manager APKs (one row per flavor, spoofed riding along) and
+        # the all-artifacts row.
+        mgr_rows = []  # list of rows; each row = list[(text, url)]
         for f in ordered_manager_flavors(e["flavors"]):
             links = manager_links(f)
             if not links:
@@ -489,8 +470,7 @@ def main() -> int:
             row += [("spoofed", u) for u in links[1:]]
             mgr_rows.append(row)
 
-        kb_rows = [[{"text": t, "url": u} for t, u in row]
-                   for row in btn_rows + mgr_rows]
+        kb_rows = [[{"text": t, "url": u} for t, u in row] for row in mgr_rows]
         kb_rows.append([{"text": "📦 All artifacts", "url": args.nightly_url}])
         buttons = json.dumps({"inline_keyboard": kb_rows},
                              separators=(",", ":"), ensure_ascii=False)
@@ -517,21 +497,25 @@ def main() -> int:
             rich_parts.append(roots_rich)
         if feat_text:
             rich_parts.append(f"**Features**\n{feat_rich}")
-        # No Sublevels/Flavors sections here: the button rows below carry
-        # the same info (one download button per kernel, manager buttons
-        # per flavor) - the user asked for the leaner card.
-        # Buttons: per-kernel downloads (success; multi-flavor sublevels
-        # get flavor-suffixed rows), managers (primary).
-        for row in btn_rows:
-            cells = "".join(
-                f'<tg-button type="url" style="success" url="{u}">{t}</tg-button>'
-                for t, u in row)
-            rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
+        # Sublevels as TEXT LINKS in an expandable quote: carries every
+        # kernel link without the button wall, and collapses by default
+        # so the card stays clean.
+        if rich_subs_list:
+            rich_parts.append(
+                f"<blockquote expandable>**Sublevels**\n{rich_subs}"
+                f"</blockquote>")
+        # Manager APK buttons (primary) + the all-artifacts escape hatch.
+        # Per-kernel download buttons were removed 2026-10-14 - see the
+        # keyboard section above for why.
         for row in mgr_rows:
             cells = "".join(
                 f'<tg-button type="url" style="primary" url="{u}">{t}</tg-button>'
                 for t, u in row)
             rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
+        rich_parts.append(
+            f'<tg-button-row><tg-button type="url" style="primary" '
+            f'url="{args.nightly_url}">📦 All artifacts</tg-button>'
+            f"</tg-button-row>")
         rich = "\n\n".join(rich_parts)
         if len(rich) > RICH_MAX_LEN:
             rich = rich[:RICH_MAX_LEN - 1] + "…"
