@@ -112,6 +112,18 @@ FLAVOR_MANAGERS = {
                ("BakaSU_v*spoofed*", None)],
 }
 
+# Manager-link flavor order (user request 2026-10-13): KernelSU first, then
+# KernelSU-Next with its trailing spoofed link, then BakaSU with its spoofed.
+# Any other flavor keeps alphabetical order after these.
+MANAGER_FLAVOR_ORDER = ["KernelSU", "KernelSU-Next", "BakaSU",
+                        "SukiSU-Ultra", "KowSU"]
+
+
+def ordered_manager_flavors(flavors) -> list:
+    known = [f for f in MANAGER_FLAVOR_ORDER if f in flavors]
+    rest = sorted(f for f in flavors if f not in MANAGER_FLAVOR_ORDER)
+    return known + rest
+
 
 def load_json_any(stream) -> list:
     """Accept a single JSON object/array OR gh api --paginate's
@@ -339,7 +351,7 @@ def main() -> int:
         # trailing "spoofed" link for its second variant.
         flines = []
         rich_fl = []
-        for f in sorted(e["flavors"]):
+        for f in ordered_manager_flavors(e["flavors"]):
             links = manager_links(f)
             if not links:
                 flines.append(esc(f))
@@ -469,7 +481,7 @@ def main() -> int:
         if pool:
             btn_rows.append(pool)
         mgr_rows = []
-        for f in sorted(e["flavors"]):
+        for f in ordered_manager_flavors(e["flavors"]):
             links = manager_links(f)
             if not links:
                 continue
