@@ -1080,6 +1080,10 @@ jobs:
       # what was built, one line per feature. Empty on resolve failure =
       # the features section is skipped, cards still post.
       DIGEST_FEATURES: ${{ needs.resolve-sources.outputs.feature_set }}
+      # release_type dispatch input ("CI"/"Nightly"/"Pre-Release"/"Release";
+      # empty on schedule): the digest cards carry the testing/flash
+      # warning unless this is "Release".
+      RELEASE_TYPE: ${{ inputs.release_type }}
       # Local Bot API 10.x server (rich cards: real tables, styled button
       # rows, expandable quotes). Optional - without these secrets the job
       # falls back to the cloud API and the plain HTML cards.
@@ -1224,6 +1228,14 @@ jobs:
           # linking each family's digest post in the announcement group,
           # with a t.me button row per family + the all-artifacts button.
           if [ -n "$TG_TEST_CHAT" ] && [ -n "$TG_TEST_TOPIC" ] && [ -n "$FAMILY_LINKS" ]; then
+            # Same testing warning as the family cards (gated identically).
+            TEST_WARN=""
+            if [ "${RELEASE_TYPE}" != "Release" ]; then
+              TEST_WARN="⚠️ <b>Testing release</b> — please back up your data before flashing.<br>"
+              TEST_WARN_MD="⚠️ **Testing release** — please back up your data before flashing."$'\n\n'
+            else
+              TEST_WARN_MD=""
+            fi
             ALL_ROW=$(jq -nc --arg u "${NIGHTLY_URL}" \
               '[{text:"📦 All artifacts",url:$u}]' 2>/dev/null || true)
             TEST_BTN_ROWS="${FAMILY_BTN_ROWS}${ALL_ROW}"
@@ -1231,9 +1243,9 @@ jobs:
             if [ -n "${TG_API:-}" ]; then
               # Rich combined card (same dialect as the family cards).
               RICH_ALL="<tg-button-row><tg-button type=\"url\" style=\"success\" url=\"${NIGHTLY_URL}\">📦 All artifacts</tg-button></tg-button-row>"
-              RICH_MSG=$(printf '# 👋 New Testing Release\n\n**Wild Kernels** — %s\n\nRun: [#%s](%s)\n\n%s\n\n%s' \
+              RICH_MSG=$(printf '# 👋 New Testing Release\n\n**Wild Kernels** — %s\n\nRun: [#%s](%s)\n\n%s%s\n\n%s' \
                 "${{ github.ref_name }}" "${RUN_ID}" "${RUN_URL}" \
-                "${RICH_BTN_ROWS}" "${RICH_ALL}")
+                "${TEST_WARN_MD}" "${RICH_BTN_ROWS}" "${RICH_ALL}")
               TBODY=$(jq -nc --arg chat "$TG_TEST_CHAT" --arg topic "$TG_TEST_TOPIC" --arg md "$RICH_MSG" \
                 '{chat_id: ($chat|tonumber? // $chat),
                   message_thread_id: ($topic|tonumber? // $topic),
@@ -1248,7 +1260,7 @@ jobs:
             fi
             if [ -z "$TRESP" ]; then
               COMBINED=$(printf '%s' \
-                "👋 <b>Hello, new testing release here:</b><br>🔨 <b>Wild Kernels</b> — <code>${{ github.ref_name }}</code><br><b>Run</b>: <a href=\"${RUN_URL}\">#${RUN_ID}</a><br><ul>${FAMILY_LINKS}</ul>")
+                "👋 <b>Hello, new testing release here:</b><br>🔨 <b>Wild Kernels</b> — <code>${{ github.ref_name }}</code><br><b>Run</b>: <a href=\"${RUN_URL}\">#${RUN_ID}</a><br>${TEST_WARN}<ul>${FAMILY_LINKS}</ul>")
               MK=( )
               if [ -n "$TEST_BTN_ROWS" ]; then
                 TEST_BUTTONS=$(jq -nc --argjson rows "[${TEST_BTN_ROWS%,}]" \
