@@ -365,6 +365,11 @@ jobs:
       if: (contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'All')
       uses: ./.github/actions/bbg
 
+    - name: LZ4KD ZRAM Algorithm (houji 6.1)
+      uses: ./.github/actions/lz4kd-houji
+      with:
+        version: ${{ inputs.version }}
+
     - name: Setup Networking
       if: contains(inputs.feature_set, 'NET') || inputs.feature_set == 'All'
       uses: ./.github/actions/networking

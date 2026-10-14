@@ -1,0 +1,200 @@
+diff -u a/lib/Kconfig b/lib/Kconfig
+--- a/lib/Kconfig
++++ b/lib/Kconfig
+@@ -336,12 +336,24 @@
+ 
+ config LZ4HC_COMPRESS
+ 	tristate
+ 
+ config LZ4_DECOMPRESS
+ 	tristate
++	
++config LZ4K_COMPRESS
++	tristate
++
++config LZ4K_DECOMPRESS
++	tristate
++
++config LZ4KD_COMPRESS
++	tristate
++
++config LZ4KD_DECOMPRESS
++ 	tristate
+ 
+ config ZSTD_COMMON
+ 	select XXHASH
+ 	tristate
+ 
+ config ZSTD_COMPRESS
+
+diff -u a/lib/Makefile b/lib/Makefile
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -187,12 +187,16 @@
+ obj-$(CONFIG_BCH) += bch.o
+ obj-$(CONFIG_LZO_COMPRESS) += lzo/
+ obj-$(CONFIG_LZO_DECOMPRESS) += lzo/
+ obj-$(CONFIG_LZ4_COMPRESS) += lz4/
+ obj-$(CONFIG_LZ4HC_COMPRESS) += lz4/
+ obj-$(CONFIG_LZ4_DECOMPRESS) += lz4/
++obj-$(CONFIG_LZ4K_COMPRESS) += lz4k/
++obj-$(CONFIG_LZ4K_DECOMPRESS) += lz4k/
++obj-$(CONFIG_LZ4KD_COMPRESS) += lz4kd/
++obj-$(CONFIG_LZ4KD_DECOMPRESS) += lz4kd/
+ obj-$(CONFIG_ZSTD_COMPRESS) += zstd/
+ obj-$(CONFIG_ZSTD_DECOMPRESS) += zstd/
+ obj-$(CONFIG_XZ_DEC) += xz/
+ obj-$(CONFIG_RAID6_PQ) += raid6/
+ 
+ lib-$(CONFIG_DECOMPRESS_GZIP) += decompress_inflate.o
+diff -u a/crypto/Kconfig b/crypto/Kconfig
+--- a/crypto/Kconfig
++++ b/crypto/Kconfig
+@@ -1260,12 +1260,28 @@
+ 	select LZ4_DECOMPRESS
+ 	help
+ 	  LZ4 compression algorithm
+ 
+ 	  See https://github.com/lz4/lz4 for further information.
+ 
++config CRYPTO_LZ4K
++	tristate "LZ4K compression algorithm"
++	select CRYPTO_ALGAPI
++	select LZ4K_COMPRESS
++	select LZ4K_DECOMPRESS
++	help
++	  This is the LZ4K algorithm.
++
++config CRYPTO_LZ4KD
++	tristate "LZ4KD compression algorithm"
++	select CRYPTO_ALGAPI
++	select LZ4KD_COMPRESS
++	select LZ4KD_DECOMPRESS
++	help
++	  This is the LZ4KD algorithm.
++
+ config CRYPTO_LZ4HC
+ 	tristate "LZ4HC"
+ 	select CRYPTO_ALGAPI
+ 	select CRYPTO_ACOMP2
+ 	select LZ4HC_COMPRESS
+ 	select LZ4_DECOMPRESS
+
+diff -u a/drivers/block/zram/Kconfig b/drivers/block/zram/Kconfig
+--- a/drivers/block/zram/Kconfig
++++ b/drivers/block/zram/Kconfig
+@@ -1,11 +1,11 @@
+ # SPDX-License-Identifier: GPL-2.0
+ config ZRAM
+ 	tristate "Compressed RAM block device support"
+ 	depends on BLOCK && SYSFS && MMU
+-	depends on CRYPTO_LZO || CRYPTO_ZSTD || CRYPTO_LZ4 || CRYPTO_LZ4HC || CRYPTO_842
++	depends on CRYPTO_LZO || CRYPTO_LZ4 || CRYPTO_LZ4HC || CRYPTO_LZ4K || CRYPTO_LZ4KD || CRYPTO_DEFLATE || CRYPTO_842 || CRYPTO_ZSTD
+ 	select ZSMALLOC
+ 	help
+ 	  Creates virtual block devices called /dev/zramX (X = 0, 1, ...).
+ 	  Pages written to these disks are compressed and stored in memory
+ 	  itself. These disks allow very fast I/O and compression provides
+ 	  good amounts of memory savings.
+@@ -14,49 +14,64 @@
+ 	  disks and maybe many more.
+ 
+ 	  See Documentation/admin-guide/blockdev/zram.rst for more information.
+ 
+ choice
+ 	prompt "Default zram compressor"
+-	default ZRAM_DEF_COMP_LZORLE
++	default ZRAM_DEF_COMP_LZ4KD
+ 	depends on ZRAM
+ 
++config ZRAM_DEF_COMP_LZO
++	bool "lzo"
++	depends on CRYPTO_LZO
++
+ config ZRAM_DEF_COMP_LZORLE
+ 	bool "lzo-rle"
+ 	depends on CRYPTO_LZO
+ 
+-config ZRAM_DEF_COMP_ZSTD
+-	bool "zstd"
+-	depends on CRYPTO_ZSTD
+-
+ config ZRAM_DEF_COMP_LZ4
+ 	bool "lz4"
+ 	depends on CRYPTO_LZ4
+ 
+-config ZRAM_DEF_COMP_LZO
+-	bool "lzo"
+-	depends on CRYPTO_LZO
+-
+ config ZRAM_DEF_COMP_LZ4HC
+ 	bool "lz4hc"
+ 	depends on CRYPTO_LZ4HC
+ 
++config ZRAM_DEF_COMP_LZ4K
++	bool "lz4k"
++	depends on CRYPTO_LZ4K
++
++config ZRAM_DEF_COMP_LZ4KD
++	bool "lz4kd"
++	depends on CRYPTO_LZ4KD
++
++config ZRAM_DEF_COMP_DEFLATE
++	bool "deflate"
++	depends on CRYPTO_DEFLATE
++
+ config ZRAM_DEF_COMP_842
+ 	bool "842"
+ 	depends on CRYPTO_842
+ 
++config ZRAM_DEF_COMP_ZSTD
++	bool "zstd"
++	depends on CRYPTO_ZSTD
++
+ endchoice
+ 
+ config ZRAM_DEF_COMP
+ 	string
++	default "lzo" if ZRAM_DEF_COMP_LZO
+ 	default "lzo-rle" if ZRAM_DEF_COMP_LZORLE
+-	default "zstd" if ZRAM_DEF_COMP_ZSTD
+ 	default "lz4" if ZRAM_DEF_COMP_LZ4
+-	default "lzo" if ZRAM_DEF_COMP_LZO
+ 	default "lz4hc" if ZRAM_DEF_COMP_LZ4HC
++	default "lz4k" if ZRAM_DEF_COMP_LZ4K
++	default "lz4kd" if ZRAM_DEF_COMP_LZ4KD
++    	default "deflate" if ZRAM_DEF_COMP_DEFLATE
+ 	default "842" if ZRAM_DEF_COMP_842
++	default "zstd" if ZRAM_DEF_COMP_ZSTD
+ 
+ config ZRAM_WRITEBACK
+        bool "Write back incompressible or idle page to backing device"
+        depends on ZRAM
+        help
+ 	 With incompressible page, there is no memory saving to keep it
+
+diff -u a/drivers/block/zram/zcomp.c b/drivers/block/zram/zcomp.c
+--- a/drivers/block/zram/zcomp.c
++++ b/drivers/block/zram/zcomp.c
+@@ -22,12 +22,21 @@
+ #if IS_ENABLED(CONFIG_CRYPTO_LZ4)
+ 	"lz4",
+ #endif
+ #if IS_ENABLED(CONFIG_CRYPTO_LZ4HC)
+ 	"lz4hc",
+ #endif
++#if IS_ENABLED(CONFIG_CRYPTO_LZ4K)
++	"lz4k",
++#endif
++#if IS_ENABLED(CONFIG_CRYPTO_LZ4KD)
++	"lz4kd",
++#endif
++#if IS_ENABLED(CONFIG_CRYPTO_DEFLATE)
++	"deflate",
++#endif
+ #if IS_ENABLED(CONFIG_CRYPTO_842)
+ 	"842",
+ #endif
+ #if IS_ENABLED(CONFIG_CRYPTO_ZSTD)
+ 	"zstd",
+ #endif

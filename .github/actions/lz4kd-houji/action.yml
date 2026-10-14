@@ -1,0 +1,49 @@
+name: 'Apply LZ4KD ZRAM Algorithm'
+description: 'Copy Huawei LZ4K/LZ4KD sources into the kernel tree and patch Kconfig/Makefile/zcomp (6.1 only). Excludes the unsafe module-blacklist bypass from upstream patch.'
+inputs:
+  version:
+    description: 'Kernel config version (e.g., android14-6.1)'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Apply LZ4KD (safe subset, no module-blacklist change)
+      if: inputs.version == 'android14-6.1'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        SRC="${{ github.workspace }}/kernel_patches/common/lz4kd"
+
+        echo "[+] Copying LZ4K/LZ4KD sources"
+        cp -r "$SRC/crypto/lz4k.c"  crypto/lz4k.c
+        cp -r "$SRC/crypto/lz4kd.c" crypto/lz4kd.c
+        cp -r "$SRC/include/linux/lz4k.h"  include/linux/lz4k.h
+        cp -r "$SRC/include/linux/lz4kd.h" include/linux/lz4kd.h
+        cp -r "$SRC/lib/lz4k"  lib/lz4k
+        cp -r "$SRC/lib/lz4kd" lib/lz4kd
+
+        echo "[+] Patching Kconfig/Makefile/zcomp"
+        patch -p1 --forward < "$SRC/0001-lz4kd-6.1-safe.patch"
+
+        echo "[+] Wiring crypto/Makefile (offset-tolerant)"
+        grep -q "CONFIG_CRYPTO_LZ4K" crypto/Makefile || \
+          sed -i '/obj-\$(CONFIG_CRYPTO_LZ4) += lz4.o/a obj-$(CONFIG_CRYPTO_LZ4K) += lz4k.o\nobj-$(CONFIG_CRYPTO_LZ4KD) += lz4kd.o' crypto/Makefile
+
+        echo "[+] Enabling configs"
+        {
+          echo "CONFIG_CRYPTO_LZ4K=y"
+          echo "CONFIG_CRYPTO_LZ4KD=y"
+          echo "CONFIG_LZ4K_COMPRESS=y"
+          echo "CONFIG_LZ4K_DECOMPRESS=y"
+          echo "CONFIG_LZ4KD_COMPRESS=y"
+          echo "CONFIG_LZ4KD_DECOMPRESS=y"
+          echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"
+        } >> arch/arm64/configs/gki_defconfig
+
+        echo "[+] LZ4KD applied"
+    - name: Skip on non-6.1
+      if: inputs.version != 'android14-6.1'
+      shell: bash
+      run: echo "[-] LZ4KD patch only prepared for android14-6.1, skipped"
