@@ -82,8 +82,29 @@ runs:
               echo "patches/stable listing attempt $attempt/5 got HTTP ${HTTP:-none}; backing off..." >&2
               sleep $((attempt * 15))
             done
+            # API dead after all retries (run 37910384802: secondary 403
+            # under matrix concurrency; run 38623058057: five 403s while
+            # GitHub's API was degraded) -> fall back to the GIT protocol:
+            # blobless clone + ls-tree. Never touches api.github.com, no
+            # rate limit, ~1.2s. Live tree, so the resolved name is
+            # guaranteed to exist on raw.githubusercontent.
             if [ "$HTTP" != "200" ]; then
-              echo "ERROR: could not list firelzrd/bore-scheduler patches/stable/ (HTTP $HTTP after 5 attempts)" >&2
+              echo "API listing failed (HTTP ${HTTP:-none}); falling back to git ls-tree..." >&2
+              rm -rf /tmp/bore-src
+              if git clone -q --depth 1 --filter=blob:none \
+                   https://github.com/firelzrd/bore-scheduler /tmp/bore-src 2>/dev/null; then
+                NAMES=$(git -C /tmp/bore-src ls-tree -r --name-only HEAD patches/stable/ \
+                  | xargs -n1 basename 2>/dev/null \
+                  | grep "^0001-linux${VER}.*\.patch$" | sort -V || true)
+                LATEST=$(printf '%s\n' "$NAMES" | tail -1)
+                HTTP=200
+                rm -rf /tmp/bore-src
+              else
+                rm -rf /tmp/bore-src
+              fi
+            fi
+            if [ "$HTTP" != "200" ]; then
+              echo "ERROR: could not list firelzrd/bore-scheduler patches/stable/ (HTTP $HTTP after 5 attempts + git fallback)" >&2
               exit 1
             fi
             if [ -z "$LATEST" ]; then
