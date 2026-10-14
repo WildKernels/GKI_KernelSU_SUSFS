@@ -716,6 +716,60 @@ jobs:
           fi
         } > "$SUMMARY_FILE"
 
+    - name: Patch AnyKernel3 for system_dlkm zram replacement (houji)
+      shell: bash
+      run: |
+        set -euo pipefail
+        AK3="${{ github.workspace }}/AnyKernel3"
+        [ -d "$AK3/system_dlkm_modules" ] || { echo "no system_dlkm_modules, skip"; exit 0; }
+        # anykernel.sh: before final write_boot/flash_boot, replace system_dlkm modules
+        python3 - "$AK3/anykernel.sh" <<'PYEOF'
+        import sys
+        p = sys.argv[1]
+        t = open(p).read()
+        hook = '''
+        # --- houji system_dlkm zram/zsmalloc replacement ---
+        MODDIR="$(dirname "$0")/system_dlkm_modules"
+        if [ -d "$MODDIR" ]; then
+            DLKM_TARGET="/system_dlkm/lib/modules"
+            KREL="$(uname -r)"
+            for ko in "$MODDIR"/*.ko; do
+              [ -e "$ko" ] || continue
+              base=$(basename "$ko")
+              # try kernel-versioned path first, then flatten dir
+              dst=""
+              for cand in "$DLKM_TARGET/$KREL/kernel/drivers/block/$base" "$DLKM_TARGET/$KREL/kernel/mm/$base" "$DLKM_TARGET/$base" $(find /system_dlkm/lib/modules -name "$base" 2>/dev/null); do
+                [ -e "$cand" ] && dst="$cand" && break
+              done
+              if [ -n "$dst" ]; then
+                mount -o remount,rw /system_dlkm 2>/dev/null || mount -o remount,rw / 2>/dev/null
+                if cp "$ko" "$dst"; then
+                  ui_print "  -> replaced $base"
+                  chmod 644 "$dst"; chown 0:0 "$dst"
+                  restorecon "$dst" 2>/dev/null
+                else
+                  ui_print "  !! failed to replace $base"
+                fi
+              else
+                ui_print "  ?? no target found for $base"
+              fi
+            done
+            mount -o remount,ro /system_dlkm 2>/dev/null
+        fi
+        # --- end houji hook ---
+        '''
+        # insert before write_boot/flash_boot invocation
+        for anchor in ['write_boot', 'flash_boot']:
+            needle = '\n' + anchor + '\n'
+            if needle in t:
+                t = t.replace(needle, '\n' + hook + anchor + '\n', 1)
+                break
+        else:
+            raise SystemExit('no write_boot/flash_boot anchor found')
+        open(p, 'w').write(t)
+        print('anykernel.sh patched')
+        PYEOF
+
     - name: Upload Artifacts
       id: kernel-artifact
       uses: actions/upload-artifact@v7
