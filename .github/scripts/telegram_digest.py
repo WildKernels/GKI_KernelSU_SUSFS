@@ -262,6 +262,20 @@ def main() -> int:
             if any(k != "skipped" for k in e["counts"])}
 
     icon = "🌙" if args.event == "schedule" else "🔨"
+
+    # Testing-release note (user request 2026-10-14): only a dispatch with
+    # release_type == "Release" (or a real GitHub release event) is a final
+    # build; CI / Nightly / Pre-Release / schedule builds carry a flash
+    # warning. RELEASE_TYPE arrives as env from the announce job
+    # (github.event.inputs.release_type - empty on schedule/push).
+    is_release = (args.event == "release"
+                  or os.environ.get("RELEASE_TYPE", "").strip() == "Release")
+    test_note_md = ("" if is_release else
+                    "⚠️ **Testing release** — please back up your data "
+                    "before flashing.")
+    test_note_html = ("" if is_release else
+                      "<b>⚠️ Testing release</b> — please back up your "
+                      "data before flashing.")
     for fam, e in sorted(fams.items()):
         topic = TOPICS.get(fam, FALLBACK_TOPIC)
         fname = FAMILY_NAMES.get(fam, fam)
@@ -492,6 +506,8 @@ def main() -> int:
         rich_parts.append(
             f'<table bordered><tr><th colspan="2" align="center">'
             f"{esc(fname)}</th></tr>{tbody}</table>")
+        if test_note_md:
+            rich_parts.append(test_note_md)
         rich_parts.append(f"Run: [#{args.run_id}]({args.run_url})")
         if roots_rich:
             rich_parts.append(roots_rich)
@@ -522,11 +538,13 @@ def main() -> int:
 
         root_block = f"{root_line}\n\n" if root_line else ""
         feat_block = f"<b>Features</b>:\n{feat_text}\n\n" if feat_text else ""
+        warn_block = f"{test_note_html}\n\n" if test_note_html else ""
         msg = (
             f"<b>{icon} Wild Kernels</b>\n"
             f"\n"
             f"<b>{esc(fname)}</b>\n"
             f"\n"
+            f"{warn_block}"
             f"<b>Branch</b>: <code>{esc(args.branch)}</code>\n"
             f"<b>Trigger</b>: {esc(args.event)}\n"
             f"<b>Run</b>: <a href=\"{esc(args.run_url)}\">#{args.run_id}</a>\n"
