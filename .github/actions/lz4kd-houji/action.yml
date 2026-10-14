@@ -14,7 +14,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         set -euo pipefail
-        SRC="${{ github.workspace }}/kernel_patches/common/lz4kd"
+        SRC="${{ github.workspace }}/kernel_patches_bundled/common/lz4kd"
 
         echo "[+] Copying LZ4K/LZ4KD sources"
         cp -r "$SRC/crypto/lz4k.c"  crypto/lz4k.c

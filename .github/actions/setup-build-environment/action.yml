@@ -46,6 +46,12 @@ runs:
 
         if [ -d "${{ github.workspace }}/kernel_patches" ]; then rm -rf "${{ github.workspace }}/kernel_patches"; fi
         retry git clone https://github.com/WildKernels/kernel_patches.git "${{ github.workspace }}/kernel_patches"
+        # houji fork: overlay our bundled lz4kd sources into the patched tree
+        if [ -d "${{ github.workspace }}/kernel_patches_bundled/common/lz4kd" ]; then
+          echo "[+] overlaying bundled lz4kd patch sources"
+          mkdir -p "${{ github.workspace }}/kernel_patches/common/lz4kd"
+          cp -r "${{ github.workspace }}/kernel_patches_bundled/common/lz4kd/." "${{ github.workspace }}/kernel_patches/common/lz4kd/"
+        fi
         if [ -n "${{ inputs.kernel_patches_commit }}" ]; then
           # Same retry as the clone above: fetching a specific SHA is the call
           # most likely to need a second round trip, since upstreams that don't
