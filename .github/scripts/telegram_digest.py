@@ -2,8 +2,19 @@
 """Build per-family Telegram digest messages from a workflow run's jobs.
 
 Input : the run's jobs JSON (actions API, all pages merged) on stdin.
-Output: one line per kernel family, TAB-separated:  <topic_id>\t<html>
+Output: one line per kernel family, TAB-separated:
+        <topic_id>\t<html>
         The caller posts each line to that topic via sendMessage.
+
+CARD FORMAT (rich): when a local Bot API server (Bot API 10.x) is
+available the caller posts the rich-markdown variant via sendRichMessage
+- real tables, styled button rows, expandable quotes. The cloud HTML
+variant + inline keyboard JSON always ride along as the fallback.
+
+  Rich-card idea and markup vocabulary (sendRichMessage, <table
+  bordered>, <tg-button-row>/<tg-button>, <blockquote expandable>)
+  adapted from nullptr-t-oss/Dragonw1nd-Kernels (.github/telegram/).
+  Every card carries a footer credit to them.
 
 Routing (topic IDs in the Wild Kernels Testing forum, editable in place):
   build-android12-5-10 -> 3   (5.10.x-android12)
@@ -74,6 +85,16 @@ MARKS = {"success": "✅", "failure": "❌", "cancelled": "⛔",
          "skipped": "⏭️", "startup_failure": "❌"}
 
 MAX_LEN = 4000  # Telegram cap is 4096; leave headroom for entities
+RICH_MAX_LEN = 32000  # Bot API 10.x rich message cap is ~32768
+
+# Root repo -> commit URL base (shared by the HTML and rich cards).
+ROOT_URLS = {
+    "next": "https://github.com/pershoot/KernelSU-Next/commit/",
+    "kernelsu": "https://github.com/tiann/KernelSU/commit/",
+    "bakasu": "https://github.com/Baka-SU/BakaSU/commit/",
+    "sukisu-ultra": "https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/",
+    "kowsu": "https://github.com/KOWX712/KernelSU/commit/",
+}
 
 # Flavor -> manager APK artifact patterns (fnmatch against the run's
 # uploaded artifact names; first non-excluded match wins per entry).
@@ -84,8 +105,24 @@ FLAVOR_MANAGERS = {
     "KernelSU": [("KernelSU_v*", None)],
     "KernelSU-Next": [("KernelSU_Next_v*", "spoofed"),
                       ("KernelSU_Next_v*spoofed*", None)],
-    "BakaSU": [("BakaSU_v*", None)],
+    # BakaSU ships a spoofed manager too (Spoofed-Manager-release in
+    # their Build Manager CI; our publish filter keeps the universal
+    # pair) - link it like KernelSU-Next's.
+    "BakaSU": [("BakaSU_v*", "spoofed"),
+               ("BakaSU_v*spoofed*", None)],
 }
+
+# Manager-link flavor order (user request 2026-10-13): KernelSU first, then
+# KernelSU-Next with its trailing spoofed link, then BakaSU with its spoofed.
+# Any other flavor keeps alphabetical order after these.
+MANAGER_FLAVOR_ORDER = ["KernelSU", "KernelSU-Next", "BakaSU",
+                        "SukiSU-Ultra", "KowSU"]
+
+
+def ordered_manager_flavors(flavors) -> list:
+    known = [f for f in MANAGER_FLAVOR_ORDER if f in flavors]
+    rest = sorted(f for f in flavors if f not in MANAGER_FLAVOR_ORDER)
+    return known + rest
 
 
 def load_json_any(stream) -> list:
@@ -190,16 +227,20 @@ def main() -> int:
         if not fam.startswith("build-android") or fam in EXCLUDED:
             continue  # resolve-sources, nomount, rej, release, ...
         e = fams.setdefault(fam, {"sublevels": [], "flavors": [],
-                                  "counts": {}, "sub_jobs": {}, "root": None})
+                                  "counts": {}, "sub_jobs": {}, "roots": {}})
         # The matrix parent part embeds the root: "build-android15-6-6
         # (next, KernelSU-Next, <40-hex-sha>) / <sublevel> (<flavor>)".
-        if e["root"] is None:
+        # A run can dispatch MULTIPLE roots - collect one entry per root
+        # (1:1 with the release notes' per-flavor Root lines).
+        if " / " in name or "(" in name.split(" / ")[0]:
             parent = name.split(" / ")[0]
             if "(" in parent:
                 inner = parent[parent.index("(") + 1:parent.rindex(")")]
                 bits = [b.strip() for b in inner.split(",")]
                 if len(bits) >= 3 and len(bits[2]) == 40:
-                    e["root"] = (bits[0], bits[1], bits[2])
+                    rid, rlabel, rsha = bits[0], bits[1], bits[2]
+                    if rid not in e["roots"]:
+                        e["roots"][rid] = (rlabel, rsha)
         last = name.split(" / ")[-1]
         if " / " in name and "(" in last:
             tag = last.rsplit(" (", 1)[0]
@@ -249,18 +290,17 @@ def main() -> int:
         # artifact (KernelSU-Next preferred, then KernelSU, then BakaSU);
         # sublevels with any failed/cancelled job get a ❌ mark and no link.
         art_base = args.nightly_url.rsplit("/actions/runs/", 1)[0]
-        sub_lines = []
-        sub_links = {}
+        # Per-(sublevel, flavor) artifact links: every root flavor that
+        # built a sublevel gets its own link (a KernelSU-Next + BakaSU
+        # dispatch produces two kernels per version - both link).
+        FLAVOR_ORDER = ["KernelSU-Next", "KernelSU", "BakaSU",
+                        "SukiSU-Ultra", "KowSU"]
+        flav_order = [f for f in FLAVOR_ORDER if f in e["flavors"]] + \
+                     sorted(f for f in e["flavors"] if f not in FLAVOR_ORDER)
+        sub_flav = {}  # (tag, flavor) -> nightly.link url
         for s in subs:
-            sj = e["sub_jobs"].get(s, {})
-            bad = sj.get("failure", 0) + sj.get("cancelled", 0) + \
-                sj.get("startup_failure", 0)
-            if bad:
-                sub_lines.append(f"- ❌ {esc(s)}")
-                continue
-            link_id = None
-            for fl in ("KernelSU-Next", "KernelSU", "BakaSU"):
-                art_name = f"{s}-{fl}-AnyKernel3"
+            for f in flav_order:
+                art_name = f"{s}-{f}-AnyKernel3"
                 # LTS runs build a REAL kernel version, so the artifact is
                 # named e.g. 6.6.144-android15-lts-... while the job tag is
                 # 6.6.X-android15-lts (run 38210657645 posted the lts line
@@ -275,113 +315,226 @@ def main() -> int:
                     if "id" not in a:
                         continue
                     if aname == art_name or (pat and fnmatch.fnmatch(aname, pat)):
-                        link_id = a["id"]
+                        sub_flav[(s, f)] = f"{art_base}/actions/artifacts/{a['id']}.zip"
                         break
-                if link_id:
-                    break
-            if link_id:
-                url = f"{art_base}/actions/artifacts/{link_id}.zip"
-                sub_links[s] = url
-                sub_lines.append(f"- <a href=\"{html.escape(url, quote=True)}\">"
-                                 f"{esc(s)}</a>")
+
+        # Per-sublevel lines: every built flavor links separately.
+        sub_lines = []
+        rich_subs_list = []
+        for s in subs:
+            links = [(f, sub_flav[(s, f)]) for f in flav_order
+                     if (s, f) in sub_flav]
+            if links:
+                h = "  ·  ".join(
+                    f"<a href=\"{html.escape(u, quote=True)}\">{esc(f)}</a>"
+                    for f, u in links)
+                sub_lines.append(f"- {esc(s)} — {h}")
+                r = " · ".join(f"[{f}]({u})" for f, u in links)
+                rich_subs_list.append(f"- {esc(s)} — {r}")
             else:
-                sub_lines.append(f"- {esc(s)}")
+                sub_lines.append(f"- ❌ {esc(s)}")
+                rich_subs_list.append(f"- ❌ {esc(s)}")
         sub_text = "\n".join(sub_lines) if sub_lines else "—"
+        rich_subs = "\n".join(rich_subs_list) if rich_subs_list else "—"
+
+        # Family gate: zero linked kernels means nothing built for this
+        # family (every sublevel failed) - skip the card entirely instead
+        # of posting an all-❌ notice. Families with at least one built
+        # kernel still post, failures shown per-sublevel.
+        if not sub_flav:
+            print(f"telegram-digest: {fname}: no AnyKernel3 artifacts "
+                  f"(no kernels built); skipping card", file=sys.stderr)
+            continue
 
         # Flavors, each linking its manager APK when the run uploaded one.
         # The flavor name links the stock manager; KernelSU-Next gets a
         # trailing "spoofed" link for its second variant.
         flines = []
-        for f in sorted(e["flavors"]):
+        rich_fl = []
+        for f in ordered_manager_flavors(e["flavors"]):
             links = manager_links(f)
             if not links:
                 flines.append(esc(f))
+                rich_fl.append(esc(f))
                 continue
             line = f"<a href=\"{html.escape(links[0], quote=True)}\">" \
                    f"{esc(f)}</a>"
+            rf = f"[{esc(f)}]({links[0]})"
             if len(links) > 1:
                 line += "  ·  " + "  ·  ".join(
                     f"<a href=\"{html.escape(u, quote=True)}\">spoofed</a>"
                     for u in links[1:])
+                rf += " · " + " · ".join(f"[spoofed]({u})" for u in links[1:])
             flines.append(line)
+            rich_fl.append(rf)
         flavors = "\n".join(flines) if flines else "—"
+        rich_flavors = "\n".join(rich_fl) if rich_fl else "—"
 
         # Root + Features + SUSFS commit info, mirroring the release notes
         # (main.yml notes-preview job). The root comes from the job names;
         # component commits + the SUSFS pin per family arrive via env vars
         # fed from resolve-sources outputs. Empty env = the line is skipped,
         # so a failed resolve-sources degrades gracefully.
+        # Root(s): every root implementation this run built for the
+        # family, each with its manager-repo commit link - 1:1 with the
+        # release notes' per-flavor Root lines.
         root_line = ""
-        if e.get("root"):
-            rid, rlabel, rsha = e["root"]
-            rurl = {
-                "next": "https://github.com/pershoot/KernelSU-Next/commit/",
-                "kernelsu": "https://github.com/tiann/KernelSU/commit/",
-                "bakasu": "https://github.com/Baka-SU/BakaSU/commit/",
-                "sukisu-ultra": "https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/",
-                "kowsu": "https://github.com/KOWX712/KernelSU/commit/",
-            }.get(rid)
+        roots_sorted = [r for r in ("next", "kernelsu", "bakasu",
+                                    "sukisu-ultra", "kowsu") if r in e["roots"]]
+        roots_sorted += [r for r in sorted(e["roots"]) if r not in roots_sorted]
+        rlines = []
+        rlines_rich = []
+        for rid in roots_sorted:
+            rlabel, rsha = e["roots"][rid]
+            rurl = ROOT_URLS.get(rid)
             if rurl:
-                root_line = (f"<b>Root</b>: {esc(rlabel)} "
-                             f"<a href=\"{rurl}{rsha}\">{esc(rsha[:7])}</a>")
+                rlines.append(f"{esc(rlabel)} "
+                              f"<a href=\"{rurl}{rsha}\">{esc(rsha[:7])}</a>")
+                rlines_rich.append(f"[{esc(rlabel)} {rsha[:7]}]({rurl}{rsha})")
             else:
-                root_line = (f"<b>Root</b>: {esc(rlabel)} "
-                             f"<code>{esc(rsha[:7])}</code>")
+                rlines.append(f"{esc(rlabel)} <code>{esc(rsha[:7])}</code>")
+                rlines_rich.append(f"{esc(rlabel)} {rsha[:7]}")
+        if rlines:
+            root_line = "<b>Roots</b>: " + "  ·  ".join(rlines)
+        roots_rich = "Roots: " + " · ".join(rlines_rich) if rlines_rich else ""
 
-        feats_on = {f.strip().lower()
-                    for f in os.environ.get("DIGEST_FEATURES", "").split(",")
-                    if f.strip()}
+        # Features: exactly what THIS run's feature_set carried (the
+        # resolve-sources output feeds DIGEST_FEATURES, "+"-separated;
+        # the old comma form is accepted too). One line per feature -
+        # NTSync/Ptrace/Unicode are their own features, not a group.
+        feats_on = {s.strip().lower()
+                    for s in re.split(r"[+,]", os.environ.get("DIGEST_FEATURES", ""))
+                    if s.strip()}
         variant = VARIANT_OF_FAM.get(fam, "")
         susfs_sha = os.environ.get(
             "SUSFS_" + variant.replace(".", "_").replace("-", "_").upper(), "")
         flines2 = []
+        rlines2 = []
+        susfs_url = "https://gitlab.com/simonpunk/susfs4ksu/-/commit/"
+        nomount_url = "https://github.com/maxsteeel/nomount/commit/"
+        bbg_url = "https://github.com/WildKernels/kernel_patches/commit/"
+        ds_url = "https://github.com/ravindu644/Droidspaces-OSS/commit/"
         if "susfs" in feats_on:
             if susfs_sha:
-                flines2.append(f"- SUSFS <a href=\"https://gitlab.com/simonpunk/"
-                               f"susfs4ksu/-/commit/{susfs_sha}\">"
+                flines2.append(f"- SUSFS <a href=\"{susfs_url}{susfs_sha}\">"
                                f"{esc(susfs_sha[:7])}</a>")
+                rlines2.append(f"- **SUSFS**: [{susfs_sha[:7]}]({susfs_url}{susfs_sha})")
             else:
                 flines2.append("- SUSFS")
+                rlines2.append("- **SUSFS**")
         if "nomount" in feats_on and (c := os.environ.get("NOMOUNT_COMMIT", "")):
-            flines2.append(f"- NoMount <a href=\"https://github.com/maxsteeel/"
-                           f"nomount/commit/{c}\">{esc(c[:7])}</a>")
+            flines2.append(f"- NoMount <a href=\"{nomount_url}{c}\">{esc(c[:7])}</a>")
+            rlines2.append(f"- **NoMount**: [{c[:7]}]({nomount_url}{c})")
         if "bbg" in feats_on and (c := os.environ.get("KERNEL_PATCHES_COMMIT", "")):
-            flines2.append(f"- Baseband Guard <a href=\"https://github.com/"
-                           f"WildKernels/kernel_patches/commit/{c}\">{esc(c[:7])}</a>")
+            flines2.append(f"- Baseband Guard <a href=\"{bbg_url}{c}\">{esc(c[:7])}</a>")
+            rlines2.append(f"- **Baseband Guard**: [{c[:7]}]({bbg_url}{c})")
         if "ds" in feats_on and (c := os.environ.get("DROIDSPACES_COMMIT", "")):
-            flines2.append(f"- DroidSpaces-OSS <a href=\"https://github.com/"
-                           f"ravindu644/Droidspaces-OSS/commit/{c}\">{esc(c[:7])}</a>")
-        net_bits = [b for b, k in (("NTSync", "ntsync"), ("Ptrace Leak Fix", "ptrace"),
-                                   ("Unicode Fix", "unicode")) if k in feats_on]
-        if net_bits:
-            flines2.append("- Networking: " + " · ".join(net_bits))
+            flines2.append(f"- DroidSpaces-OSS <a href=\"{ds_url}{c}\">{esc(c[:7])}</a>")
+            rlines2.append(f"- **DroidSpaces-OSS**: [{c[:7]}]({ds_url}{c})")
+        if "net" in feats_on:
+            flines2.append("- Networking")
+            rlines2.append("- **Networking**")
+        if "ntsync" in feats_on:
+            flines2.append("- NTSync")
+            rlines2.append("- **NTSync**")
+        if "ptrace" in feats_on:
+            flines2.append("- Ptrace Leak Fix")
+            rlines2.append("- **Ptrace Leak Fix**")
+        if "unicode" in feats_on:
+            flines2.append("- Unicode Fix")
+            rlines2.append("- **Unicode Fix**")
         if "bpf" in feats_on:
             flines2.append("- BTF / eBPF / FUSE-BPF")
+            rlines2.append("- **BTF / eBPF / FUSE-BPF**")
+        if "perf" in feats_on:
+            flines2.append("- Performance patches")
+            rlines2.append("- **Performance patches**")
         feat_text = "\n".join(flines2)
+        feat_rich = "\n".join(rlines2)
 
-        # Inline keyboard buttons (URL buttons only - no backend needed):
-        # the newest passing sublevel's kernel zip, manager APKs, and the
-        # whole-run download. Emitted as the record's 5th field for the
-        # workflow to pass as reply_markup.
-        kb_rows = []
+        # Buttons (URL only - no backend needed), one source for both the
+        # JSON inline keyboard (cloud fallback) and the rich card:
+        #   - one download button per BUILT kernel, full kernel string as
+        #     the label (6.1.157-android14-2025-12); sublevels built by
+        #     MULTIPLE flavors get one button per flavor (suffixed), on
+        #     their own row. Single-flavor sublevels pack 2 per row.
+        #   - manager APK buttons, one row per flavor (name + spoofed)
+        #   - all-artifacts row
+        btn_rows = []  # list of rows; each row = list[(text, url)]
+        pool = []
         for s in reversed(subs):
-            if s in sub_links:
-                kb_rows.append([{"text": "⬇️ Download Kernel",
-                                 "url": sub_links[s]}])
-                break
-        for f in sorted(e["flavors"]):
+            ls = [(f, sub_flav[(s, f)]) for f in flav_order
+                  if (s, f) in sub_flav]
+            if not ls:
+                continue
+            if len(ls) == 1:
+                pool.append((f"⬇️ {s}", ls[0][1]))
+                if len(pool) == 2:
+                    btn_rows.append(pool)
+                    pool = []
+            else:
+                if pool:
+                    btn_rows.append(pool)
+                    pool = []
+                for f, u in ls:  # one button per row: full string + flavor
+                    btn_rows.append([(f"⬇️ {s} · {f}", u)])
+        if pool:
+            btn_rows.append(pool)
+        mgr_rows = []
+        for f in ordered_manager_flavors(e["flavors"]):
             links = manager_links(f)
-            if links:
-                row = [{"text": f"🧩 {f}",
-                        "url": links[0]}]
-                if len(links) > 1:
-                    row.append({"text": "spoofed", "url": links[1]})
-                kb_rows.append(row)
-                break
-        kb_rows.append([{"text": "📦 All artifacts",
-                         "url": args.nightly_url}])
+            if not links:
+                continue
+            row = [(f"🧩 {f}", links[0])]
+            row += [("spoofed", u) for u in links[1:]]
+            mgr_rows.append(row)
+
+        kb_rows = [[{"text": t, "url": u} for t, u in row]
+                   for row in btn_rows + mgr_rows]
+        kb_rows.append([{"text": "📦 All artifacts", "url": args.nightly_url}])
         buttons = json.dumps({"inline_keyboard": kb_rows},
                              separators=(",", ":"), ensure_ascii=False)
+
+        # ---- Rich-markdown variant (Bot API 10.x sendRichMessage) ----
+        # Table / button-row / expandable-quote vocabulary adapted from
+        # nullptr-t-oss/Dragonw1nd-Kernels (.github/telegram/telegram.py).
+        # Only proven-rendering constructs are used: links live in plain
+        # markdown positions (list items, standalone lines) - never inside
+        # table cells; table cells carry plain text only. No credit footer
+        # in the message (attribution lives in this header).
+        rich_parts = [f"# {icon} Wild Kernels"]
+        trows = [
+            ("Branch", esc(args.branch)),
+            ("Trigger", esc(args.event)),
+            ("Jobs", esc(counts)),
+        ]
+        tbody = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in trows)
+        rich_parts.append(
+            f'<table bordered><tr><th colspan="2" align="center">'
+            f"{esc(fname)}</th></tr>{tbody}</table>")
+        rich_parts.append(f"Run: [#{args.run_id}]({args.run_url})")
+        if roots_rich:
+            rich_parts.append(roots_rich)
+        if feat_text:
+            rich_parts.append(f"**Features**\n{feat_rich}")
+        # No Sublevels/Flavors sections here: the button rows below carry
+        # the same info (one download button per kernel, manager buttons
+        # per flavor) - the user asked for the leaner card.
+        # Buttons: per-kernel downloads (success; multi-flavor sublevels
+        # get flavor-suffixed rows), managers (primary).
+        for row in btn_rows:
+            cells = "".join(
+                f'<tg-button type="url" style="success" url="{u}">{t}</tg-button>'
+                for t, u in row)
+            rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
+        for row in mgr_rows:
+            cells = "".join(
+                f'<tg-button type="url" style="primary" url="{u}">{t}</tg-button>'
+                for t, u in row)
+            rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
+        rich = "\n\n".join(rich_parts)
+        if len(rich) > RICH_MAX_LEN:
+            rich = rich[:RICH_MAX_LEN - 1] + "…"
 
         root_block = f"{root_line}\n\n" if root_line else ""
         feat_block = f"<b>Features</b>:\n{feat_text}\n\n" if feat_text else ""
@@ -409,11 +562,12 @@ def main() -> int:
         )
         if len(msg) > MAX_LEN:
             msg = msg[:MAX_LEN - 1] + "…"
-        # Records: CHAT \t TOPIC \t FAMILY \t HTML \t BUTTONS_JSON,
-        # separated by ASCII RS (\x1e). The caller sends each record with
-        # reply_markup=BUTTONS_JSON, then builds the combined testing-group
-        # card from the returned t.me message links.
-        print(f"{args.chat_id}\t{topic}\t{fname}\t{msg}\t{buttons}", end="\x1e")
+        # Records: CHAT \t TOPIC \t FAMILY \t RICH_MD \t HTML \t BUTTONS_JSON,
+        # separated by ASCII RS (\x1e). The caller prefers sendRichMessage on
+        # a local Bot API 10.x server (rich tables + styled buttons) and falls
+        # back to cloud sendMessage with HTML + reply_markup. It then builds
+        # the combined testing-group card from the returned t.me links.
+        print(f"{args.chat_id}\t{topic}\t{fname}\t{rich}\t{msg}\t{buttons}", end="\x1e")
 
     return 0
 
