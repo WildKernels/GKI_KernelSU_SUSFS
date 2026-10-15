@@ -700,13 +700,13 @@ jobs:
                   -H "Authorization: Bearer ${GH_TOKEN}" \
                   "https://api.github.com/repos/${OWNER}/${REPO}/actions/runs/${RUN_ID}/artifacts")
                 if [ -z "$WANT" ]; then
-                  ART_IDS=$(echo "$AJSON" | jq -r '.artifacts[].id')
+                  ART_IDS=$(echo "$AJSON" | jq -r '.artifacts[] | "\(.id) \(.name)"')
                 else
                   ART_IDS=$(echo "$AJSON" | jq -r --arg want "$WANT" '
                     ($want | split(",")) as $wl |
-                    .artifacts[] | select(.name as $n | any($wl[]; $n == .)) | .id')
+                    .artifacts[] | select(.name as $n | any($wl[]; $n == .)) | "\(.id) \(.name)"')
                 fi
-                echo "$ART_IDS" | while read -r AID; do
+                echo "$ART_IDS" | while read -r AID ART_NAME; do
                   [ -n "$AID" ] || continue
                   curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
                     -H "Authorization: Bearer ${GH_TOKEN}" \
@@ -718,6 +718,23 @@ jobs:
                   for apk in _${AID}/*.apk; do
                     [ -f "$apk" ] || continue
                     NAME="$(basename "$apk")"
+                    # Spoofed-manager artifacts (BakaSU/SukiSU upstream CI)
+                    # package APKs under the SAME filename as the stock
+                    # build. A flat cp -f then silently overwrites stock
+                    # with spoofed (or vice versa) - run 38659164844 lost
+                    # the BakaSU spoofed manager this way and the digest
+                    # had no spoofed download. Disambiguate: when the
+                    # upstream artifact is a spoofed one but the APK name
+                    # does not say so, suffix the filename. The digest's
+                    # FLAVOR_MANAGERS already expects *-spoofed.apk.
+                    case "$ART_NAME" in
+                      *poofed*)
+                        case "$NAME" in
+                          *poofed*) ;;
+                          *) NAME="${NAME%.apk}-spoofed.apk" ;;
+                        esac
+                        ;;
+                    esac
                     cp -f "$apk" "$OUT_APKS/$NAME"
                     echo "$OWNER|$REPO|$NAME" >> "$MANIFEST"
                   done
@@ -726,7 +743,11 @@ jobs:
               fi
             )
           done
-          # Filter BakaSU to only release universal and universal spoofed (drop debug/non-universal)
+          # Filter BakaSU to release arm64/universal APKs only (drop debug,
+          # 32-bit, riscv64). Upstream re-packaged 2026-10-14: artifacts now
+          # carry per-ABI APKs (arm64-v8a/armeabi-v7a/riscv64) instead of a
+          # single universal APK - keep arm64-v8a (all our devices) plus the
+          # legacy universal name.
           if grep -q "Baka-SU|BakaSU|" "$MANIFEST" 2>/dev/null; then
             tmp_manifest="${MANIFEST}.filtered"
             : > "$tmp_manifest"
@@ -734,10 +755,10 @@ jobs:
               [ -n "$n" ] || continue
               if [ "$o" = "Baka-SU" ] && [ "$r" = "BakaSU" ]; then
                 ln=$(echo "$n" | tr '[:upper:]' '[:lower:]')
-                # keep only universal apks, drop debug
-                if [[ "$ln" != *universal* ]]; then echo "Dropping BakaSU non-universal $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
+                # keep universal (old packaging) or arm64-v8a (new), drop debug
+                if [[ "$ln" != *universal* && "$ln" != *arm64-v8a* ]]; then echo "Dropping BakaSU non-arm64 $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
                 if [[ "$ln" == *debug* ]]; then echo "Dropping BakaSU debug $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
-                # now only universal release and universal spoofed remain
+                # now only arm64/universal release + spoofed remain
               fi
               echo "$o|$r|$n" >> "$tmp_manifest"
             done < "$MANIFEST"
