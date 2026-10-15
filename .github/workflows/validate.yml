@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
+concurrency: 
+
+permissions:
+  contents: read
 
 jobs:
   validate:

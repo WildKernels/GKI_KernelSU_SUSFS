@@ -55,10 +55,11 @@ runs:
           cp ${{ github.workspace }}/Droidspaces-OSS/Documentation/resources/kernel-patches/GKI/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kabi.patch ./
           patch -p1 < 001.GKI-6.12-or-above-fix_sysvipc_kabi.patch
         elif [ "${{ inputs.version }}" == "android15-6.6" ]; then
-          #curl -L https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_1_2_3.patch
-          #curl -L https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_3_4_5.patch
-          cp ${{ github.workspace }}/Droidspaces-OSS/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_6_7_8.patch ./
-          patch -p1 < 001.GKI-below-6.12-fix_sysvipc_kabi_6_7_8.patch
+          # 6.6 runs the DS-combo with BORE: this gap patch places
+          # sysvsem/sysvshm in the pre-se alignment hole (no KABI slots),
+          # leaving slots 3-5 for bore's group_burst (bore66_state.py).
+          cp ${{ github.workspace }}/.github/actions/droidspaces/patches/001.GKI-6.6-fix_sysvipc_kabi_gap.patch ./
+          patch -p1 < 001.GKI-6.6-fix_sysvipc_kabi_gap.patch
         elif [ "${{ inputs.version }}" == "android14-6.1" ]; then
           #curl -L https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_1_2_3.patch
           #curl -L https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_3_4_5.patch
