@@ -3,35 +3,48 @@
 DroidSpaces method.
 
 BORE 5.9.6 stores its burst state INLINE in struct sched_entity: burst_time,
-four u8 penalty/score fields, and two 24-byte spinlocked sched_burst_cache
-structs (~60 bytes). The 6.6 GKI KMI pins sched_entity structurally at its
+four u8 penalty/score fields, and two spinlocked sched_burst_cache structs
+(24-byte def; ~60 bytes). The 6.6 GKI KMI pins sched_entity structurally at its
 stock size, so every member after the insertion shifts - a confirmed
 bootloop on stock-vendor devices.
 
-The caches cannot fit single 8-byte slots (24 > 8; the kernel's
-_Static_assert refuses), so instead of a heap pointer this version follows
-the DroidSpaces slot-merge method (_ANDROID_KABI_REPLACE over consecutive
-reserves, exactly their SYSVIPC 6_7_8 patch shape) and lays the state FLAT
-across the structs' own free KABI reserves:
+The caches cannot fit single 8-byte slots, so instead of a heap pointer this
+version follows the DroidSpaces slot-merge method (_ANDROID_KABI_REPLACE over
+consecutive reserves, exactly their SYSVIPC shape) and lays the state FLAT
+across the structs' own free KABI reserves, DS-combo edition:
 
   1. struct sched_entity, RESERVE(1)+RESERVE(2) merged:
-     burst_time (u64) + the four u8 penalty/score fields. These stay FLAT
-     members of sched_entity, so the patch's own `se->burst_time`-style
-     accessors compile UNCHANGED - no translation, no guards.
-  2. struct task_struct, RESERVE(3..5) merged: child_burst cache.
-  3. struct task_struct, RESERVE(6..8) merged: group_burst cache.
+     burst_time (u64) + the four u8 penalty/score fields as an ANONYMOUS
+     payload - the patch's own `se->burst_time`-style accessors compile
+     UNCHANGED through the anonymous union nesting.
+  2. struct sched_entity, RESERVE(3)+RESERVE(4) merged: child_burst as a
+     NAMED `struct sched_burst_cache child_burst;` payload (the def is
+     packed to 16 bytes first, so it fits). bore66_flat.py leaves every
+     `se->child_burst` / `p->se.child_burst` accessor untouched: the
+     member keeps its name AND its type, so `&se->child_burst` still
+     type-checks as `struct sched_burst_cache *` for the cache helpers.
+  3. struct task_struct, RESERVE(3..5) merged: group_burst as a NAMED
+     `struct sched_burst_cache group_burst;` payload (16 of the 24
+     bytes). Only ITS accessors change - bore66_flat.py rewrites
+     `X->se.group_burst` -> `X->group_burst` and the se/task_of form.
 
   Zero runtime machinery: no heap allocation, no fork/exit hooks, no NULL
   guards, no pointer-alias hazard. The caches are copied by fork's
   dup_task_struct exactly as the upstream inline design intends, and the
   patch's own spin_lock_init-at-fork hook re-initializes them.
 
-Slot budget (GKI 6.6): sched_entity has 4 free reserves; task_struct has
-6 (slots 3-8; Google holds 1-2 via dmabuf_info/user_dumpable on newer
-sublevels). Needed: 2 (scalars) + 3 + 3 (caches) = 8 slots across both
-structs - every reserve is consumed, nothing wasted, and DroidSpaces'
-SYSVIPC must therefore NOT run on 6.6 (its 24 bytes do not fit; the
-build.yml gates the DS step off for android15-6.6).
+Slot budget (GKI 6.6): sched_entity has 4 free reserves, all consumed
+(2 scalars + 16 bytes of child_burst). task_struct spends 3 of its slots
+3-8 on group_burst; slots 6-8 stay stock for DroidSpaces - the DS 6.6
+patch does not consume task_struct KABI slots anyway (its SYSVIPC gap
+fix relocates sysvsem/sysvshm), so the two features coexist.
+
+NAMED-MEMBER INVARIANT: the cache payloads MUST be named members. The
+481e4486 draft shipped them as anonymous `struct { ... };` payloads -
+layout-assert green but nameless, so `se->child_burst` and `p->group_burst`
+resolved to nothing and run 38648460454 failed all 60 6.6 jobs at bore.c
+with "no member named 'child_burst' in 'struct sched_entity'". The
+post-splice verifier refuses to write a splice that drops either name.
 
 Every transform fails loudly on anchor misses instead of shipping a
 half-merged tree.
@@ -90,12 +103,8 @@ SE_RESERVES_NEW = (
     "\t_ANDROID_KABI_REPLACE(\n"
     "\t\tANDROID_KABI_RESERVE(3);\n"
     "\t\tANDROID_KABI_RESERVE(4),\n"
-    "\t\tstruct {\n"
-    "\t\t\tu64\ttimestamp;\n"
-    "\t\t\tspinlock_t\tlock;\n"
-    "\t\t\tu16\tcount;\n"
-    "\t\t\tu8\tscore;\n"
-    "\t\t});\n"
+    "\t\tstruct sched_burst_cache child_burst;\n"
+    "\t);\n"
     "#else\n"
     "\tANDROID_KABI_RESERVE(1);\n"
     "\tANDROID_KABI_RESERVE(2);\n"
@@ -147,10 +156,12 @@ TS_TAIL_FORMS = [
 ]
 
 DS_CONFLICT_MSG = (
-    "DroidSpaces SYSVIPC occupies task_struct slots 3-5 on this tree; the\n"
-    "6.6 burst state needs slots 3-8 inline and the two features cannot\n"
-    "coexist (84 bytes of payload vs an 80-byte slot budget). Disable the\n"
-    "DS feature for android15-6.6 builds (build.yml gates it off)."
+    "DroidSpaces SYSVIPC occupies task_struct slots 3-5 on this tree, but\n"
+    "the DS-combo group_burst payload needs those slots. The current DS\n"
+    "6.6 patch (SYSVIPC gap fix) consumes no task_struct KABI slots, so\n"
+    "this firing means a PRE-COMBO DS patch ran (the old 3-4-5 sysvshm\n"
+    "REPLACE). Reorder the patches or move one feature's slots; do not\n"
+    "ship a tree where the splice landed on top of the DS payload."
 )
 
 # task_struct: group_burst packed into slots 3-5 (16 of the 24 bytes).
@@ -165,12 +176,8 @@ TS_GROUP_NEW = (
     "\t\tANDROID_KABI_RESERVE(3);\n"
     "\t\tANDROID_KABI_RESERVE(4);\n"
     "\t\tANDROID_KABI_RESERVE(5),\n"
-    "\t\tstruct {\n"
-    "\t\t\tu64\ttimestamp;\n"
-    "\t\t\tspinlock_t\tlock;\n"
-    "\t\t\tu16\tcount;\n"
-    "\t\t\tu8\tscore;\n"
-    "\t\t});\n"
+    "\t\tstruct sched_burst_cache group_burst;\n"
+    "\t);\n"
     "#else\n"
     "\tANDROID_KABI_RESERVE(3);\n"
     "\tANDROID_KABI_RESERVE(4);\n"
@@ -269,12 +276,8 @@ def process(path: str) -> bool:
         "\t_ANDROID_KABI_REPLACE(\n"
         "\t\tANDROID_KABI_RESERVE(3);\n"
         "\t\tANDROID_KABI_RESERVE(4),\n"
-        "\t\tstruct {\n"
-        "\t\t\tu64\ttimestamp;\n"
-        "\t\t\tspinlock_t\tlock;\n"
-        "\t\t\tu16\tcount;\n"
-        "\t\t\tu8\tscore;\n"
-        "\t\t});\n"
+        "\t\tstruct sched_burst_cache child_burst;\n"
+        "\t);\n"
         "#else\n"
         "\tANDROID_KABI_RESERVE(1);\n"
         "\tANDROID_KABI_RESERVE(2);\n"
@@ -301,6 +304,10 @@ def process(path: str) -> bool:
         print(f"bore66-state: {path}: no known task_struct tail shape; "
               f"aborting", file=sys.stderr)
         return False
+    if matched is TS_TAIL_FORMS[3]:
+        print(f"bore66-state: {path}: {DS_CONFLICT_MSG}",
+              file=sys.stderr)
+        return False
 
     # DS-combo: only the RESERVE(3)(4)(5) triple is consumed (16 bytes of
     # group_burst in 24 bytes of slots). Slots 6-8 stay as-is - plain
@@ -317,6 +324,31 @@ def process(path: str) -> bool:
               file=sys.stderr)
         return False
     out = out[:r3_pos] + TS_GROUP_NEW + out[r3_pos + len(r3):]
+
+    # Post-splice verifier (named-member invariant). 481e4486's draft
+    # payloads were layout-green but ANONYMOUS - `se->child_burst` and
+    # `p->group_burst` resolved to nothing and run 38648460454 failed
+    # all 60 6.6 jobs at bore.c with "no member named ...". Both caches
+    # MUST ship as NAMED `struct sched_burst_cache` members or neither
+    # the accessors nor the `struct sched_burst_cache *` helper params
+    # can resolve. Fail loudly instead of writing a broken tree.
+    checks = {
+        "sched_entity child_burst payload missing":
+            "\t\tstruct sched_burst_cache child_burst;\n" not in out,
+        "task_struct group_burst payload missing":
+            "\t\tstruct sched_burst_cache group_burst;\n" not in out,
+        "packed 16-byte sched_burst_cache def missing":
+            struct_def_new not in out,
+        "inline burst fields still present":
+            SE_FIELDS_OLD in out,
+        "splice markers not exactly 2":
+            out.count(MARK) != 2,
+    }
+    bad = [k for k, v in checks.items() if v]
+    if bad:
+        print(f"bore66-state: {path}: post-splice verifier FAILED "
+              f"({'; '.join(bad)}); NOT writing", file=sys.stderr)
+        return False
 
     with open(path, "w", encoding="utf-8", errors="surrogateescape") as fh:
         fh.write(out)
