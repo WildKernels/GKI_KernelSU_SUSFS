@@ -85,7 +85,8 @@ runs:
             --config=fast \
             "${PAGE_SIZE_FLAGS[@]}" \
             --disk_cache=/home/runner/.cache/bazel \
-            //common:kernel_aarch64/Image
+            //common:kernel_aarch64/Image \
+            //common:gki_system_dlkm_modules
         fi
 
     - name: 'Verify Page Size in Generated .config'
@@ -148,12 +149,20 @@ runs:
         if [ -f "bazel-bin/common/kernel_aarch64/Image" ]; then
           echo "Found Image at bazel-bin/common/kernel_aarch64/Image"
           cp "bazel-bin/common/kernel_aarch64/Image" "${{ github.workspace }}/AnyKernel3/Image"
-          exit 0
-        fi
-        if [ -f "/home/runner/out/dist/Image" ]; then
+        elif [ -f "/home/runner/out/dist/Image" ]; then
           echo "Found Image at /home/runner/out/dist/Image"
           cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Image"
-          exit 0
+        else
+          exit 1
         fi
 
-        exit 1
+        # houji: collect freshly-built system_dlkm modules (zram/zsmalloc with LZ4KD)
+        ZRAM_OUT=$(find bazel-bin/common /home/runner/out -type f \( -name 'zram.ko' -o -name 'zsmalloc.ko' \) 2>/dev/null | head -5 || true)
+        if [ -n "$ZRAM_OUT" ]; then
+          mkdir -p "${{ github.workspace }}/AnyKernel3/system_dlkm_modules"
+          echo "$ZRAM_OUT" | while read -r ko; do cp "$ko" "${{ github.workspace }}/AnyKernel3/system_dlkm_modules/"; done
+          ls -la "${{ github.workspace }}/AnyKernel3/system_dlkm_modules/"
+        else
+          echo "WARNING: no zram/zsmalloc .ko found in build output" >&2
+        fi
+        exit 0
