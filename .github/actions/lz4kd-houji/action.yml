@@ -40,31 +40,12 @@ runs:
           echo "CONFIG_LZ4KD_COMPRESS=y"
           echo "CONFIG_LZ4KD_DECOMPRESS=y"
           echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"
-          # Build zram into the kernel (was =m). The stock vendor zram.ko from
-          # system_dlkm then fails to insmod (symbols already present) and init
-          # skips it harmlessly; the in-kernel zram with lz4kd is used instead.
-          echo "CONFIG_ZRAM=y"
-          echo "CONFIG_ZSMALLOC=y"
-          # Power: run kworkers on power-efficient CPUs by default (stock leaves
-          # this off; upstream default recommendation, no KMI impact).
-          echo "CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y"
+          # v5: ZRAM stays =m (stock GKI). Building it in (=y) changes symbol
+          # CRCs and breaks all 497 vendor modules -> early-boot bootloop
+          # (proven by v3/v4). Algorithm compression is instead provided by
+          # the crypto registrations above, and zram0's algorithm is chosen
+          # via the perfinit-lz4 companion module (bind perfinit.conf).
         } >> arch/arm64/configs/gki_defconfig
-
-        # kleaf's modules.bzl lists zram/zsmalloc as expected .ko outputs;
-        # with them built-in (=y) those files never appear, so drop them from
-        # the list or the KernelBuild post-step fails with "Unable to find".
-        echo "[+] removing zram/zsmalloc from modules.bzl"
-        BZL=""
-        for cand in modules.bzl ../modules.bzl ../../modules.bzl build/kernel/kleaf/modules.bzl; do
-          [ -f "$cand" ] && BZL="$cand" && break
-        done
-        if [ -n "$BZL" ]; then
-          sed -i '\#drivers/block/zram/zram.ko#d; \#mm/zsmalloc.ko#d' "$BZL"
-          echo "[+] patched $BZL"
-        else
-          echo "[warn] modules.bzl not found; searching"
-          find .. ../.. -maxdepth 3 -name modules.bzl 2>/dev/null || true
-        fi
 
         echo "[+] LZ4KD applied"
     - name: Skip on non-6.1
