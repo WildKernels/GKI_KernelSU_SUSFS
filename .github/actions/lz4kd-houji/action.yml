@@ -45,6 +45,9 @@ runs:
           # skips it harmlessly; the in-kernel zram with lz4kd is used instead.
           echo "CONFIG_ZRAM=y"
           echo "CONFIG_ZSMALLOC=y"
+          # Power: run kworkers on power-efficient CPUs by default (stock leaves
+          # this off; upstream default recommendation, no KMI impact).
+          echo "CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y"
         } >> arch/arm64/configs/gki_defconfig
 
         # kleaf's modules.bzl lists zram/zsmalloc as expected .ko outputs;
