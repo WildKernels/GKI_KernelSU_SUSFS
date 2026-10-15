@@ -72,6 +72,11 @@ on:
         required: false
         type: boolean
         default: true
+      bore_variant:
+        description: "BORE patch generation for 6.6: 5.9.6 (default) or 5.1.0 (kABI-slot relocatable, boot-test A/B)"
+        required: false
+        type: string
+        default: "5.9.6"
       allow_version_mismatch:
         required: false
         type: boolean
@@ -427,6 +432,7 @@ jobs:
       with:
         kernel_version: ${{ inputs.kernel_version }}
         sublevel: ${{ inputs.sublevel }}
+        variant: ${{ inputs.bore_variant || '5.9.6' }}
 
     - name: Enable BPF Stack (BTF + eBPF + FUSE-BPF)
       if: contains(inputs.feature_set, 'BPF')

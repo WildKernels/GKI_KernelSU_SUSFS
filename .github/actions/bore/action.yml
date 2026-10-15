@@ -11,6 +11,11 @@ inputs:
     required: false
     type: string
     default: ''
+  variant:
+    description: 'BORE patch generation for 6.6: 5.9.6 (default, inline sched_burst_cache) or 5.1.0 (5.1.0-era scalars, kABI-slot relocatable)'
+    required: false
+    type: string
+    default: '5.9.6'
 
 runs:
   using: 'composite'
@@ -54,7 +59,19 @@ runs:
             # NOTE: lives in the action dir, NOT kernel_patches/ - the
             # setup step wipes kernel_patches/ and re-clones the separate
             # WildKernels/kernel_patches repo before this action runs.
-            URL=".github/actions/bore/patches/0001-linux6.6.67-bore-5.9.6.patch"
+            # Two vendored generations:
+            #   5.9.6 (default) - inline 24-byte sched_burst_cache members;
+            #     needs the out-of-line bore_state design below to keep the
+            #     KMI stock.
+            #   5.1.0 - 5.1.0-generation scalars (burst_time + four u8s +
+            #     child_burst_cnt/last_cached), exactly the shape the
+            #     6.1-family kABI relocation script handles; selected with
+            #     the bore_variant=5.1.0 dispatch input for A/B boot tests.
+            if [ "${{ inputs.variant }}" = "5.1.0" ]; then
+              URL=".github/actions/bore/patches/0001-linux6.6.67-bore5.1.0.patch"
+            else
+              URL=".github/actions/bore/patches/0001-linux6.6.67-bore-5.9.6.patch"
+            fi
             URL_IS_LOCAL="true" ;;
           6.12|6.18)
             # The author promotes new BORE versions into patches/stable/
@@ -268,6 +285,26 @@ runs:
         # bore_state design instead, which is follow-up work; for now the
         # 6.6 tree is left with the inline fields so it builds, and this
         # step reports that loudly instead of failing the job.
+        #
+        # 6.6 + bore_variant=5.1.0 is the EXCEPTION: the 5.1.0-generation
+        # patch adds exactly the eight-scalar shape bore_kabi_612.py was
+        # written for, so bore66_510.py relocates it into sched_entity's
+        # four slots (flat anonymous-struct payloads - se->burst_time & co
+        # compile unchanged). Its reserve anchor is searched ONLY inside the
+        # sched_entity slice because on 6.6 the bare-}; closing form swaps
+        # between sched_entity and sched_rt_entity across sublevel eras; a
+        # whole-file match would splice sched_rt_entity on the flipped
+        # ones. The script aborts loudly on any anchor miss - a miss here
+        # means real drift and the job SHOULD fail, not build a silently
+        # shifted sched_entity.
+        if [ "${{ inputs.kernel_version }}" = "6.6" ] && \
+           [ "${{ inputs.variant }}" = "5.1.0" ]; then
+          python3 "${{ github.workspace }}/.github/scripts/bore66_510.py" \
+            include/linux/sched.h
+          grep -A9 'bore-kabi: burst_' include/linux/sched.h | head -10 || true
+          exit 0
+        fi
+
         python3 "${{ github.workspace }}/.github/scripts/bore_kabi_612.py" \
           include/linux/sched.h || rc=$?
         if [ "${rc:-0}" != "0" ]; then
@@ -600,6 +637,31 @@ runs:
 
         echo "=== repaired block ==="
         sed -n "$((SLICE_LINE-2)),$((EXPORT_LINE+3))p" kernel/sched/fair.c
+
+    - name: Fix 6.6 sysctl reject (5.1.0 variant)
+      # bore_variant=5.1.0's sysctl hunk also rejects on GKI 6.6 (it targets
+      # upstream 750000ULL declarations; GKI has 700000ULL + an
+      # EXPORT_SYMBOL_GPL between them), leaving the BORE uses of
+      # sysctl_sched_min_base_slice / configured_sched_base_slice undeclared.
+      # bore66_510_sysctl.py rewrites the WHOLE declaration region from exact
+      # anchors into one canonical #ifdef block: BORE arm gets
+      # tunable_scaling=NONE, base_slice=1s/HZ, configured_ + min_base_slice
+      # (2ms); #else keeps Android's 700000ULL literals verbatim with
+      # normalized_ scoped INSIDE it (nothing under CONFIG_SCHED_BORE reads
+      # it on 6.6 - its only reader is the #else update_sysctl); the export
+      # stays outside the ifdef. Idempotent and anchor-checked: any drift
+      # fails the job instead of half-merging. On the default 5.9.6 variant
+      # the declaration marker is absent and this no-ops; the step above
+      # likewise no-ops on a 5.1.0 tree (it keys on nsecs_per_tick, which
+      # the 5.1.0 generation never uses).
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        python3 "${{ github.workspace }}/.github/scripts/bore66_510_sysctl.py" \
+          kernel/sched/fair.c
+        echo "=== repaired region (5.1.0 variant) ==="
+        sed -n '/Minimal preemption granularity for CPU-bound tasks:/,/EXPORT_SYMBOL_GPL(sysctl_sched_base_slice)/p' kernel/sched/fair.c
 
     - name: Fix fuzz-spliced update_curr_bore block (6.12/6.18 7.0.0)
       # BORE 7.0.0's update_curr() hunk was cut against the author's 6.12.37

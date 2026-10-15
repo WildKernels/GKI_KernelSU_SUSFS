@@ -96,6 +96,11 @@ on:
         required: false
         type: string
         default: "4k"
+      bore_variant:
+        description: "BORE patch generation for 6.6: 5.9.6 (default) or 5.1.0 (kABI-slot relocatable, boot-test A/B)"
+        required: false
+        type: string
+        default: "5.9.6"
 
 jobs:
   generate-matrix:
@@ -350,6 +355,7 @@ jobs:
       brand_name: ${{ inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi }}
       use_bore: ${{ inputs.use_bore }}
+      bore_variant: ${{ inputs.bore_variant || '5.9.6' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size }}
