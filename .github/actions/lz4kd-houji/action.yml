@@ -51,8 +51,17 @@ runs:
         # with them built-in (=y) those files never appear, so drop them from
         # the list or the KernelBuild post-step fails with "Unable to find".
         echo "[+] removing zram/zsmalloc from modules.bzl"
-        sed -i '\#drivers/block/zram/zram.ko#d; \#mm/zsmalloc.ko#d' common/modules.bzl
-        grep -c "zram.ko\|zsmalloc.ko" common/modules.bzl || true
+        BZL=""
+        for cand in modules.bzl ../modules.bzl ../../modules.bzl build/kernel/kleaf/modules.bzl; do
+          [ -f "$cand" ] && BZL="$cand" && break
+        done
+        if [ -n "$BZL" ]; then
+          sed -i '\#drivers/block/zram/zram.ko#d; \#mm/zsmalloc.ko#d' "$BZL"
+          echo "[+] patched $BZL"
+        else
+          echo "[warn] modules.bzl not found; searching"
+          find .. ../.. -maxdepth 3 -name modules.bzl 2>/dev/null || true
+        fi
 
         echo "[+] LZ4KD applied"
     - name: Skip on non-6.1
