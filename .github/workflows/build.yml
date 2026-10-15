@@ -720,6 +720,10 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
+        # zram is now built into the kernel (CONFIG_ZRAM=y); module replacement
+        # on EROFS is neither possible nor needed. Kept as a no-op guard.
+        echo "zram built-in; skipping system_dlkm module replacement"
+        exit 0
         AK3="${{ github.workspace }}/AnyKernel3"
         [ -d "$AK3/system_dlkm_modules" ] || { echo "no system_dlkm_modules, skip"; exit 0; }
         python3 - "$AK3/anykernel.sh" <<'PYEOF'

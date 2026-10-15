@@ -40,6 +40,11 @@ runs:
           echo "CONFIG_LZ4KD_COMPRESS=y"
           echo "CONFIG_LZ4KD_DECOMPRESS=y"
           echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"
+          # Build zram into the kernel (was =m). The stock vendor zram.ko from
+          # system_dlkm then fails to insmod (symbols already present) and init
+          # skips it harmlessly; the in-kernel zram with lz4kd is used instead.
+          echo "CONFIG_ZRAM=y"
+          echo "CONFIG_ZSMALLOC=y"
         } >> arch/arm64/configs/gki_defconfig
 
         echo "[+] LZ4KD applied"
