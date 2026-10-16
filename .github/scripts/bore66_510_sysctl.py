@@ -84,6 +84,22 @@ def main():
         return 1
     # Back up to the start of the comment line containing the anchor.
     region_start = src.rfind("\n", 0, open_pos) + 1
+    # The anchor sits INSIDE the stock comment block, several lines below
+    # its '/*' opener (upstream carries a header line + a ' *' separator
+    # above the SCHED_TUNABLESCALING list). Find the comment's opener
+    # semantically: the nearest '/*' before the anchor with no '*/' in
+    # between is by construction the opener of the comment containing the
+    # anchor. Replacing from the anchor alone strands that opener, and the
+    # replacement's own '/*' then fires -Werror=-Wcomment '/*' within
+    # block comment (run 38817841766, fair.c:97).
+    prev_open = src.rfind("/*", 0, open_pos)
+    if prev_open >= 0 and "*/" not in src[prev_open:open_pos]:
+        candidate = src.rfind("\n", 0, prev_open) + 1
+        # Only rewrite from the opener when it starts its own line (the
+        # stock shape); a mid-line hit means something exotic - keep the
+        # line-level region in that case and let the balance check speak.
+        if src[candidate:prev_open].strip() == "":
+            region_start = candidate
     # Walk forward to the END of the normalized_... line.
     close_pos = src.find(CLOSE_PREFIX, open_pos)
     if close_pos < 0:
@@ -106,6 +122,50 @@ def main():
         return 1
 
     out = src[:region_start] + BORE_ARM + "\n" + src[region_end:]
+
+    # Post-write sanity: the rewrite touches a comment block, so verify the
+    # file has no UNCLOSED comment (nesting must be 0 at EOF - C comments
+    # do not nest, so depth>0 at EOF means an opener with no closer; the
+    # stranded-opener class is instead caught by -Wcomment, which the
+    # region-TU syntax gate and CI both run).
+    depth = 0
+    i, n = 0, len(out)
+    state = "code"  # code | line_comment | block_comment | str | char
+    while i < n:
+        c = out[i]
+        nxt = out[i + 1] if i + 1 < n else ""
+        if state == "code":
+            if c == "/" and nxt == "/":
+                state = "line_comment"; i += 2; continue
+            if c == "/" and nxt == "*":
+                depth += 1; state = "block_comment"; i += 2; continue
+            if c == '"':
+                state = "str"; i += 1; continue
+            if c == "'":
+                state = "char"; i += 1; continue
+        elif state == "line_comment":
+            if c == "\n":
+                state = "code"
+        elif state == "block_comment":
+            if c == "*" and nxt == "/":
+                depth -= 1; state = "code"; i += 2; continue
+        elif state == "str":
+            if c == "\\":
+                i += 2; continue
+            if c == '"':
+                state = "code"
+        elif state == "char":
+            if c == "\\":
+                i += 2; continue
+            if c == "'":
+                state = "code"
+        i += 1
+    if depth != 0:
+        print(f"bore66-510-sysctl: FATAL comment nesting {depth} at EOF after "
+              f"rewrite - region boundaries are wrong, not writing",
+              file=sys.stderr)
+        return 1
+
     with open(path, "w", encoding="utf-8", errors="surrogateescape") as fh:
         fh.write(out)
     print("bore66-510-sysctl: rebuilt sysctl declaration region "
