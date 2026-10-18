@@ -639,6 +639,7 @@ runs:
         sed -n "$((SLICE_LINE-2)),$((EXPORT_LINE+3))p" kernel/sched/fair.c
 
     - name: Fix 6.6 sysctl reject (5.1.0 variant)
+      if: inputs.variant == '5.1.0'
       # bore_variant=5.1.0's sysctl hunk also rejects on GKI 6.6 (it targets
       # upstream 750000ULL declarations; GKI has 700000ULL + an
       # EXPORT_SYMBOL_GPL between them), leaving the BORE uses of

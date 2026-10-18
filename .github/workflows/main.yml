@@ -884,7 +884,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
-      use_bore: ${{ inputs.use_bore || true }}
+      use_bore: ${{ inputs.use_bore || github.event_name == 'schedule' }}
       bore_variant: ${{ inputs.bore_variant || '5.9.6' }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
@@ -917,7 +917,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
-      use_bore: ${{ inputs.use_bore || true }}
+      use_bore: ${{ inputs.use_bore || github.event_name == 'schedule' }}
       bore_variant: ${{ inputs.bore_variant || '5.9.6' }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
@@ -950,7 +950,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
-      use_bore: ${{ inputs.use_bore || true }}
+      use_bore: ${{ inputs.use_bore || github.event_name == 'schedule' }}
       bore_variant: ${{ inputs.bore_variant || '5.9.6' }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
@@ -983,7 +983,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
-      use_bore: ${{ inputs.use_bore || true }}
+      use_bore: ${{ inputs.use_bore || github.event_name == 'schedule' }}
       bore_variant: ${{ inputs.bore_variant || '5.9.6' }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
@@ -1016,7 +1016,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
-      use_bore: ${{ inputs.use_bore || true }}
+      use_bore: ${{ inputs.use_bore || github.event_name == 'schedule' }}
       bore_variant: ${{ inputs.bore_variant || '5.9.6' }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
@@ -1049,7 +1049,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
-      use_bore: ${{ inputs.use_bore || true }}
+      use_bore: ${{ inputs.use_bore || github.event_name == 'schedule' }}
       bore_variant: ${{ inputs.bore_variant || '5.9.6' }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
@@ -1082,7 +1082,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
-      use_bore: ${{ inputs.use_bore || true }}
+      use_bore: ${{ inputs.use_bore || github.event_name == 'schedule' }}
       bore_variant: ${{ inputs.bore_variant || '5.9.6' }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
