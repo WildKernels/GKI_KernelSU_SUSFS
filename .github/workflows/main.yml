@@ -241,21 +241,18 @@ jobs:
           # NoMount: dev tip (2026-10-20, "kernel: use store_release for
           # d_flags in nm_hijack_dentry_ops"; module-side only, no kernel contract).
           PIN_NOMOUNT="e240bb031820fd3f7de5dadb007281b33bb70634"
-          # KernelSU: official main tip (46636100, 2026-10-20,
-          # "manager: remove DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION (#3927)").
-          # The susfs patch (10_enable_susfs_for_ksu) was verified to apply at
-          # the old 0c0fdb96 pin; this tip is several manager commits ahead of
-          # that layout - re-confirm the patch applies before relying on this
-          # pin for susfs/root builds. BBG is kernel-side and unaffected.
-          PIN_KERNELSU="4663610011d03771a64e7c36a2aa65bd1794022d"
-          # BakaSU: official main tip (2026-10-20,
-          # "manager: support multiple module repositories, one-shot scripts and
-          # other minimal fixes (#600)"). Advanced per user request to track
-          # latest despite the fa12ffd fake_state removal - the 5 older branches
-          # (12-5.10/13-5.10/13-5.15/14-5.15/14-6.1) fs patches reference
-          # `fake_state` and will fail to link with latest BakaSU; 6.6/6.12 are
-          # unaffected. Watch those 5 families for build failures.
-          PIN_BAKASU="dac2d186406a0d2b0ce3c67cad5a1fa1adbf9f4d"
+          # KernelSU: official main (0c0fdb96, 2026-10-12).
+          # Reverted from 46636100 (2026-10-20): that commit uses close_fd()
+          # in drivers/kernelsu/preinit/preinit.c, which is unavailable on the
+          # older 5.10 GKI sublevels (android12-5-10, android13-5-10) -> build
+          # fails with implicit declaration [-Werror]. Keep the verified pin.
+          PIN_KERNELSU="0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d"
+          # BakaSU: 9097b1a (2026-10-11, = fa12ffd^, newest BakaSU that still
+          # defines+populates fake_state). Reverted from dac2d186 (2026-10-20):
+          # latest BakaSU removed struct selinux_state fake_state, and the fs
+          # patches on 12-5.10/13-5.10/13-5.15/14-5.15/14-6.1 still reference
+          # it under CONFIG_KSU_SUSFS -> link failure on those 5 branches.
+          PIN_BAKASU="9097b1a1c6c889756201bbc5713a84a9b23f7908"
           # SukiSU-Ultra: builtin tip (2026-10-21,
           # "kernel: switch sig_fallback hook from weak symbol to static_call");
           # defines fake_state itself, calls the susfs_def.h no_su API -> OK on tips.
