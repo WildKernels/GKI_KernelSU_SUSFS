@@ -68,7 +68,7 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        bash "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/apply.sh" FinaSU
+        bash "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/apply.sh" FinaSU "${{ inputs.version }}" "${{ inputs.sublevel }}"
 
         # Old-model completion: when the 10_enable selinux_hide rewrite partially
         # applies, the file can end up without fake_state entirely, while the
