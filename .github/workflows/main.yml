@@ -4,10 +4,6 @@ permissions:
   contents: write
   actions: write
 
-concurrency:
-  group: build-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: false
-
 on:
   workflow_dispatch:
     inputs:
@@ -1439,9 +1435,6 @@ jobs:
           echo "announced ${sent} message(s)"
 
   update-verified-pins:
-    concurrency:
-      group: update-verified-pins-${{ github.repository }}
-      cancel-in-progress: false
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.commit_mode == 'update'"
     runs-on: ubuntu-latest
     permissions:

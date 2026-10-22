@@ -92,13 +92,6 @@ jobs:
     name: "${{ inputs.kernel_version }}.${{ inputs.sublevel }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ inputs.variant }})"
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    concurrency:
-      # Must include every input that varies across matrix legs. Without
-      # sublevel/variant/page_size, several distinct builds collide on one key
-      # and, with cancel-in-progress: false, queue behind each other instead of
-      # running in parallel — one kernel compiles at a time.
-      group: build-${{ inputs.root_flavor }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size }}
-      cancel-in-progress: false
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7

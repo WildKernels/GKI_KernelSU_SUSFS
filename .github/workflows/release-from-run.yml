@@ -18,10 +18,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: release-from-run
-  cancel-in-progress: false
-
 jobs:
   release:
     runs-on: ubuntu-latest
