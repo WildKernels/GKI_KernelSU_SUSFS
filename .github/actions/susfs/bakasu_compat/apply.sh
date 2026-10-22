@@ -50,7 +50,9 @@ cat > "$BAKASU_KSU/bakasu_susfs_compat.c" <<'COMPAT'
  */
 
 #include <linux/fs.h>
-#include <linux/binprm.h>
+
+struct filename;
+struct user_arg_ptr;
 
 /* ------------------------------------------------------------------ */
 /* my_write_context / my_write_access                                 */
