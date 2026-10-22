@@ -276,7 +276,8 @@ jobs:
                 mkdir -p "${STOCK_DIR}/heads"
                 printf '%s' "$CUR_HEAD" > "${STOCK_DIR}/heads/${KVER}.head"
               else
-                echo "::warning title=stock-configs::could not fetch stock config for ${KVER} — build legs will fall back to a live download"
+                echo "::error title=stock-configs::could not fetch stock config for ${KVER} — required, not optional" >&2
+                exit 1
               fi
             fi
             if [ "$PAGE_SIZE" = "16k" ]; then
@@ -290,7 +291,8 @@ jobs:
                   mkdir -p "${STOCK_DIR}/heads"
                   printf '%s' "$CUR_HEAD" > "${STOCK_DIR}/heads/${KVER}_16k.head"
                 else
-                  echo "::warning title=stock-configs::could not fetch 16k stock config for ${KVER} — build legs will fall back to a live download"
+                  echo "::error title=stock-configs::could not fetch 16k stock config for ${KVER} — required, not optional" >&2
+                  exit 1
                 fi
               fi
             fi
