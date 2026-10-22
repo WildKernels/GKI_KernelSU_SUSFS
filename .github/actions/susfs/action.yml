@@ -121,6 +121,20 @@ runs:
           && grep -q "^KSU_SECOND_SIGNATURE_RELEASE := 1" FinaSU/kernel/Kbuild \
           || { echo "ERROR: Kbuild cert injection failed (anchor missing)" >&2; exit 1; }
 
+    - name: Enable SUSFS for BakaSU
+      # BakaSU carries SUSFS but ships my_write_context/my_write_access as
+      # static and lacks my_setprocattr + preinit functions that the susfs4ksu
+      # 50_add_susfs_in_gki patch extern-declares. This compat layer makes the
+      # symbols global and adds preinit support so the link succeeds.
+      if: inputs.root_flavor == 'bakasu'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      env:
+        SUSFS4KSU: ${{ github.workspace }}/susfs4ksu
+      run: |
+        set -euo pipefail
+        bash "$GITHUB_WORKSPACE/.github/actions/susfs/bakasu_compat/apply.sh" BakaSU "${{ inputs.version }}" "${{ inputs.sublevel }}"
+
     - name: Enable SUSFS Kernel Configs
       uses: ./.github/actions/susfs-config
 
