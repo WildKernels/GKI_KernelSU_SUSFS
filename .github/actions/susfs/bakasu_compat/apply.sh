@@ -6,9 +6,9 @@
 #   my_setprocattr                     (doesn't exist; BakaSU uses ksu_handle_selinux_setprocattr)
 #   ksu_setup_preinit_file, ksu_preinit_handle_post_execveat  (no preinit dir)
 #
-# Instead of patching selinux_hide.c (fragile, may be reverted by later steps),
-# we ship a standalone compat object that defines all five symbols globally.
-# The SUSFS patch's extern declarations resolve against this object.
+# We drop bakasu_susfs_compat.c directly into kernel/BakaSU/kernel/ (the
+# directory symlinked into common/drivers/kernelsu/) and add it to
+# kernelsu-objs in Kbuild so it's compiled and linked into vmlinux.
 
 set -eo pipefail
 
@@ -19,12 +19,19 @@ KSU_VERSION="${2:-}"
 KSU_SUBLEVEL="${3:-}"
 
 BAKASU_KSU="$KERNEL_ROOT/$KSU_DIR/kernel"
-COMPAT_DIR="$BAKASU_KSU/susfs_compat"
+BAKASU_KBUILD="$BAKASU_KSU/Kbuild"
 
-mkdir -p "$COMPAT_DIR"
+[ -f "$BAKASU_KSU/feature/selinux_hide.c" ] || {
+  echo "::error::BakaSU selinux_hide.c not found at $BAKASU_KSU/feature/selinux_hide.c" >&2
+  exit 1
+}
+[ -f "$BAKASU_KBUILD" ] || {
+  echo "::error::BakaSU Kbuild not found at $BAKASU_KBUILD" >&2
+  exit 1
+}
 
 # compat.c: defines all SUSFS-expected symbols that BakaSU lacks
-cat > "$COMPAT_DIR/bakasu_susfs_compat.c" <<'COMPAT'
+cat > "$BAKASU_KSU/bakasu_susfs_compat.c" <<'COMPAT'
 /* BakaSU SUSFS compat: global symbol definitions for SUSFS patch extern refs.
  *
  * BakaSU ships my_write_context/my_write_access as static in selinux_hide.c
@@ -51,7 +58,6 @@ cat > "$COMPAT_DIR/bakasu_susfs_compat.c" <<'COMPAT'
 /* my_write_context / my_write_access                                 */
 /*   Provided globally for selinuxfs.c handle_sel_write_context /     */
 /*   handle_sel_write_access (added by SUSFS 50_add_susfs patch).     */
-/*   Logic mirrors KernelSU's selinux_hide.c implementation.          */
 /* ------------------------------------------------------------------ */
 
 ssize_t my_write_context(struct file *file, char *buf, size_t size)
@@ -60,9 +66,7 @@ ssize_t my_write_context(struct file *file, char *buf, size_t size)
     u32 sid, len;
     ssize_t length;
 
-    /* apply to all app uids */
     if (likely(ksu_get_uid_t(current_uid()) < 10000)) {
-        /* fall through to original behavior via sel_write_context */
         return -EINVAL; /* caller (handle_sel_write_context) falls back to sel_write_context */
     }
 
@@ -151,15 +155,10 @@ out:
 /* my_setprocattr                                                     */
 /*   Provided globally for hooks.c handle_selinux_setprocattr         */
 /*   (added by SUSFS 50_add_susfs patch).                             */
-/*   Wraps BakaSU's ksu_handle_selinux_setprocattr when available,    */
-/*   otherwise falls through to the original setprocattr.             */
 /* ------------------------------------------------------------------ */
 
 int my_setprocattr(const char *name, void *value, size_t size)
 {
-    /* BakaSU's ksu_handle_selinux_setprocattr may be conditionally
-     * compiled out (KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE). When
-     * available, delegate to it; otherwise return 0 (allow). */
 #if defined(KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE)
     return 0;
 #else
@@ -197,10 +196,14 @@ int ksu_preinit_handle_post_execveat(int *fd, struct filename **filename_ptr,
 }
 COMPAT
 
-# Kbuild: compile the compat object into drivers/kernelsu
-cat > "$COMPAT_DIR/Kbuild" <<'KBUILD'
+# Register compat object in Kbuild
+if ! grep -q 'bakasu_susfs_compat.o' "$BAKASU_KBUILD"; then
+  cat >> "$BAKASU_KBUILD" <<'KBUILD'
+
 # BakaSU SUSFS compat object
 obj-y += bakasu_susfs_compat.o
 KBUILD
+  echo "BakaSU compat: added obj-y to Kbuild"
+fi
 
-echo "BakaSU SUSFS compat layer applied (compat object + Kbuild)"
+echo "BakaSU SUSFS compat layer applied (bakasu_susfs_compat.c + Kbuild)"
