@@ -39,12 +39,7 @@ runs:
         fi
         if [ "${{ inputs.sublevel }}" -le "117" ]; then
           echo "Applying fdinfo.c Android 12 5.10 Fake Patch"
-          perl -0777 -i -pe 's{(if \(inode\) {\n)\s*/\*.*?\n\s* \*/}{$1}gs; s/^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;\n}{}m' fs/notify/fdinfo.c
-          perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
-          perl -i -pe 's/mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          echo "Adding inotify_mark_user_mask function definition"
-          python3 -c 'import re;c=open("fs/notify/fdinfo.c").read();c=re.sub(r"^static void inotify_fdinfo\(struct seq_file \*m, struct fsnotify_mark \*mark\)$",lambda m:"static inline u32 inotify_mark_user_mask(struct fsnotify_mark *mark)\n{\n\treturn mark->mask & IN_ALL_EVENTS;\n}\n\n"+m.group(0),c,count=1,flags=re.MULTILINE);open("fs/notify/fdinfo.c","w").write(c)'
+          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_fdinfo.py" fs/notify/fdinfo.c
         fi
 
     - name: Apply Android 13 5.10 Fake Patches
@@ -55,12 +50,7 @@ runs:
         echo "Applying Android 13 5.10 SUSFS fixes"
         if [ "${{ inputs.sublevel }}" -le "107" ]; then
           echo "Applying fdinfo.c Android 13 5.10 Fake Patch"
-          perl -0777 -i -pe 's{(if \(inode\) {\n)\s*/\*.*?\n\s* \*/}{$1}gs; s/^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;\n}{}m' fs/notify/fdinfo.c
-          perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
-          perl -i -pe 's/mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          echo "Adding inotify_mark_user_mask function definition"
-          python3 -c 'import re;c=open("fs/notify/fdinfo.c").read();c=re.sub(r"^static void inotify_fdinfo\(struct seq_file \*m, struct fsnotify_mark \*mark\)$",lambda m:"static inline u32 inotify_mark_user_mask(struct fsnotify_mark *mark)\n{\n\treturn mark->mask & IN_ALL_EVENTS;\n}\n\n"+m.group(0),c,count=1,flags=re.MULTILINE);open("fs/notify/fdinfo.c","w").write(c)'
+          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_fdinfo.py" fs/notify/fdinfo.c
         fi
 
     - name: Apply Android 13 5.15 Fake Patches
@@ -75,12 +65,7 @@ runs:
           echo "Applying open.c Android 13 5.15 Fake Patch"
           sed -i '/^#include <linux\/compat.h>$/a #include <linux/mnt_idmapping.h>' fs/open.c
           echo "Applying fdinfo.c Android 13 5.15 Fake Patch"
-          perl -0777 -i -pe 's{(if \(inode\) {\n)\s*/\*.*?\n\s* \*/}{$1}gs; s/^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;\n}{}m' fs/notify/fdinfo.c
-          perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
-          perl -i -pe 's/mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          echo "Adding inotify_mark_user_mask function definition"
-          python3 -c 'import re;c=open("fs/notify/fdinfo.c").read();c=re.sub(r"^static void inotify_fdinfo\(struct seq_file \*m, struct fsnotify_mark \*mark\)$",lambda m:"static inline u32 inotify_mark_user_mask(struct fsnotify_mark *mark)\n{\n\treturn mark->mask & IN_ALL_EVENTS;\n}\n\n"+m.group(0),c,count=1,flags=re.MULTILINE);open("fs/notify/fdinfo.c","w").write(c)'
+          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_fdinfo.py" fs/notify/fdinfo.c
         fi
         # -ge 197 blocks stay disabled (context removal breaks SUSFS patch context)
 
