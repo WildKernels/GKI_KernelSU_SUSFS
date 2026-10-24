@@ -19,7 +19,7 @@ inputs:
   brand_name:
     description: 'Branding text appended to the version (e.g., Wild). Empty = stock version string.'
     required: false
-    default: Wild
+    default: Frostblade
   keep_kmi:
     description: 'Keep stock KMI generation suffix (e.g., -8) and append brand after it. Off = legacy hardcoded replace.'
     required: false
