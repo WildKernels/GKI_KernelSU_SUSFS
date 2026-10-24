@@ -68,7 +68,7 @@ runs:
           SKIP_EXT_MODULES=1 \
           SKIP_CP_KERNEL_HDR=1 \
           OUT_DIR="/home/runner/out" \
-          LTO=thin \
+          LTO=full \
           BUILD_CONFIG=common/build.config.gki.aarch64 \
           CC="/usr/bin/ccache clang" \
           CXX="/usr/bin/ccache clang++" \
