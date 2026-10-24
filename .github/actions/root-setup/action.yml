@@ -118,13 +118,6 @@ runs:
         config_list: |
           CONFIG_KSU=y
 
-    - name: Add close_fd compat shim for kernels < 5.15 (kernelsu preinit)
-      if: inputs.flavor == 'kernelsu'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        bash "${{ github.workspace }}/.github/scripts/close_fd_compat.sh" "${{ github.workspace }}/kernel"
-
     - name: Soften KernelSU-Next Kbuild config guard for mrproper
       if: inputs.flavor == 'next'
       shell: bash

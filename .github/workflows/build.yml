@@ -318,6 +318,25 @@ jobs:
           sublevel: ${{ steps.extract.outputs.sublevel }}
           root_flavor: ${{ inputs.root_flavor }}
 
+      - name: Restore ksu_close_fd for kernels < 5.15 (kernelsu preinit)
+        if: inputs.root_flavor == 'kernelsu' && (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'All')
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel
+        run: |
+          # SUSFS 10_enable patch rewrites ksu_close_fd(fd) -> close_fd(fd)
+          # in preinit.c. close_fd() is undeclared on kernels < 5.15.
+          # Restore ksu_close_fd(fd) which KernelSU defines via ksyscall(close, fd).
+          set -euo pipefail
+          for d in common/drivers/kernelsu drivers/kernelsu; do
+            F="${{ github.workspace }}/kernel/$d/preinit/preinit.c"
+            if [ -f "$F" ] && grep -qE '^[[:space:]]*close_fd\(fd\);' "$F"; then
+              sed -i 's/^\([[:space:]]*\)close_fd(fd);/\1ksu_close_fd(fd);/' "$F"
+              echo "Restored ksu_close_fd(fd) in $F"
+            else
+              echo "No bare close_fd(fd) in $F; skipping"
+            fi
+          done
+
       - name: Fix selinux_hide pointer-bool-conversion on 6.6+ (ALL branches)
         shell: bash
         run: |
