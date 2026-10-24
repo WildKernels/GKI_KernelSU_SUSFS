@@ -44,7 +44,7 @@ runs:
           CONFIG_TCP_CONG_WESTWOOD=y
           CONFIG_TCP_CONG_HTCP=y
           CONFIG_DEFAULT_BBR=y
-          CONFIG_DEFAULT_TCP_CONG="bbr"
+          CONFIG_DEFAULT_TCP_CONG="bbr3"
 
     - name: Enable Traffic Shaping (Qdisc) Configs
       uses: ./.github/actions/set-kernel-config
