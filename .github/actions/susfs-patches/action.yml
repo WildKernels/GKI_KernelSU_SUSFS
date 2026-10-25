@@ -138,7 +138,12 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
+        if [[ "${{ inputs.version }}" == "android16-6.12" ]]; then
+          python3 "${{ github.workspace }}/.github/scripts/apply_susfs_compat.py" \
+            "$PWD" "50_add_susfs_in_gki-${{ inputs.version }}.patch"
+        else
+          patch --batch --forward -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
+        fi
 
         # SUSFS's OPEN_REDIRECT code unconditionally calls VMA_PAD_START(), which
         # only exists on GKI branches that carry Google's page-size-migration
