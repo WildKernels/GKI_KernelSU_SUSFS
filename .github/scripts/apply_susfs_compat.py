@@ -38,10 +38,10 @@ def adapt_patch(patch, exec_source, mmu_source):
 
         elif section.startswith("diff --git a/fs/proc/task_mmu.c "):
             if "if (!vma_pages(vma))" in mmu_source:
-                if section.count(" \tif (!vma_data_pages(vma))\n") != 1:
+                if section.count(" \tif (!_data_pages())\n") != 1:
                     raise ValueError("unexpected show_smap SUSFS hunk")
                 section = section.replace(
-                    " \tif (!vma_data_pages(vma))\n", " \tif (!vma_pages(vma))\n", 1
+                    " \tif (!_data_pages())\n", " \tif (!_pages())\n", 1
                 )
 
             if old_rollup:
@@ -75,7 +75,7 @@ def guard_old_rollup(mmu_source):
         return (
             "#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
             f"{indent}if (!vma->vm_file || "
-            "!SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))\n"
+            "!(SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))))\n"
             "#endif\n"
             f"{indent}\tsmap_gather_stats(vma, &mss, {offset});"
         )
