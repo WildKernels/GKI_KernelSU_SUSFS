@@ -34,7 +34,7 @@ If the output does not identify the Android common-kernel generation, check the 
 The workflow currently exposes these families:
 
 | Workflow selection | Android common-kernel generation | Linux series |
-|---|---:|---:|
+| --- | ---: | ---: |
 | `5.10.x-android12` | Android 12 | 5.10 |
 | `5.10.x-android13` | Android 13 | 5.10 |
 | `5.15.x-android13` | Android 13 | 5.15 |
@@ -67,25 +67,25 @@ The matrix files under [`.github/config/`](../.github/config/) are the source of
 Recommended settings for a first build:
 
 | Input | Recommended value | Reason |
-|---|---|---|
+| --- | --- | --- |
 | Release Type | `Action` | Runs the build without creating a numbered `rN` release. It still replaces the fork's `nightly` prerelease. |
 | Use cache | `false` for the first build | Avoids creating cache releases while testing the fork. Enable it later to speed up repeat builds. |
 | Kernel Version | One exact family | Prevents an all-family fan-out. |
 | OS patch level | One unique date or `lts` | Selects one matrix row. A numeric sublevel can match multiple dates. |
 | Kernel Branding | Your short brand name | Changes the kernel's local version string. |
 | Commit mode | `verified` | Uses the project's verified component pins where pins are supported. |
-| Root Flavor | One implementation | Produces one kernel instead of KernelSU-Next, KernelSU, and ReSukiSU builds. `SukiSU-Ultra`, `KowSU`, and `No Root` are opt-in only and are not part of `All`. `KowSU` cannot be combined with SUSFS. |
+| Root Flavor | One implementation | Produces one kernel instead of KernelSU-Next, KernelSU, and BakaSU builds. `SukiSU-Ultra`, `KowSU`, `FinaSU`, and `No Root` are opt-in only and are not part of `All`. `KowSU` cannot be combined with SUSFS; `FinaSU` requires SUSFS. |
 | Feature toggles | Keep the defaults initially | Establishes a known baseline before customizing features. |
 | Test release notes | `false` | `true` skips the kernel builds and only previews release notes. |
 
-Root Flavor choices are `KernelSU-Next`, `KernelSU`, `ReSukiSU`, `SukiSU-Ultra`, `KowSU`, `No Root`, or `All`. `All` builds only KernelSU-Next, KernelSU, and ReSukiSU. `KowSU` always tracks the latest `master` tip and errors out if SUSFS is enabled. `No Root` produces a kernel with no root implementation (and no manager APK). Install the matching manager after flashing a rooted build; see [Post-install Setup](post-install.md).
+Root Flavor choices are `KernelSU-Next`, `KernelSU`, `BakaSU`, `SukiSU-Ultra`, `KowSU`, `FinaSU`, `No Root`, or `All`. `All` builds only KernelSU-Next, KernelSU, and BakaSU. `KowSU` always tracks the latest `master` tip and errors out if SUSFS is enabled. `FinaSU` is pinned in verified mode and errors out if SUSFS is disabled (its kernel hard-depends on the susfs headers). `No Root` produces a kernel with no root implementation (and no manager APK). Install the matching manager after flashing a rooted build; see [Post-install Setup](post-install.md).
 
 ### Example: Current Android 15 / Linux 6.6 LTS
 
 Use:
 
 | Input | Value |
-|---|---|
+| --- | --- |
 | Kernel Version | `6.6.x-android15` |
 | OS patch level | `lts` |
 | Commit mode | `verified` |
@@ -98,7 +98,7 @@ The workflow syncs `common-android15-6.6-lts` and reads the actual numeric `SUBL
 Use:
 
 | Input | Value |
-|---|---|
+| --- | --- |
 | Kernel Version | `6.1.x-android14` |
 | OS patch level | `118` or `2025-01` |
 | Commit mode | `verified` |

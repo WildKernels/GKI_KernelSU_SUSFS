@@ -1,4 +1,5 @@
 name: 'Restore Cache'
+description: "Restore cached build artifacts by key with prefix fallbacks"
 
 inputs:
   cache_path:
@@ -40,27 +41,27 @@ runs:
       run: |
         # Detect and Download Cache
         if [ "${{ inputs.debug }}" = "true" ]; then set -x; fi
-        
+
         cd "$GITHUB_WORKSPACE"
-        
+
         TAG_NAME="${{ inputs.cache_bucket }}"
         BASE_URL="https://github.com/${TARGET_REPO}/releases/download/$TAG_NAME"
         ASSETS_URL="https://github.com/${TARGET_REPO}/releases/expanded_assets/$TAG_NAME"
-        
+
         ARIA2_OPTS=(
           "-x16" "-s16" "-k1M" "-j5" "--file-allocation=none"
           "--header=User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
           "--header=Accept: */*"
           "--header=Connection: keep-alive"
         )
-        
+
         if [ "${{ inputs.debug }}" != "true" ]; then
           ARIA2_OPTS+=("--quiet" "--summary-interval=0" "--console-log-level=error")
         fi
-        
+
         echo "::group:: Fetching Asset List"
         HTTP_RESPONSE=$(curl -sL -A "Mozilla/5.0" --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 30 -w "%{http_code}" "$ASSETS_URL" -o assets.html || echo "404")
-        
+
         if [ "$HTTP_RESPONSE" -eq 200 ]; then
           ALL_ASSETS=$(grep -oP "download/$TAG_NAME/\K[^\"' ]+" assets.html | sort -u || echo "")
         else
@@ -68,7 +69,7 @@ runs:
           ALL_ASSETS=""
         fi
         rm -f assets.html
-        
+
         if [ -z "$ALL_ASSETS" ]; then
           echo "No assets found in bucket '$TAG_NAME'. Skipping search."
           echo "cache-hit=false" >> "$GITHUB_OUTPUT"

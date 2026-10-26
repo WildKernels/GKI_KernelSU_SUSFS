@@ -20,7 +20,7 @@ Generic kernels built on [Google's GKI sources](https://android.googlesource.com
 
 ## Features
 
-- **KernelSU / KernelSU-Next / ReSukiSU** — root implementations
+- **KernelSU / KernelSU-Next / BakaSU / FinaSU / Suki-SU Ultra / KowSU** — root implementations
 - **susfs4ksu** — root hiding (incl. Ptrace Leak Fix, Unicode Fix)
 - **NoMount / Mountify** — mount metamodules
 - **Baseband Guard** — partition protection
@@ -50,7 +50,7 @@ See **[Installation Guide](https://github.com/WildKernels/GKI_KernelSU_SUSFS/wik
 ## Our Projects
 
 | Device | Repository | Description |
-|--------|------------|-------------|
+| -------- | ------------ | ------------- |
 | **Multi** | [GKI_KernelSU_SUSFS](https://github.com/WildKernels/GKI_KernelSU_SUSFS) | Google GKI sources — built to be generic and work across many devices |
 | **Pixel** | [Sultan_KernelSU_SUSFS](https://github.com/WildKernels/Sultan_KernelSU_SUSFS) | Custom kernels for specific Pixel devices — built from Sultan sources |
 | **Samsung** | [Samsung_KernelSU_SUSFS](https://github.com/WildKernels/Samsung_KernelSU_SUSFS) | Built from Samsung sources and manifest |
@@ -65,7 +65,10 @@ See **[Installation Guide](https://github.com/WildKernels/GKI_KernelSU_SUSFS/wik
 - **KernelSU** — [tiann](https://github.com/tiann/KernelSU)
 - **KernelSU-Next** — [rifsxd](https://github.com/KernelSU-Next/KernelSU-Next)
 - **KernelSU-Next SUSFS Fork** — [pershoot](https://github.com/pershoot/KernelSU-Next)
-- **ReSukiSU** — [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU)
+- **BakaSU** (formerly ReSukiSU) — [BakaSU](https://github.com/Baka-SU/BakaSU)
+- **FinaSU** — [LyraVoid](https://github.com/LyraVoid/FinaSU)
+- **Suki-SU Ultra** — [SukiSU Ultra](https://github.com/sukisu-ultra/sukisu-ultra)
+- **KowSU** (KOWX712's KernelSU fork) — [KowSU](https://github.com/KOWX712/KernelSU)
 - **Magic-KSU** — [5ec1cff](https://github.com/5ec1cff/KernelSU)
 - **SUSFS** — [simonpunk](https://gitlab.com/simonpunk/susfs4ksu)
 - **SUSFS Module** — [sidex15](https://github.com/sidex15)

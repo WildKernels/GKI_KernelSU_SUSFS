@@ -1,4 +1,5 @@
 name: 'Save Cache'
+description: "Save cached build artifacts under an explicit key"
 
 inputs:
   cache_path:
@@ -47,26 +48,26 @@ runs:
       run: |
         # Archive, Split, and Upload Cache
         if [ "${{ inputs.debug }}" = "true" ]; then set -x; fi
-        
+
         if [ "${{ inputs.working_dir }}" != "" ]; then 
           cd "${{ inputs.working_dir }}"
         fi
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        
+
         TAG_NAME="${{ inputs.cache_bucket }}"
         BASE_FILENAME="cache-${{ inputs.cache_key }}"
-        
+
         if [ "${{ inputs.compression_level }}" -eq 0 ]; then
           FILENAME="$BASE_FILENAME.tar"
         else
           FILENAME="$BASE_FILENAME.tzst"
         fi
-        
+
         echo "::group:: Checking Release State"
-        
+
         git fetch --tags --force
-        
+
         if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
           echo "Tag '$TAG_NAME' not found. Creating backdated tag..."
           GIT_COMMITTER_DATE="2015-01-01T12:00:00" git tag -a "$TAG_NAME" -m "General Cache Storage"
@@ -94,10 +95,10 @@ runs:
           echo "Release '$TAG_NAME' already exists. Ready for upload."
         fi
         echo "::endgroup::"
-        
+
         echo "::group:: Archiving Path"
         echo "Target: ${{ inputs.cache_path }}"
-        
+
         if [ ! -d "${{ inputs.cache_path }}" ] && [ ! -f "${{ inputs.cache_path }}" ]; then
           echo "⚠️ Target path not found. Skipping cache save."
           echo "::endgroup::"

@@ -2,7 +2,7 @@
 
 After flashing a Wild Kernels GKI kernel, do these checks in order.
 
-## 1. Download matching manager — KernelSU / KernelSU-Next / ReSukiSU
+## 1. Download matching manager — KernelSU / KernelSU-Next / BakaSU / FinaSU / Suki-SU Ultra / KowSU
 
 - [ ] Download the `manager-apk-*` from the same [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases) page you got the kernel from.
 - [ ] Install / update it over any existing manager.
@@ -35,7 +35,7 @@ If you need to mount modules, install one:
 - **General issues** — try restarting your device.
 - **Bootloop** — restore a stock boot.img via fastboot/recovery.
 - **Manager and kernel version do not match (e.g. 31000 != 32000)** — install the latest kernel and manager from the release and reboot.
-- **Root not working** — ensure the manager matches the flashed flavor (KernelSU / KernelSU-Next / ReSukiSU).
+- **Root not working** — ensure the manager matches the flashed flavor (KernelSU / KernelSU-Next / ReSukiSU / FinaSU).
 
 </details>
 

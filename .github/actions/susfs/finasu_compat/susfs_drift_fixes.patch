@@ -1,0 +1,1085 @@
+diff --git a/kernel/core/init.c b/kernel/core/init.c
+index 7ddc0d78..94fc5d51 100644
+--- a/kernel/core/init.c
++++ b/kernel/core/init.c
+@@ -6,6 +6,7 @@
+ #include <linux/sched.h>
+ #include <linux/workqueue.h>
+ #include <linux/moduleparam.h>
++#include <linux/susfs.h>
+ 
+ #include "policy/allowlist.h"
+ #include "policy/app_profile.h"
+@@ -14,8 +15,6 @@
+ #include "manager/dynamic_manager.h"
+ #include "manager/manager_observer.h"
+ #include "manager/throne_tracker.h"
+-#include "hook/syscall_hook_manager.h"
+-#include "hook/lsm_hook.h"
+ #include "runtime/ksud.h"
+ #include "runtime/ksud_boot.h"
+ #include "feature/sulog.h"
+@@ -23,19 +22,12 @@
+ #include "ksu.h"
+ #include "infra/file_wrapper.h"
+ #include "selinux/selinux.h"
+-#include "hook/syscall_hook.h"
+ #include "feature/adb_root.h"
+ #include "feature/selinux_hide.h"
+ #include "feature/avc_spoof.h"
+-#include "infra/symbol_resolver.h"
++#include "hook/setuid_hook.h"
++#include "feature/sucompat.h"
+ 
+-#if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
+-#include <asm/cpufeature.h>
+-#include <linux/version.h>
+-#ifndef X86_FEATURE_INDIRECT_SAFE
+-#error "FATAL: Your kernel is missing the indirect syscall bypass patches!"
+-#endif
+-#endif
+ 
+ // workaround for A12-5.10 kernel
+ // Some third-party kernel (e.g. linegaeOS) uses wrong toolchain, which supports
+@@ -73,7 +65,6 @@ __attribute__((naked)) int __init kernelsu_init_early(void)
+ #endif
+ 
+ struct cred *ksu_cred;
+-bool ksu_late_loaded;
+ 
+ #ifdef CONFIG_KSU_DEBUG
+ bool allow_shell = true;
+@@ -85,35 +76,8 @@ module_param(allow_shell, bool, 0);
+ bool ksu_no_custom_rc = false;
+ module_param_named(norc, ksu_no_custom_rc, bool, 0);
+ 
+-#ifdef MODULE
+-bool ksu_bundled = false;
+-module_param_named(bundled, ksu_bundled, bool, 0);
+-#endif
+-
+ int __init kernelsu_init(void)
+ {
+-#if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
+-    // If the kernel has the hardening patch, X86_FEATURE_INDIRECT_SAFE must be set
+-    if (!boot_cpu_has(X86_FEATURE_INDIRECT_SAFE)) {
+-        pr_alert("*************************************************************");
+-        pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+-        pr_alert("**                                                         **");
+-        pr_alert("**        X86_FEATURE_INDIRECT_SAFE is not enabled!        **");
+-        pr_alert("**      KernelSU will abort initialization to prevent      **");
+-        pr_alert("**                     kernel panic.                       **");
+-        pr_alert("**                                                         **");
+-        pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+-        pr_alert("*************************************************************");
+-        return -ENOSYS;
+-    }
+-#endif
+-
+-#ifdef MODULE
+-    ksu_late_loaded = (current->pid != 1);
+-#else
+-    ksu_late_loaded = false;
+-#endif
+-
+ #ifdef CONFIG_KSU_DEBUG
+     pr_alert("*************************************************************");
+     pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+@@ -123,6 +87,7 @@ int __init kernelsu_init(void)
+     pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+     pr_alert("*************************************************************");
+ #endif
++
+     if (allow_shell) {
+         pr_alert("shell is allowed at init!");
+     }
+@@ -133,86 +98,48 @@ int __init kernelsu_init(void)
+         return -ENOSYS;
+     }
+ 
+-    ksu_init_symbol_resolver();
+-    ksu_syscall_hook_init();
++#ifdef CONFIG_KSU_SUSFS
++    susfs_init();
++#endif // #ifdef KSU_SUSFS
+ 
+     ksu_feature_init();
+-    ksu_sulog_init();
+-    ksu_adb_root_init();
+-    ksu_lsm_hook_init();
+-    ksu_selinux_hide_init();
+-    ksu_avc_spoof_init();
+ 
+     ksu_supercalls_init();
+-    ksu_app_profile_init();
+ 
+-    if (ksu_late_loaded) {
+-        pr_info("late load mode, skipping kprobe hooks\n");
++    ksu_sucompat_init();
+ 
+-        apply_kernelsu_rules();
+-        cache_sid();
+-        setup_ksu_cred();
++    ksu_setuid_hook_init();
+ 
+-        // Grant current process (ksud late-load) root
+-        // with KSU SELinux domain before enforcing SELinux, so it
+-        // can continue to access /data/app etc. after enforcement.
+-        escape_to_root_for_init();
+-
+-        ksu_allowlist_init();
+-        ksu_load_allow_list();
+-
+-        ksu_syscall_hook_manager_init();
+-
+-        ksu_throne_tracker_init();
+-#ifdef CONFIG_KSU_DYNAMIC_MANAGER
+-        ksu_dynamic_manager_init();
+-        ksu_dynamic_manager_load();
+-#endif
+-        ksu_observer_init();
+-        ksu_file_wrapper_init();
++    ksu_sulog_init();
+ 
+-        ksu_boot_completed = true;
+-        track_throne(false);
++    ksu_adb_root_init();
+ 
+-        if (!getenforce()) {
+-            pr_info("Permissive SELinux, enforcing\n");
+-            setenforce(true);
+-        }
++    ksu_selinux_hide_init();
+ 
+-    } else {
+-        ksu_syscall_hook_manager_init();
++    ksu_avc_spoof_init();
+ 
+-        ksu_allowlist_init();
++    ksu_allowlist_init();
+ 
+-        ksu_throne_tracker_init();
++    ksu_throne_tracker_init();
+ 
+ #ifdef CONFIG_KSU_DYNAMIC_MANAGER
+-        ksu_dynamic_manager_init();
++    ksu_dynamic_manager_init();
+ #endif
+ 
+-        ksu_ksud_init();
++    ksu_ksud_init();
+ 
+-        ksu_file_wrapper_init();
+-    }
++    ksu_file_wrapper_init();
+ 
+-#ifdef MODULE
+-#ifndef CONFIG_KSU_DEBUG
+-    kobject_del(&THIS_MODULE->mkobj.kobj);
+-#endif
+-#endif
+     return 0;
+ }
+ 
+ void __exit kernelsu_exit(void)
+ {
+-    // Phase 1: Stop all hooks first to prevent new callbacks
+-    ksu_syscall_hook_manager_exit();
+     ksu_avc_spoof_exit();
+ 
+     ksu_supercalls_exit();
+ 
+-    if (!ksu_late_loaded)
+-        ksu_ksud_exit();
++    ksu_ksud_exit();
+ 
+     // Wait for any in-flight RCU readers (e.g. handler traversing allow_list)
+     synchronize_rcu();
+@@ -229,9 +156,11 @@ void __exit kernelsu_exit(void)
+     ksu_allowlist_exit();
+ 
+     ksu_selinux_hide_exit();
+-    ksu_lsm_hook_exit();
++
+     ksu_adb_root_exit();
++
+     ksu_sulog_exit();
++
+     ksu_feature_exit();
+ 
+     put_cred(ksu_cred);
+diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
+index 033cab8d..ede4667c 100644
+--- a/kernel/feature/selinux_hide.c
++++ b/kernel/feature/selinux_hide.c
+@@ -1,6 +1,4 @@
+ #include "selinux_hide.h"
+-#include "infra/symbol_resolver.h"
+-#include "linux/jump_label.h"
+ #include "selinux/sepolicy.h"
+ #include <linux/cred.h>
+ #include <linux/cpu.h>
+@@ -14,6 +12,7 @@
+ #include <net/genetlink.h>
+ #include <linux/moduleparam.h>
+ #include <linux/mutex.h>
++#include <linux/version.h>
+ // security/selinux/include/security.h
+ #include <security.h>
+ #include <ss/context.h>
+@@ -22,254 +21,41 @@
+ #include <ss/conditional.h>
+ #include "avc.h"
+ #include "klog.h" // IWYU pragma: keep
+-#include "linux/kallsyms.h"
+ #include "objsec.h"
+-#include "hook/patch_memory.h"
+ #include "ksu.h"
+ #include "policy/feature.h"
+-#include "hook/lsm_hook.h"
+ 
+ static DEFINE_MUTEX(selinux_hide_mutex);
+-static bool ksu_selinux_hide_enabled __read_mostly = false;
+-static bool ksu_selinux_hide_running __read_mostly = false;
+-
+-enum sel_inos {
+-    SEL_ROOT_INO = 2,
+-    SEL_LOAD, /* load policy */
+-    SEL_ENFORCE, /* get or set enforcing status */
+-    SEL_CONTEXT, /* validate context */
+-    SEL_ACCESS, /* compute access decision */
+-    SEL_CREATE, /* compute create labeling decision */
+-    SEL_RELABEL, /* compute relabeling decision */
+-    SEL_USER, /* compute reachable user contexts */
+-    SEL_POLICYVERS, /* return policy version for this kernel */
+-    SEL_COMMIT_BOOLS, /* commit new boolean values */
+-    SEL_MLS, /* return if MLS policy is enabled */
+-    SEL_DISABLE, /* disable SELinux until next reboot */
+-    SEL_MEMBER, /* compute polyinstantiation membership decision */
+-    SEL_CHECKREQPROT, /* check requested protection, not kernel-applied one */
+-    SEL_COMPAT_NET, /* whether to use old compat network packet controls */
+-    SEL_REJECT_UNKNOWN, /* export unknown reject handling to userspace */
+-    SEL_DENY_UNKNOWN, /* export unknown deny handling to userspace */
+-    SEL_STATUS, /* export current status using mmap() */
+-    SEL_POLICY, /* allow userspace to read the in kernel policy */
+-    SEL_VALIDATE_TRANS, /* compute validatetrans decision */
+-    SEL_INO_NEXT, /* The next inode number to use */
+-};
+-
+-typedef ssize_t (*write_op_fn)(struct file *, char *, size_t);
+-
+-static write_op_fn *selinux_write_op;
++bool ksu_selinux_hide_enabled __read_mostly = false;
++bool ksu_selinux_hide_running __read_mostly = false;
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+-static int security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext, u32 scontext_len,
++int security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext, u32 scontext_len,
+                                                u32 *sid, u32 def_sid, gfp_t gfp_flags);
+-static int security_sid_to_context_with_policy(struct selinux_policy *policy, u32 sid, char **scontext,
++int security_sid_to_context_with_policy(struct selinux_policy *policy, u32 sid, char **scontext,
+                                                u32 *scontext_len);
+-static void security_compute_av_user_with_policy(struct selinux_policy *policy, u32 ssid, u32 tsid, u16 tclass,
++void security_compute_av_user_with_policy(struct selinux_policy *policy, u32 ssid, u32 tsid, u16 tclass,
+                                                  struct av_decision *avd);
+-static void (*security_dump_masked_av_fn)(struct policydb *policydb, struct context *scontext, struct context *tcontext,
+-                                          u16 tclass, u32 permissions, const char *reason) = NULL;
+-static void (*context_struct_compute_av_fn)(struct policydb *policydb, struct context *scontext,
+-                                            struct context *tcontext, u16 tclass, struct av_decision *avd,
+-                                            struct extended_perms *xperms) = NULL;
+-#else
+-static struct selinux_state fake_state;
+-#endif
+-
+-static write_op_fn *context_write, *access_write;
+-static write_op_fn orig_context_write, orig_access_write;
+-
+-static ssize_t my_write_context(struct file *file, char *buf, size_t size)
+-{
+-    // apply to all app uids
+-    if (likely(current_uid().val < 10000)) {
+-        return orig_context_write(file, buf, size);
+-    }
+-    char *canon = NULL;
+-    u32 sid, len, tmp;
+-    ssize_t length;
+-
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+-    length = avc_has_perm(current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY, SECURITY__CHECK_CONTEXT, NULL);
+-    if (length)
+-        goto out;
+-    length = security_context_to_sid_with_policy(backup_sepolicy, buf, size, &sid, SECSID_NULL, GFP_KERNEL);
+-    if (length) {
+-        goto out;
+-    } else {
+-        // sync to global sidtab
+-        security_context_to_sid(buf, size, &tmp, GFP_KERNEL);
+-    }
+-
+-    length = security_sid_to_context_with_policy(backup_sepolicy, sid, &canon, &len);
+-    if (length)
+-        goto out;
+-
+-    length = -ERANGE;
+-    if (len > SIMPLE_TRANSACTION_LIMIT) {
+-        pr_err("SELinux: %s:  context size (%u) exceeds "
+-               "payload max\n",
+-               __func__, len);
+-        goto out;
+-    }
+-#else
+-    length = avc_has_perm(&selinux_state, current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY,
+-                          SECURITY__CHECK_CONTEXT, NULL);
+-    if (length)
+-        goto out;
+-
+-    length = security_context_to_sid(&fake_state, buf, size, &sid, GFP_KERNEL);
+-    if (length) {
+-        goto out;
+-    } else {
+-        // sync to global sidtab
+-        security_context_to_sid(&selinux_state, buf, size, &tmp, GFP_KERNEL);
+-    }
+-
+-    length = security_sid_to_context(&fake_state, sid, &canon, &len);
+-    if (length)
+-        goto out;
+-#endif
+-
+-    memcpy(buf, canon, len);
+-    length = len;
+-out:
+-    kfree(canon);
+-    return length;
+-}
+-
+-static ssize_t my_write_access(struct file *file, char *buf, size_t size)
+-{
+-    // apply to all app uids
+-    if (likely(current_uid().val < 10000)) {
+-        return orig_access_write(file, buf, size);
+-    }
+-    char *scon = NULL, *tcon = NULL;
+-    u32 ssid, tsid, sconlen, tconlen, tmp;
+-    u16 tclass;
+-    struct av_decision avd;
+-    ssize_t length;
+-
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+-    length = avc_has_perm(current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY, SECURITY__COMPUTE_AV, NULL);
+-#else
+-    length =
+-        avc_has_perm(&selinux_state, current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY, SECURITY__COMPUTE_AV, NULL);
+-#endif
+-    if (length)
+-        goto out;
+-
+-    length = -ENOMEM;
+-    scon = kzalloc(size + 1, GFP_KERNEL);
+-    if (!scon)
+-        goto out;
+-
+-    length = -ENOMEM;
+-    tcon = kzalloc(size + 1, GFP_KERNEL);
+-    if (!tcon)
+-        goto out;
+-
+-    length = -EINVAL;
+-    if (sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3)
+-        goto out;
+-
+-    sconlen = strlen(scon);
+-    tconlen = strlen(tcon);
+-
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+-    length = security_context_to_sid_with_policy(backup_sepolicy, scon, sconlen, &ssid, SECSID_NULL, GFP_KERNEL);
+-    if (length) {
+-        goto out;
+-    } else {
+-        // sync to global sidtab
+-        security_context_to_sid(scon, sconlen, &tmp, GFP_KERNEL);
+-    }
+-
+-    length = security_context_to_sid_with_policy(backup_sepolicy, tcon, tconlen, &tsid, SECSID_NULL, GFP_KERNEL);
+-    if (length) {
+-        goto out;
+-    } else {
+-        // sync to global sidtab
+-        security_context_to_sid(tcon, tconlen, &tmp, GFP_KERNEL);
+-    }
+-
+-    security_compute_av_user_with_policy(backup_sepolicy, ssid, tsid, tclass, &avd);
+-#else
+-    length = security_context_to_sid(&fake_state, scon, sconlen, &ssid, GFP_KERNEL);
+-    if (length) {
+-        goto out;
+-    } else {
+-        // sync to global sidtab
+-        security_context_to_sid(&selinux_state, scon, sconlen, &tmp, GFP_KERNEL);
+-    }
+-
+-    length = security_context_to_sid(&fake_state, tcon, tconlen, &tsid, GFP_KERNEL);
+-    if (length) {
+-        goto out;
+-    } else {
+-        // sync to global sidtab
+-        security_context_to_sid(&selinux_state, tcon, tconlen, &tmp, GFP_KERNEL);
+-    }
+-
+-    security_compute_av_user(&fake_state, ssid, tsid, tclass, &avd);
+-#endif
+-
+-    // stock reads 1; a loader load_policy may have bumped the backup before we load
+-    avd.seqno = 1;
+-    length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", avd.allowed, 0xffffffff, avd.auditallow,
+-                       avd.auditdeny, avd.seqno, avd.flags);
+-out:
+-    kfree(tcon);
+-    kfree(scon);
+-    return length;
+-}
+-
+-static int my_setprocattr(const char *name, void *value, size_t size);
+-struct ksu_lsm_hook selinux_setprocattr_hook = KSU_LSM_HOOK_INIT(setprocattr, "selinux_setprocattr", my_setprocattr, 0);
+-
+-typedef int (*setprocattr_fn)(const char *name, void *value, size_t size);
+-static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
+-{
+-    int error, perm_error;
+-    u32 mysid, sid;
+-    char *str = value;
+-    if (likely(current_uid().val < 10000)) {
+-        goto call_orig;
+-    }
+-
+-    if (strcmp(name, "current")) {
+-        goto call_orig;
+-    }
+-    if (size && str[0] && str[0] != '\n') {
+-        if (str[size - 1] == '\n') {
+-            str[size - 1] = 0;
+-            size--;
+-        }
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+-        error = security_context_to_sid_with_policy(backup_sepolicy, str, size, &sid, SECSID_NULL, GFP_KERNEL);
++extern void security_dump_masked_av_fn(struct policydb *policydb,
++				    struct context *scontext,
++				    struct context *tcontext,
++				    u16 tclass,
++				    u32 permissions,
++				    const char *reason);
++extern void context_struct_compute_av_fn(struct policydb *policydb,
++				      struct context *scontext,
++				      struct context *tcontext,
++				      u16 tclass,
++				      struct av_decision *avd,
++				      struct extended_perms *xperms);
+ #else
+-        error = security_context_to_sid(&fake_state, str, size, &sid, GFP_KERNEL);
++struct selinux_state fake_state;
+ #endif
+-        if (error) {
+-            mysid = current_sid();
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+-            perm_error = avc_has_perm(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
+-#else
+-            perm_error = avc_has_perm(&selinux_state, mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
+-#endif
+-            return perm_error ?: error;
+-        }
+-    }
+ 
+-call_orig:
+-    return ((setprocattr_fn)selinux_setprocattr_hook.original)(name, value, size);
+-}
+-
+-static DEFINE_STATIC_KEY_FALSE(fake_status_initialize_key);
+-static struct page *fake_status = NULL;
++DEFINE_STATIC_KEY_FALSE(fake_status_initialize_key);
++struct page *fake_status = NULL;
+ 
+-static void initialize_fake_status()
++void initialize_fake_status()
+ {
+     mutex_lock(&selinux_state.status_lock);
+     if (fake_status)
+@@ -280,7 +66,7 @@ static void initialize_fake_status()
+     }
+ 
+     struct selinux_kernel_status *status = page_address(selinux_state.status_page);
+-    if (!status->enforcing && !ksu_late_loaded) {
++    if (!status->enforcing) {
+         pr_warn("initialize_fake_status: skip not enforcing\n");
+         goto out;
+     }
+@@ -293,22 +79,6 @@ static void initialize_fake_status()
+ 
+     struct selinux_kernel_status *new_status = page_address(new_page);
+     memcpy(new_status, status, sizeof(*status));
+-    if (ksu_late_loaded) {
+-        // In late_load mode the loader may have reloaded sepolicy before us,
+-        // so the captured page is not stock. Serve what a stock boot ends
+-        // with instead: creation sentinel below 6.10, one load plus one
+-        // setenforce above.
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+-        new_status->sequence = 4;
+-        new_status->policyload = 1;
+-#else
+-        new_status->sequence = 0;
+-        new_status->policyload = 0;
+-#endif
+-        if (!new_status->enforcing) {
+-            new_status->enforcing = 1;
+-        }
+-    }
+ 
+     fake_status = new_page;
+     pr_info("initialize_fake_status initialized: sequence=%d, policyload=%d, enforcing=%d\n", new_status->sequence,
+@@ -318,125 +88,38 @@ out:
+     mutex_unlock(&selinux_state.status_lock);
+ }
+ 
+-typedef int (*sel_open_handle_status_fn)(struct inode *inode, struct file *filp);
+-static sel_open_handle_status_fn orig_sel_open_handle_status, *sel_open_handle_status_slot;
+-static int my_sel_open_handle_status(struct inode *inode, struct file *filp)
++void ksu_selinux_hide_handle_second_stage()
+ {
+-    if (likely(current_uid().val >= 10000 && ksu_selinux_hide_enabled)) {
+-        void *data;
+-        mutex_lock(&selinux_state.status_lock);
+-        data = fake_status;
+-        mutex_unlock(&selinux_state.status_lock);
+-        if (data) {
+-            filp->private_data = data;
+-            return 0;
+-        }
+-    }
++    initialize_fake_status();
++    // https://github.com/torvalds/linux/blame/e8c2f9fdadee7cbc75134dc463c1e0d856d6e5c7/security/selinux/selinuxfs.c#L2014
++    if (fake_status)
++        static_key_disable(&fake_status_initialize_key.key);
++    else
++        pr_warn("selinux_hide: fake status need late initialization\n");
++}
+ 
+-    int ret = orig_sel_open_handle_status(inode, filp);
+-    if (static_branch_unlikely(&fake_status_initialize_key) && !ret && !fake_status) {
+-        initialize_fake_status();
+-    }
+-    return ret;
++void ksu_selinux_hide_handle_post_fs_data()
++{
++    static_key_disable(&fake_status_initialize_key.key);
++    if (!fake_status)
++        pr_err("selinux_hide: fake status is not initialized after post-fs-data!\n");
+ }
+ 
+-static void hook_selinux_status_open();
+-static void ksu_selinux_hide_unhook();
+ static int ksu_selinux_hide_enable()
+ {
+-    int ret;
+     pr_info("selinux_hide: init selinux hide\n");
+     if (!backup_sepolicy) {
+         pr_err("no backup sepolicy available, please save feature and reboot to retry!\n");
+         return -EAGAIN;
+     }
+-    selinux_write_op = find_kernel_symbol_exact("write_op");
+-    if (!selinux_write_op) {
+-        pr_err("selinux_hide: no write_op found!\n");
+-        return -ENOSYS;
+-    }
+-    hook_selinux_status_open();
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+-    security_dump_masked_av_fn = find_kernel_symbol_exact("security_dump_masked_av");
+-    if (!security_dump_masked_av_fn) {
+-        pr_warn("security_dump_masked_av not found!\n");
+-    }
+-    context_struct_compute_av_fn = find_kernel_symbol_exact("context_struct_compute_av");
+-    if (!context_struct_compute_av_fn) {
+-        pr_warn("context_struct_compute_av not found!\n");
+-    }
+ #else
+     fake_state.initialized = true;
+     fake_state.policy = backup_sepolicy;
+ #endif
+ 
+-    context_write = &selinux_write_op[SEL_CONTEXT];
+-    pr_info("selinux_hide: context_write: 0x%lx [%pSb]\n", (unsigned long)*context_write, *context_write);
+-    write_op_fn my = my_write_context;
+-    orig_context_write = *context_write;
+-    ret = ksu_patch_text(context_write, &my, sizeof(my), KSU_PATCH_TEXT_FLUSH_DCACHE);
+-    if (ret) {
+-        pr_err("selinux_hide: init: patch_text context_write err: %d\n", ret);
+-        goto unhook;
+-    }
+-
+-    access_write = &selinux_write_op[SEL_ACCESS];
+-    pr_info("selinux_hide: access_write: 0x%lx [%pSb]\n", (unsigned long)*access_write, *access_write);
+-    my = my_write_access;
+-    orig_access_write = *access_write;
+-    ret = ksu_patch_text(access_write, &my, sizeof(my), KSU_PATCH_TEXT_FLUSH_DCACHE);
+-    if (ret) {
+-        pr_err("selinux_hide: init: patch_text access_write err: %d\n", ret);
+-        goto unhook;
+-    }
+-
+-    ret = ksu_lsm_hook(&selinux_setprocattr_hook);
+-    if (ret) {
+-        pr_err("selinux_hide: init: selinux_setprocattr_hook err: %d\n", ret);
+-        goto unhook;
+-    }
+-
+     return 0;
+-
+-unhook:
+-    ksu_selinux_hide_unhook();
+-    return -ENOSYS;
+-}
+-
+-static void ksu_selinux_hide_unhook()
+-{
+-    int ret;
+-    if (orig_context_write) {
+-        ret =
+-            ksu_patch_text(context_write, &orig_context_write, sizeof(orig_context_write), KSU_PATCH_TEXT_FLUSH_DCACHE);
+-        orig_context_write = NULL;
+-        if (ret) {
+-            pr_err("selinux_hide: exit: patch_text context_write err: %d\n", ret);
+-        }
+-    }
+-    if (orig_access_write) {
+-        ret = ksu_patch_text(access_write, &orig_access_write, sizeof(orig_access_write), KSU_PATCH_TEXT_FLUSH_DCACHE);
+-        orig_access_write = NULL;
+-        if (ret) {
+-            pr_err("selinux_hide: exit: patch_text access_write err: %d\n", ret);
+-        }
+-    }
+-    if (sel_open_handle_status_slot && orig_sel_open_handle_status) {
+-        ret = ksu_patch_text(sel_open_handle_status_slot, &orig_sel_open_handle_status,
+-                             sizeof(orig_sel_open_handle_status), KSU_PATCH_TEXT_FLUSH_DCACHE);
+-        orig_sel_open_handle_status = NULL;
+-        if (ret) {
+-            pr_err("selinux_hide: exit: patch_text sel_open_handle_status err: %d\n", ret);
+-        }
+-    }
+-    ksu_lsm_unhook(&selinux_setprocattr_hook);
+-}
+-
+-static void ksu_selinux_hide_disable()
+-{
+-    pr_info("selinux_hide: exit selinux hide\n");
+-    ksu_selinux_hide_unhook();
+ }
+ 
+ static int selinux_hide_feature_get(u64 *value)
+@@ -461,10 +144,11 @@ static int selinux_hide_feature_set(u64 value)
+         }
+     } else {
+         if (ksu_selinux_hide_running) {
+-            ksu_selinux_hide_disable();
+             ksu_selinux_hide_running = false;
+         }
+     }
++    pr_info("selinux_hide: ksu_selinux_hide_enabled: %d, ksu_selinux_hide_running: %d\n",
++            ksu_selinux_hide_enabled, ksu_selinux_hide_running);
+     mutex_unlock(&selinux_hide_mutex);
+     return ret;
+ }
+@@ -476,65 +160,18 @@ static const struct ksu_feature_handler selinux_hide_handler = {
+     .set_handler = selinux_hide_feature_set,
+ };
+ 
+-void ksu_selinux_hide_handle_second_stage()
+-{
+-    initialize_fake_status();
+-    // https://github.com/torvalds/linux/blame/e8c2f9fdadee7cbc75134dc463c1e0d856d6e5c7/security/selinux/selinuxfs.c#L2014
+-    if (fake_status) {
+-        static_key_disable(&fake_status_initialize_key.key);
+-    } else {
+-        pr_warn("selinux_hide: fake status need late initialization\n");
+-    }
+-}
+-
+-void ksu_selinux_hide_handle_post_fs_data()
+-{
+-    static_key_disable(&fake_status_initialize_key.key);
+-    if (!fake_status) {
+-        pr_err("selinux_hide: fake status is not initialized after post-fs-data!\n");
+-    }
+-}
+-
+-static void hook_selinux_status_open()
+-{
+-    if (orig_sel_open_handle_status)
+-        return;
+-    if (!sel_open_handle_status_slot) {
+-        struct file_operations *ops = find_kernel_symbol_exact("sel_handle_status_ops");
+-        if (!ops) {
+-            pr_err("selinux_hide: sel_handle_status_ops not found, fake status will not work\n");
+-            return;
+-        }
+-        sel_open_handle_status_slot = &ops->open;
+-    }
+-    sel_open_handle_status_fn new_fn = my_sel_open_handle_status;
+-    orig_sel_open_handle_status = *sel_open_handle_status_slot;
+-    int ret = ksu_patch_text(sel_open_handle_status_slot, &new_fn, sizeof(new_fn), KSU_PATCH_TEXT_FLUSH_DCACHE);
+-    if (ret) {
+-        pr_err("selinux_hide: init: patch_text sel_open_handle_status err: %d\n", ret);
+-        sel_open_handle_status_slot = NULL;
+-        orig_sel_open_handle_status = NULL;
+-    }
+-}
+-
+ void __init ksu_selinux_hide_init()
+ {
+     if (ksu_register_feature_handler(&selinux_hide_handler)) {
+         pr_err("Failed to register selinux_hide feature handler\n");
+     }
+-    if (ksu_late_loaded) {
+-        initialize_fake_status();
+-    } else {
+-        static_key_enable(&fake_status_initialize_key.key);
+-    }
+-    hook_selinux_status_open();
++    static_key_enable(&fake_status_initialize_key.key);
+ }
+ 
+ void __exit ksu_selinux_hide_exit()
+ {
+     mutex_lock(&selinux_hide_mutex);
+     if (ksu_selinux_hide_running) {
+-        ksu_selinux_hide_disable();
+         ksu_selinux_hide_running = false;
+     }
+     mutex_unlock(&selinux_hide_mutex);
+@@ -638,7 +275,7 @@ out:
+     return rc;
+ }
+ 
+-static int security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext, u32 scontext_len,
++int security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext, u32 scontext_len,
+                                                u32 *sid, u32 def_sid, gfp_t gfp_flags)
+ {
+     struct policydb *policydb;
+@@ -745,7 +382,7 @@ static int sidtab_entry_to_string(struct policydb *p, struct sidtab *sidtab, str
+     return rc;
+ }
+ 
+-static int security_sid_to_context_with_policy(struct selinux_policy *policy, u32 sid, char **scontext,
++int security_sid_to_context_with_policy(struct selinux_policy *policy, u32 sid, char **scontext,
+                                                u32 *scontext_len)
+ {
+     struct policydb *policydb;
+@@ -837,8 +474,7 @@ static void __nocfi type_attribute_bounds_av(struct policydb *policydb, struct c
+     avd->allowed &= ~masked;
+ 
+     /* audit masked permissions */
+-    if (security_dump_masked_av_fn)
+-        security_dump_masked_av_fn(policydb, scontext, tcontext, tclass, masked, "bounds");
++    security_dump_masked_av_fn(policydb, scontext, tcontext, tclass, masked, "bounds");
+ }
+ 
+ /*
+@@ -1118,7 +754,7 @@ static void context_struct_compute_av(struct policydb *policydb, struct context
+     type_attribute_bounds_av(policydb, scontext, tcontext, tclass, avd);
+ }
+ 
+-static void __nocfi security_compute_av_user_with_policy(struct selinux_policy *policy, u32 ssid, u32 tsid, u16 tclass,
++void __nocfi security_compute_av_user_with_policy(struct selinux_policy *policy, u32 ssid, u32 tsid, u16 tclass,
+                                                          struct av_decision *avd)
+ {
+     struct policydb *policydb;
+@@ -1154,11 +790,7 @@ static void __nocfi security_compute_av_user_with_policy(struct selinux_policy *
+         goto out;
+     }
+ 
+-    if (context_struct_compute_av_fn) {
+-        context_struct_compute_av_fn(policydb, scontext, tcontext, tclass, avd, NULL);
+-    } else {
+-        context_struct_compute_av(policydb, scontext, tcontext, tclass, avd, NULL);
+-    }
++    context_struct_compute_av_fn(policydb, scontext, tcontext, tclass, avd, NULL);
+ out:
+     return;
+ allow:
+diff --git a/kernel/runtime/boot_event.c b/kernel/runtime/boot_event.c
+index 968a7298..211973dd 100644
+--- a/kernel/runtime/boot_event.c
++++ b/kernel/runtime/boot_event.c
+@@ -14,6 +14,7 @@
+ 
+ bool ksu_module_mounted __read_mostly = false;
+ bool ksu_boot_completed __read_mostly = false;
++extern struct static_key_true ksu_is_input_hook_enabled;
+ 
+ void on_post_fs_data(void)
+ {
+@@ -33,7 +34,10 @@ void on_post_fs_data(void)
+ #endif
+     ksu_observer_init();
+     // Sanity check for safe mode only needs early-boot input samples.
+-    ksu_stop_input_hook_runtime();
++    if (static_key_enabled(&ksu_is_input_hook_enabled)) {
++        static_branch_disable(&ksu_is_input_hook_enabled);
++        pr_info("ksu_input_hook is disabled\n");
++    }
+     ksu_selinux_hide_handle_post_fs_data();
+ }
+ 
+diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
+index 5e5add92..d8be9ab1 100644
+--- a/kernel/supercall/dispatch.c
++++ b/kernel/supercall/dispatch.c
+@@ -4,6 +4,8 @@
+ #include <linux/uaccess.h>
+ #include <linux/version.h>
+ #include <linux/thread_info.h>
++#include <linux/namei.h>
++#include <linux/susfs.h>
+ #include "uapi/supercall.h"
+ #include "supercall/internal.h"
+ #include "arch.h" // IWYU pragma: keep
+@@ -18,7 +20,6 @@
+ #include "manager/throne_tracker.h"
+ #include "selinux/selinux.h"
+ #include "infra/file_wrapper.h"
+-#include "hook/tp_marker.h"
+ #include "policy/app_profile.h"
+ #include "sulog/event.h"
+ #include "sulog/fd.h"
+@@ -45,17 +46,11 @@ static int do_get_info(void __user *arg)
+ 
+ #ifdef MODULE
+     cmd.flags |= KSU_GET_INFO_FLAG_LKM;
+-    if (ksu_bundled) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_BUNDLED;
+-    }
+ #endif
+ 
+     if (is_manager()) {
+         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
+     }
+-    if (ksu_late_loaded) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
+-    }
+ #if defined(EXPECTED_SIZE2) && !defined(SECOND_SIGNATURE_RELEASE)
+     cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
+ #endif
+@@ -86,17 +81,11 @@ static int do_get_info_legacy(void __user *arg)
+ 
+ #ifdef MODULE
+     cmd.flags |= KSU_GET_INFO_FLAG_LKM;
+-    if (ksu_bundled) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_BUNDLED;
+-    }
+ #endif
+ 
+     if (is_manager()) {
+         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
+     }
+-    if (ksu_late_loaded) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
+-    }
+ #if defined(EXPECTED_SIZE2) && !defined(SECOND_SIGNATURE_RELEASE)
+     cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
+ #endif
+@@ -137,12 +126,8 @@ static int do_report_event(void __user *arg)
+         services_started = false;
+         if (!post_fs_data_lock) {
+             post_fs_data_lock = true;
+-            if (ksu_late_loaded) {
+-                pr_info("post-fs-data skipped (late load)\n");
+-            } else {
+-                pr_info("post-fs-data triggered\n");
+-                on_post_fs_data();
+-            }
++            pr_info("post-fs-data triggered\n");
++            on_post_fs_data();
+         }
+         break;
+     }
+@@ -150,12 +135,9 @@ static int do_report_event(void __user *arg)
+         static bool boot_complete_lock = false;
+         if (!boot_complete_lock) {
+             boot_complete_lock = true;
+-            if (ksu_late_loaded) {
+-                pr_info("boot_complete skipped (late load)\n");
+-            } else {
+-                pr_info("boot_complete triggered\n");
+-                on_boot_completed();
+-            }
++            pr_info("boot_complete triggered\n");
++            on_boot_completed();
++            susfs_start_sdcard_monitor_fn();
+         }
+         break;
+     }
+@@ -409,7 +391,6 @@ static int do_set_app_profile(void __user *arg)
+     ret = ksu_set_app_profile(&cmd.profile);
+     if (!ret) {
+         ksu_persistent_allow_list();
+-        ksu_mark_running_process();
+     }
+     return ret;
+ }
+@@ -486,49 +467,32 @@ static int do_manage_mark(void __user *arg)
+     }
+ 
+     switch (cmd.operation) {
+-    case KSU_MARK_GET: {
+-        // Get task mark status
+-        ret = ksu_get_task_mark(cmd.pid);
+-        if (ret < 0) {
+-            pr_err("manage_mark: get failed for pid %d: %d\n", cmd.pid, ret);
+-            return ret;
++        case KSU_MARK_GET: {
++            if (susfs_is_current_proc_no_su()) {
++                ret = 0; // SYSCALL_TRACEPOINT is NOT flagged
++            } else {
++                ret = 1; // SYSCALL_TRACEPOINT is flagged
++            }
++            cmd.result = (u32)ret;
++            break;
+         }
+-        cmd.result = (u32)ret;
+-        break;
+-    }
+-    case KSU_MARK_MARK: {
+-        if (cmd.pid == 0) {
+-            ksu_mark_all_process();
+-        } else {
+-            ret = ksu_set_task_mark(cmd.pid, true);
+-            if (ret < 0) {
+-                pr_err("manage_mark: set_mark failed for pid %d: %d\n", cmd.pid, ret);
++        case KSU_MARK_MARK: {
++            if (cmd.pid != 0)
+                 return ret;
+-            }
++            break;
+         }
+-        break;
+-    }
+-    case KSU_MARK_UNMARK: {
+-        if (cmd.pid == 0) {
+-            ksu_unmark_all_process();
+-        } else {
+-            ret = ksu_set_task_mark(cmd.pid, false);
+-            if (ret < 0) {
+-                pr_err("manage_mark: set_unmark failed for pid %d: %d\n", cmd.pid, ret);
++        case KSU_MARK_UNMARK: {
++            if (cmd.pid != 0)
+                 return ret;
+-            }
++            break;
++        }
++        case KSU_MARK_REFRESH: {
++            break;
++        }
++        default: {
++            pr_err("manage_mark: invalid operation %u\n", cmd.operation);
++            return -EINVAL;
+         }
+-        break;
+-    }
+-    case KSU_MARK_REFRESH: {
+-        ksu_mark_running_process();
+-        pr_info("manage_mark: refreshed running processes\n");
+-        break;
+-    }
+-    default: {
+-        pr_err("manage_mark: invalid operation %u\n", cmd.operation);
+-        return -EINVAL;
+-    }
+     }
+     if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+         pr_err("manage_mark: copy_to_user failed\n");
+@@ -538,6 +502,87 @@ static int do_manage_mark(void __user *arg)
+     return 0;
+ }
+ 
++int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
++{
++    if (magic1 != KSU_INSTALL_MAGIC1) {
++        return -EINVAL; 
++    }
++
++    // If magic2 is susfs and current process is root
++    if (magic2 == SUSFS_MAGIC && current_uid().val == 0) {
++        switch(cmd) {
++#ifdef CONFIG_KSU_SUSFS_SUS_PATH
++            case CMD_SUSFS_ADD_SUS_PATH:
++                susfs_add_sus_path(arg);
++                return 0;
++            case CMD_SUSFS_ADD_SUS_PATH_LOOP:
++                susfs_add_sus_path_loop(arg);
++                return 0;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++            case CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS:
++                susfs_set_hide_sus_mnts_for_non_su_procs(arg);
++                return 0;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
++            case CMD_SUSFS_ADD_SUS_KSTAT:
++                susfs_add_sus_kstat(arg);
++                return 0;
++            case CMD_SUSFS_UPDATE_SUS_KSTAT:
++                susfs_update_sus_kstat(arg);
++                return 0;
++            case CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY:
++                susfs_add_sus_kstat(arg);
++                return 0;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
++#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
++            case CMD_SUSFS_SET_UNAME:
++                susfs_set_uname(arg);
++                return 0;
++#endif // #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
++#ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
++            case CMD_SUSFS_ENABLE_LOG:
++                susfs_enable_log(arg);
++                return 0;
++#endif // #ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
++#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
++            case CMD_SUSFS_SET_CMDLINE_OR_BOOTCONFIG:
++                susfs_set_cmdline_or_bootconfig(arg);
++                return 0;
++#endif // #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
++#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
++            case CMD_SUSFS_ADD_OPEN_REDIRECT:
++                susfs_add_open_redirect(arg);
++                return 0;
++#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++            case CMD_SUSFS_ADD_SUS_MAP:
++                susfs_add_sus_map(arg);
++                return 0;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
++            case CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING:
++                susfs_set_avc_log_spoofing(arg);
++                return 0;
++            case CMD_SUSFS_SHOW_ENABLED_FEATURES:
++                susfs_get_enabled_features(arg);
++                return 0;
++            case CMD_SUSFS_SHOW_VARIANT:
++                susfs_show_variant(arg);
++                return 0;
++            case CMD_SUSFS_SHOW_VERSION:
++                susfs_show_version(arg);
++                return 0;
++            default:
++                return -EINVAL;
++        }
++    }
++
++    if (magic2 == KSU_INSTALL_MAGIC2)
++        return ksu_supercall_reboot_handler(arg);
++
++    return -EINVAL;
++}
++
+ static int do_nuke_ext4_sysfs(void __user *arg)
+ {
+     struct ksu_nuke_ext4_sysfs_cmd cmd;

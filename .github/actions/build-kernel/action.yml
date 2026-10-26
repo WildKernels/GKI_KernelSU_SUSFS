@@ -120,6 +120,32 @@ runs:
         echo "Verifying page size using $CONFIG_FILE"
         grep -E '^(# )?CONFIG_ARM64_(4K|16K|64K)_PAGES|^CONFIG_ARM64_PAGE_SHIFT' "$CONFIG_FILE" || true
 
+        # Susfs-presence probe on the built image: the fs/susfs.o objects leave
+        # their log-format strings in .rodata; a zero count means susfs was
+        # trimmed somewhere between config and link.
+        for img in bazel-bin/common/kernel_aarch64/Image /home/runner/out/dist/Image; do
+          if [ -f "$img" ]; then
+            echo "susfs strings in $(basename "$img"): $(grep -ac susfs "$img" || true)"
+            break
+          fi
+        done
+
+        # Root/susfs config probe: the Kleaf config stage has been observed to
+        # drop KSU configs in flavour builds; surface the block and fail loud
+        # when the root implementation's configs went missing.
+        echo "--- KSU config block from $CONFIG_FILE ---"
+        grep -E '^#? ?CONFIG_KSU' "$CONFIG_FILE" || echo '(no CONFIG_KSU entries in final .config)'
+        if [ "${ROOT_IMPLEMENTATION:-}" != '' ] && [ "${ROOT_IMPLEMENTATION:-}" != 'none' ]; then
+          if ! grep -q '^CONFIG_KSU=y' "$CONFIG_FILE"; then
+            echo "ERROR: CONFIG_KSU missing from final .config (root: $ROOT_IMPLEMENTATION)" >&2
+            exit 1
+          fi
+          if [ -n "${SUSFS_COMMIT:-}" ] && ! grep -q '^CONFIG_KSU_SUSFS=y' "$CONFIG_FILE"; then
+            echo "ERROR: CONFIG_KSU_SUSFS missing from final .config (root: $ROOT_IMPLEMENTATION, susfs ${SUSFS_COMMIT})" >&2
+            exit 1
+          fi
+        fi
+
         if [ "$PAGE_SIZE" = "16k" ]; then
           want_on="CONFIG_ARM64_16K_PAGES=y"
           want_off="# CONFIG_ARM64_4K_PAGES is not set"

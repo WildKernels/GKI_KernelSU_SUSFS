@@ -2,7 +2,7 @@ name: Setup pinned root implementation
 description: Clone exactly one supported root implementation at a verified commit
 inputs:
   flavor:
-    description: 'kernelsu, next, bakasu, sukisu-ultra, or kowsu'
+    description: "kernelsu, next, bakasu, finasu, sukisu-ultra, or kowsu"
     required: true
   commit:
     description: 'Full immutable commit SHA'
@@ -45,6 +45,11 @@ runs:
             directory="KowSU"
             manager="KowSU Manager"
             ;;
+          finasu)
+            repo="https://github.com/LyraVoid/FinaSU.git"
+            directory="FinaSU"
+            manager="FinaSU Manager"
+            ;;
           *)
             echo "Unsupported root flavor: $flavor" >&2
             exit 2
@@ -56,7 +61,7 @@ runs:
           exit 2
         fi
 
-        for candidate in KernelSU KernelSU-Next BakaSU SukiSU-Ultra KowSU; do
+        for candidate in KernelSU KernelSU-Next BakaSU FinaSU SukiSU-Ultra KowSU; do
           if [ "$candidate" != "$directory" ] && [ -e "$candidate" ]; then
             echo "Refusing mixed root implementations: found $candidate." >&2
             exit 1

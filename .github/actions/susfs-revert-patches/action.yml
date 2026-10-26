@@ -14,100 +14,105 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Revert Android 12 5.10 Fake Patches
-      shell: bash
-      if: inputs.version == 'android12-5.10'
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        if [ "${{ inputs.sublevel }}" -le "43" ]; then
-          echo "Reverting base.c Android 12 5.10 Fake Patch"
-          sed -i 's/^size_t this_len = min_t(size_t, count, PAGE_SIZE);$/int this_len = min_t(int, count, PAGE_SIZE);/' fs/proc/base.c
-        fi
 
-    - name: Revert Android 13 5.10 Fake Patches
-      shell: bash
-      if: inputs.version == 'android13-5.10'
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
+    # Fake-patch reverts removed per owner decision: the fake patches they undo
+    # are no longer applied (see susfs-patches/action.yml), so these revert
+    # steps would corrupt the tree by re-adding #include lines that were never
+    # deleted. Restore from git history if fake patches are ever re-enabled.
+    # - name: Revert Android 12 5.10 Fake Patches
+    #   shell: bash
+    #   if: inputs.version == 'android12-5.10'
+    #   working-directory: ${{ github.workspace }}/kernel/common
+    #   run: |
+    #     if [ "${{ inputs.sublevel }}" -le "43" ]; then
+    #       echo "Reverting base.c Android 12 5.10 Fake Patch"
+    #       sed -i 's/^size_t this_len = min_t(size_t, count, PAGE_SIZE);$/int this_len = min_t(int, count, PAGE_SIZE);/' fs/proc/base.c
+    #     fi
 
-    - name: Revert Android 13 5.15 Fake Patches
-      shell: bash
-      if: inputs.version == 'android13-5.15'
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        if [ "${{ inputs.sublevel }}" -le "41" ]; then
-          echo "Reverting namespace.c Android 13 5.15 Fake Patch"
-          sed -i '/#include <linux\/mnt_idmapping.h>$/d' fs/namespace.c
-          echo "Reverting open.c Android 13 5.15 Fake Patch"
-          sed -i '/#include <linux\/mnt_idmapping.h>$/d' fs/open.c
-          sed -i 's|i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val|i_uid_into_mnt(\&init_user_ns, \&fi->inode).val|g' fs/susfs.c
-          sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|i_uid_into_mnt(\&init_user_ns, inode).val|g' fs/susfs.c
-        fi
-        if [ "${{ inputs.sublevel }}" -ge "197" ]; then
-          echo "Reverting namespace.c Android 13 5.15 Fake Patch"
-          sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
-        fi
-        if [ "${{ inputs.sublevel }}" -ge "206" ]; then
-          echo "Reverting task_mmu.c Android 13 5.15 Fake Patch"
-          sed -i '/^#include <linux\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
-        fi
+    # - name: Revert Android 13 5.10 Fake Patches
+    #   shell: bash
+    #   if: inputs.version == 'android13-5.10'
+    #   working-directory: ${{ github.workspace }}/kernel/common
+    #   run: |
 
-    - name: Revert Android 14 6.1 Fake Patches
-      shell: bash
-      if: inputs.version == 'android14-6.1'
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        if [ "${{ inputs.sublevel }}" -le "25" ]; then
-          sed -i '/^#include <trace\/hooks\/sched.h>$/d' fs/proc/base.c
-        fi
-        if [ "${{ inputs.sublevel }}" -le "141" ]; then
-          echo "Reverting base.c Android 14 6.1 Fake Patch"
-          sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
-        fi
-        if [ "${{ inputs.sublevel }}" -ge "157" ]; then
-          echo "Reverting namespace.c Android 14 6.1 Fake Patch"
-          sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
-          echo "Reverting super.c Android 14 6.1 Fake Patch"
-          sed -i '/^#include "internal.h"$/a #include <trace/hooks/fs.h>' fs/super.c
-        fi
+    # - name: Revert Android 13 5.15 Fake Patches
+    #   shell: bash
+    #   if: inputs.version == 'android13-5.15'
+    #   working-directory: ${{ github.workspace }}/kernel/common
+    #   run: |
+    #     if [ "${{ inputs.sublevel }}" -le "41" ]; then
+    #       echo "Reverting namespace.c Android 13 5.15 Fake Patch"
+    #       sed -i '/#include <linux\/mnt_idmapping.h>$/d' fs/namespace.c
+    #       echo "Reverting open.c Android 13 5.15 Fake Patch"
+    #       sed -i '/#include <linux\/mnt_idmapping.h>$/d' fs/open.c
+    #       sed -i 's|i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val|i_uid_into_mnt(\&init_user_ns, \&fi->inode).val|g' fs/susfs.c
+    #       sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|i_uid_into_mnt(\&init_user_ns, inode).val|g' fs/susfs.c
+    #     fi
+    #     if [ "${{ inputs.sublevel }}" -ge "197" ]; then
+    #       echo "Reverting namespace.c Android 13 5.15 Fake Patch"
+    #       sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
+    #     fi
+    #     if [ "${{ inputs.sublevel }}" -ge "206" ]; then
+    #       echo "Reverting task_mmu.c Android 13 5.15 Fake Patch"
+    #       sed -i '/^#include <linux\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
+    #     fi
 
-    - name: Revert Android 15 6.6 Fake Patches
-      shell: bash
-      if: inputs.version == 'android15-6.6'
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        echo "Reverting 6.6 Fake Patches"
-        if [ "${{ inputs.sublevel }}" -le "92" ]; then
-          echo "Reverting base.c Android 15 6.6 Fake Patch"
-          sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
-        fi
-        if [ "${{ inputs.sublevel }}" -le "57" ]; then
-          echo "Reverting memory.c Android 15 6.6 Fake Patch"
-          sed -i '/^#include <linux\/zswap.h>$/d' mm/memory.c
-        fi
+    # - name: Revert Android 14 6.1 Fake Patches
+    #   shell: bash
+    #   if: inputs.version == 'android14-6.1'
+    #   working-directory: ${{ github.workspace }}/kernel/common
+    #   run: |
+    #     if [ "${{ inputs.sublevel }}" -le "25" ]; then
+    #       sed -i '/^#include <trace\/hooks\/sched.h>$/d' fs/proc/base.c
+    #     fi
+    #     if [ "${{ inputs.sublevel }}" -le "141" ]; then
+    #       echo "Reverting base.c Android 14 6.1 Fake Patch"
+    #       sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
+    #     fi
+    #     if [ "${{ inputs.sublevel }}" -ge "157" ]; then
+    #       echo "Reverting namespace.c Android 14 6.1 Fake Patch"
+    #       sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
+    #       echo "Reverting super.c Android 14 6.1 Fake Patch"
+    #       sed -i '/^#include "internal.h"$/a #include <trace/hooks/fs.h>' fs/super.c
+    #     fi
 
-    - name: Revert Android 16 6.12 Fake Patches
-      shell: bash
-      if: inputs.version == 'android16-6.12'
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        echo "Reverting 6.12 Fake Patches"
-        if [ "${{ inputs.sublevel }}" -ge "58" ]; then
-          echo "Reverting exec.c Android 16 6.12 Fake Patch"
-          sed -i '/^#include /a #include <linux/dma-buf.h>' fs/exec.c
-        fi
-        if [ "${{ inputs.sublevel }}" -ge "69" ]; then
-          echo "Reverting task_mmu.c Android 16 6.12 Fake Patch"
-          sed -i 's/vma_pages/vma_data_pages/g' fs/proc/task_mmu.c
-        fi
-        # Undo the sublevel 92+ show_smaps_rollup reshape so the tree is back to
-        # the refactored proc_maps_locking_ctx / proc_get_vma() form the kernel
-        # actually builds with. The SUS_MAP guard the patch added is carried
-        # across; only the fake-patch scaffolding is removed.
-        if [ "${{ inputs.sublevel }}" -ge "92" ]; then
-          echo "Reverting task_mmu.c show_smaps_rollup reshape for 6.12 sublevel 92+"
-          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_612.py" fs/proc/task_mmu.c revert
-        fi
+    # - name: Revert Android 15 6.6 Fake Patches
+    #   shell: bash
+    #   if: inputs.version == 'android15-6.6'
+    #   working-directory: ${{ github.workspace }}/kernel/common
+    #   run: |
+    #     echo "Reverting 6.6 Fake Patches"
+    #     if [ "${{ inputs.sublevel }}" -le "92" ]; then
+    #       echo "Reverting base.c Android 15 6.6 Fake Patch"
+    #       sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
+    #     fi
+    #     if [ "${{ inputs.sublevel }}" -le "57" ]; then
+    #       echo "Reverting memory.c Android 15 6.6 Fake Patch"
+    #       sed -i '/^#include <linux\/zswap.h>$/d' mm/memory.c
+    #     fi
+
+    # - name: Revert Android 16 6.12 Fake Patches
+    #   shell: bash
+    #   if: inputs.version == 'android16-6.12'
+    #   working-directory: ${{ github.workspace }}/kernel/common
+    #   run: |
+    #     echo "Reverting 6.12 Fake Patches"
+    #     if [ "${{ inputs.sublevel }}" -ge "58" ]; then
+    #       echo "Reverting exec.c Android 16 6.12 Fake Patch"
+    #       sed -i '/^#include /a #include <linux/dma-buf.h>' fs/exec.c
+    #     fi
+    #     if [ "${{ inputs.sublevel }}" -ge "69" ]; then
+    #       echo "Reverting task_mmu.c Android 16 6.12 Fake Patch"
+    #       sed -i 's/vma_pages/vma_data_pages/g' fs/proc/task_mmu.c
+    #     fi
+    #     # Undo the sublevel 92+ show_smaps_rollup reshape so the tree is back to
+    #     # the refactored proc_maps_locking_ctx / proc_get_vma() form the kernel
+    #     # actually builds with. The SUS_MAP guard the patch added is carried
+    #     # across; only the fake-patch scaffolding is removed.
+    #     if [ "${{ inputs.sublevel }}" -ge "92" ]; then
+    #       echo "Reverting task_mmu.c show_smaps_rollup reshape for 6.12 sublevel 92+"
+    #       python3 "${{ github.workspace }}/.github/scripts/susfs_fake_612.py" fs/proc/task_mmu.c revert
+    #     fi
 
     - name: Apply show_pad Fix
       shell: bash

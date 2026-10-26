@@ -20,6 +20,10 @@ on:
 
 jobs:
   sync-matrix:
+    # Fork gate (#328): cron runs need ENABLE_SCHEDULED_BUILDS=true (Actions
+    # variable). Forks inherit the workflow but not the variable, so their
+    # daily matrix-sync cron skips instead of opening PRs on the fork.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_BUILDS == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main

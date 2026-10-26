@@ -22,7 +22,7 @@ on:
         type: string
         default: ""
       root_flavor:
-        description: "Mutually exclusive root implementation (kernelsu, next, bakasu, sukisu-ultra, or none)"
+        description: "Mutually exclusive root implementation (kernelsu, next, bakasu, finasu, sukisu-ultra, or none)"
         required: false
         type: string
         default: ""
@@ -276,7 +276,8 @@ jobs:
                 mkdir -p "${STOCK_DIR}/heads"
                 printf '%s' "$CUR_HEAD" > "${STOCK_DIR}/heads/${KVER}.head"
               else
-                echo "::warning title=stock-configs::could not fetch stock config for ${KVER} — build legs will fall back to a live download"
+                echo "::error title=stock-configs::could not fetch stock config for ${KVER} — required, not optional" >&2
+                exit 1
               fi
             fi
             if [ "$PAGE_SIZE" = "16k" ]; then
@@ -290,7 +291,8 @@ jobs:
                   mkdir -p "${STOCK_DIR}/heads"
                   printf '%s' "$CUR_HEAD" > "${STOCK_DIR}/heads/${KVER}_16k.head"
                 else
-                  echo "::warning title=stock-configs::could not fetch 16k stock config for ${KVER} — build legs will fall back to a live download"
+                  echo "::error title=stock-configs::could not fetch 16k stock config for ${KVER} — required, not optional" >&2
+                  exit 1
                 fi
               fi
             fi
@@ -315,13 +317,6 @@ jobs:
     # stock-configs may be skipped on non-producer legs (produce_stock_configs=false)
     needs: [generate-matrix, stock-configs]
     if: ${{ !cancelled() && needs.generate-matrix.result == 'success' }}
-    concurrency:
-      # Must include every matrix field that varies. The old key was only
-      # root_flavor + version, so every patch level of a family shared one
-      # group: with cancel-in-progress: false they queued instead of running
-      # in parallel, and an "All" dispatch compiled one kernel at a time.
-      group: prepare-${{ inputs.root_flavor }}-${{ matrix.version }}-${{ matrix.sublevel }}-${{ matrix.os_patch_level }}-${{ matrix.variant }}
-      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}

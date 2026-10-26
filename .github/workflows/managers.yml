@@ -17,6 +17,7 @@ on:
           - BakaSU
           - SukiSU-Ultra
           - KowSU
+          - FinaSU
           - No Root
           - KernelSU-Next-SUSFS
         default: All
@@ -37,6 +38,11 @@ on:
         default: ""
       sukisu_ultra_commit:
         description: "Pin SukiSU-Ultra manager to this commit (40-char SHA, empty = latest main tip)"
+        required: false
+        type: string
+        default: ""
+      finasu_commit:
+        description: "Pin FinaSU manager to this commit (40-char SHA, empty = latest master tip)"
         required: false
         type: string
         default: ""
@@ -77,6 +83,11 @@ on:
         required: false
         type: string
         default: ""
+      finasu_commit:
+        description: "Pin FinaSU manager commit"
+        required: false
+        type: string
+        default: ""
       kernelsu_next_susfs_commit:
         description: "Pin KernelSU-Next SUSFS manager commit"
         required: false
@@ -106,6 +117,7 @@ jobs:
           INPUT_KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           INPUT_BAKASU_COMMIT: ${{ inputs.bakasu_commit }}
           INPUT_SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
+          INPUT_FINASU_COMMIT: ${{ inputs.finasu_commit }}
           INPUT_NEXT_SUSFS_COMMIT: ${{ inputs.kernelsu_next_susfs_commit }}
         run: |
           set -euo pipefail
@@ -149,7 +161,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_NEXT_COMMIT:-}" ]]; then
@@ -179,7 +191,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_KSU_COMMIT:-}" ]]; then
@@ -213,7 +225,7 @@ jobs:
                     stock=$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev-susfs)
                   fi
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_NEXT_SUSFS_COMMIT:-}" ]]; then
@@ -253,7 +265,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/Baka-SU/BakaSU.git refs/heads/main)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_BAKASU_COMMIT:-}" ]]; then
@@ -283,7 +295,7 @@ jobs:
                 else
                   stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)
                 fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
@@ -302,11 +314,41 @@ jobs:
                   "$flavor" "$owner" "$repo" "$run_id" "$stock"
                 ;;
 
+              finasu)
+                owner="LyraVoid"; repo="FinaSU"; wf="build-manager.yml"
+                if [[ -n "${INPUT_FINASU_COMMIT:-}" ]]; then
+                  stock="$INPUT_FINASU_COMMIT"
+                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
+                    echo "ERROR: finasu_commit must be a 40-char SHA (got: $stock)" >&2
+                    exit 1
+                  fi
+                else
+                  stock=$(resolve_sha https://github.com/LyraVoid/FinaSU.git refs/heads/master)
+                fi
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
+                  --jq '.workflow_runs[0].id // empty')
+                if [[ -z "${run_id}" ]]; then
+                  if [[ -z "${INPUT_FINASU_COMMIT:-}" ]]; then
+                    echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=master&status=success&per_page=1")
+                    run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
+                    stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
+                    if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
+                  fi
+                  if [[ -z "${run_id}" ]]; then
+                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
+                    exit 1
+                  fi
+                fi
+                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager"}' \
+                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
+                ;;
+
               kowsu)
                 # KowSU has no SUSFS support and always tracks latest master.
                 owner="KOWX712"; repo="KernelSU"; wf="build-manager.yml"
                 stock=$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
@@ -341,6 +383,7 @@ jobs:
             BakaSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one bakasu)") ;;
             SukiSU-Ultra) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one sukisu-ultra)") ;;
             KowSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kowsu)") ;;
+            FinaSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one finasu)") ;;
             *) echo "Skipping manager resolution (no root flavor / none)." ;;
           esac
           if [ -n "$LIST" ]; then
@@ -367,7 +410,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          MANAGER_LIST=$(echo "$MANAGER_LIST" | sed 's/^\[,/[/')
+          MANAGER_LIST=${MANAGER_LIST#\[,/[}
           if ! echo "$MANAGER_LIST" | jq empty 2>/dev/null; then
             echo "ERROR: Invalid MANAGER_LIST JSON"
             echo "Raw: $MANAGER_LIST"
@@ -418,7 +461,7 @@ jobs:
                   mkdir -p "_${AID}"
                   unzip -o -q "_${AID}.zip" -d "_${AID}" || true
                   rm -f "_${AID}.zip"
-                  for apk in _${AID}/*.apk; do
+                  for apk in "_${AID}"/*.apk; do
                     [ -f "$apk" ] || continue
                     NAME="$(basename "$apk")"
                     cp -f "$apk" "$OUT_APKS/$NAME"
@@ -452,7 +495,7 @@ jobs:
           done < "$MANIFEST"
           echo "apk_list=${APK_JSON}" >> "$GITHUB_OUTPUT"
           echo "Found $(wc -l < "$MANIFEST" 2>/dev/null | tr -d ' ' || echo 0) manager APKs"
-          ls -lh "$OUT_APKS" || true
+          find "$OUT_APKS" -maxdepth 1 -type f -exec ls -lh {} \; || true
 
       - name: Upload all manager APKs as one cross-blob
         uses: actions/upload-artifact@v7
@@ -497,8 +540,7 @@ jobs:
         env:
           ROOT_FLAVOR: ${{ inputs.root_flavor }}
         run: |
-          WANT="${{ inputs.root_flavor }}"
-          WANT="${WANT:-All}"
+          WANT="${ROOT_FLAVOR:-All}"
           FLAVOR="${{ matrix.flavor }}"
           case "$WANT" in
             All*) echo "run=true" >> "$GITHUB_OUTPUT" ;;
@@ -508,6 +550,7 @@ jobs:
             BakaSU) [[ "$FLAVOR" == "bakasu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             SukiSU-Ultra) [[ "$FLAVOR" == "sukisu-ultra" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             KowSU) [[ "$FLAVOR" == "kowsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
+            FinaSU) [[ "$FLAVOR" == "finasu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             *) echo "run=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
@@ -521,6 +564,7 @@ jobs:
           KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           BAKASU_COMMIT: ${{ inputs.bakasu_commit }}
           SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
+          FINASU_COMMIT: ${{ inputs.finasu_commit }}
         run: |
           set -euo pipefail
           flavor="${{ matrix.flavor }}"
@@ -531,6 +575,7 @@ jobs:
             bakasu) pin="$BAKASU_COMMIT" ;;
             sukisu-ultra) pin="$SUKISU_ULTRA_COMMIT" ;;
             kowsu) pin="" ;;
+            finasu) pin="$FINASU_COMMIT" ;;
           esac
           if [[ -n "${pin:-}" ]]; then
             echo "sha=$pin" >> "$GITHUB_OUTPUT"
@@ -600,7 +645,7 @@ jobs:
           cd "$dir"
           if [ -f userspace/ksud/src/lkm_image_bootstrap.S ]; then
             clang --target=aarch64-linux-gnu -c -nostdlib -o userspace/ksud/.lkm_image_bootstrap.o userspace/ksud/src/lkm_image_bootstrap.S 2>&1 | tail -20 || echo "lkm bootstrap optional"
-            ls -lh userspace/ksud/.lkm_image_bootstrap.o 2>&1 | head -5 || true
+            find userspace/ksud -maxdepth 1 -name ".lkm_image_bootstrap.o" -exec ls -lh {} \; 2>&1 | head -5 || true
           else
             echo "no lkm_image_bootstrap.S, skip"
           fi
@@ -626,8 +671,8 @@ jobs:
           mkdir -p "/tmp/ksud-out-${{ matrix.flavor }}/aarch64-linux-android/release" "/tmp/ksud-out-${{ matrix.flavor }}/x86_64-linux-android/release"
           for p in "userspace/ksud/target/aarch64-linux-android/release/ksud" "target/aarch64-linux-android/release/ksud"; do [ -f "$p" ] && cp -fv "$p" "/tmp/ksud-out-${{ matrix.flavor }}/aarch64-linux-android/release/ksud" && break || true; done
           for p in "userspace/ksud/target/x86_64-linux-android/release/ksud" "target/x86_64-linux-android/release/ksud"; do [ -f "$p" ] && cp -fv "$p" "/tmp/ksud-out-${{ matrix.flavor }}/x86_64-linux-android/release/ksud" && break || true; done
-          ls -lhR /tmp/ksud-out-${{ matrix.flavor }} 2>&1 | head -50 || true
-          echo "ksud build summary: aarch64=$(ls -l /tmp/ksud-out-${{ matrix.flavor }}/aarch64-linux-android/release/ksud 2>&1 | head -1); x86_64=$(ls -l /tmp/ksud-out-${{ matrix.flavor }}/x86_64-linux-android/release/ksud 2>&1 | head -1)"
+          find "/tmp/ksud-out-${{ matrix.flavor }}" -type f -exec ls -lh {} \; 2>&1 | head -50 || true
+          echo "ksud build summary: aarch64=$(find "/tmp/ksud-out-${{ matrix.flavor }}/aarch64-linux-android/release" -name ksud -exec ls -l {} \; 2>&1 | head -1); x86_64=$(find "/tmp/ksud-out-${{ matrix.flavor }}/x86_64-linux-android/release" -name ksud -exec ls -l {} \; 2>&1 | head -1)"
 
       - name: Upload ksud (${{ matrix.flavor }} aarch64)
         if: steps.gate.outputs.run == 'true'
@@ -694,6 +739,7 @@ jobs:
             BakaSU) [[ "$FLAVOR" == "bakasu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             SukiSU-Ultra) [[ "$FLAVOR" == "sukisu-ultra" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             KowSU) [[ "$FLAVOR" == "kowsu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
+            FinaSU) [[ "$FLAVOR" == "finasu" ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT" ;;
             *) echo "run=false" >> "$GITHUB_OUTPUT" ;;
           esac
           cat "$GITHUB_OUTPUT"
@@ -708,6 +754,7 @@ jobs:
           KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           BAKASU_COMMIT: ${{ inputs.bakasu_commit }}
           SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
+          FINASU_COMMIT: ${{ inputs.finasu_commit }}
         run: |
           set -euo pipefail
           flavor="${{ matrix.flavor }}"
@@ -718,6 +765,7 @@ jobs:
             bakasu) pin="$BAKASU_COMMIT" ;;
             sukisu-ultra) pin="$SUKISU_ULTRA_COMMIT" ;;
             kowsu) pin="" ;;
+            finasu) pin="$FINASU_COMMIT" ;;
           esac
           if [[ -n "${pin:-}" ]]; then
             if ! [[ "$pin" =~ ^[0-9a-f]{40}$ ]]; then
@@ -803,7 +851,7 @@ jobs:
           if [ ! -f "$dir/app/src/main/jniLibs/arm64-v8a/libksud.so" ]; then f=$(find /tmp/ksud-dl-aarch64 -type f -name ksud 2>/dev/null | head -1 || true); [ -n "${f:-}" ] && cp -fv "$f" "$dir/app/src/main/jniLibs/arm64-v8a/libksud.so" || echo "no aarch64 ksud — manager will build without it"; fi
           for p in "/tmp/ksud-dl-x86_64/ksud" "/tmp/ksud-dl-x86_64/x86_64-linux-android/release/ksud"; do [ -f "$p" ] && cp -fv "$p" "$dir/app/src/main/jniLibs/x86_64/libksud.so" && echo "copied x86_64 ksud" && break || true; done
           if [ ! -f "$dir/app/src/main/jniLibs/x86_64/libksud.so" ]; then f=$(find /tmp/ksud-dl-x86_64 -type f -name ksud 2>/dev/null | head -1 || true); [ -n "${f:-}" ] && cp -fv "$f" "$dir/app/src/main/jniLibs/x86_64/libksud.so" || echo "no x86_64 ksud — manager will build without it"; fi
-          ls -lh "$dir/app/src/main/jniLibs"/*/* 2>&1 | head -20 || echo "no jniLibs"
+          find "$dir/app/src/main/jniLibs" -mindepth 2 -type f -exec ls -lh {} \; 2>&1 | head -20 || echo "no jniLibs"
 
       - name: Spoof Package ID (Next only, like upstream build-manager-ci)
         if: steps.gate.outputs.run == 'true' && (matrix.flavor == 'next' || matrix.flavor == 'next-susfs')
@@ -842,6 +890,10 @@ jobs:
           SUKISU_ULTRA_KEYSTORE_PASSWORD: ${{ secrets.SUKISU_ULTRA_KEYSTORE_PASSWORD }}
           SUKISU_ULTRA_KEY_ALIAS: ${{ secrets.SUKISU_ULTRA_KEY_ALIAS }}
           SUKISU_ULTRA_KEY_PASSWORD: ${{ secrets.SUKISU_ULTRA_KEY_PASSWORD }}
+          FINASU_KEYSTORE: ${{ secrets.FINASU_KEYSTORE }}
+          FINASU_KEYSTORE_PASSWORD: ${{ secrets.FINASU_KEYSTORE_PASSWORD }}
+          FINASU_KEY_ALIAS: ${{ secrets.FINASU_KEY_ALIAS }}
+          FINASU_KEY_PASSWORD: ${{ secrets.FINASU_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           dir="$SRC_DIR"
@@ -860,6 +912,7 @@ jobs:
               kernelsu) b64="${KERNELSU_KEYSTORE:-}"; pw="${KERNELSU_KEYSTORE_PASSWORD:-}"; alias="${KERNELSU_KEY_ALIAS:-}"; kp="${KERNELSU_KEY_PASSWORD:-}" ;;
               bakasu) b64="${BAKASU_KEYSTORE:-}"; pw="${BAKASU_KEYSTORE_PASSWORD:-}"; alias="${BAKASU_KEY_ALIAS:-}"; kp="${BAKASU_KEY_PASSWORD:-}" ;;
               sukisu-ultra) b64="${SUKISU_ULTRA_KEYSTORE:-}"; pw="${SUKISU_ULTRA_KEYSTORE_PASSWORD:-}"; alias="${SUKISU_ULTRA_KEY_ALIAS:-}"; kp="${SUKISU_ULTRA_KEY_PASSWORD:-}" ;;
+              finasu) b64="${FINASU_KEYSTORE:-}"; pw="${FINASU_KEYSTORE_PASSWORD:-}"; alias="${FINASU_KEY_ALIAS:-}"; kp="${FINASU_KEY_PASSWORD:-}" ;;
             esac
             if [ -n "${b64:-}" ] && [ -n "${pw:-}" ] && [ -n "${alias:-}" ]; then
               echo "Using your persistent key for $flavor (alias=$alias)"
@@ -897,9 +950,9 @@ jobs:
             local task="$1"
             echo ">> ./gradlew $task"
             set -o pipefail
-            if ! ./gradlew $task 2>&1 | tee /tmp/gradle-$flavor.log; then
+            if ! ./gradlew "$task" 2>&1 | tee "/tmp/gradle-${flavor}.log"; then
               echo "--- gradle $task FAILED for $flavor ---" >&2
-              tail -n 200 /tmp/gradle-$flavor.log 2>/dev/null || true
+              tail -n 200 "/tmp/gradle-${flavor}.log" 2>/dev/null || true
               return 1
             fi
           }
@@ -919,7 +972,7 @@ jobs:
               fi
               git checkout -- app/src/main/java 2>/dev/null || git checkout -- . 2>/dev/null || true
             fi
-            if ! $ok; then echo "ERROR: Next gradle failed" >&2; tail -n 300 /tmp/gradle-$flavor.log; exit 1; fi
+            if ! $ok; then echo "ERROR: Next gradle failed" >&2; tail -n 300 "/tmp/gradle-${flavor}.log"; exit 1; fi
           elif [ "$flavor" = "kernelsu" ]; then
             # Upstream tiann: ./gradlew clean assembleRelease (repack is separate job — we just build manager here)
             gradle_build "clean assembleRelease" || gradle_build "assembleRelease" || true
@@ -934,6 +987,9 @@ jobs:
               ./randomizer 2>&1 | tail -20 || true
               gradle_build "clean assembleRelease" || true
             fi
+          elif [ "$flavor" = "finasu" ]; then
+            # Upstream FinaSU (tiann-style): clean assembleRelease
+            gradle_build "clean assembleRelease" || gradle_build "assembleRelease" || true
           elif [ "$flavor" = "sukisu-ultra" ]; then
             # Upstream SukiSU-Ultra: clean assembleRelease, spoofed via randomizer
             gradle_build "clean assembleRelease" || true
@@ -966,8 +1022,8 @@ jobs:
             done
           fi
           if [ -f /tmp/next-spoofed.apk ]; then cp -f /tmp/next-spoofed.apk "$out/${flavor}-spoofed.apk" || true; fi
-          ls -lh "$out" 2>&1 | head -30 || true
-          if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then echo "WARNING: no APK produced for $flavor" >&2; fi
+          find "$out" -maxdepth 1 -type f -exec ls -lh {} \; 2>&1 | head -30 || true
+          if [ -z "$(find "$out" -mindepth 1 -print -quit 2>/dev/null)" ]; then echo "WARNING: no APK produced for $flavor" >&2; fi
           echo "MANAGER_OUT_$flavor=$out" >> "$GITHUB_ENV"
 
       - name: Upload gradle logs (${{ matrix.flavor }})
@@ -1026,7 +1082,7 @@ jobs:
           fi
           count=$(wc -l < /tmp/list.txt 2>/dev/null | tr -d ' ' || echo 0)
           echo "Found $count source-built manager APKs"
-          ls -lh manager_apks 2>&1 | head -40 || true
+          find manager_apks -maxdepth 1 -type f -exec ls -lh {} \; 2>&1 | head -40 || true
           APK_JSON="[]"
           while IFS= read -r f; do
             [ -n "$f" ] || continue
@@ -1074,7 +1130,15 @@ jobs:
 
   notes-preview:
     if: always()
-    needs: [resolve-managers, build-ksud-from-source, build-from-source, collect-source-managers, list-manager-apks, publish-manager-artifacts]
+    needs:
+      [
+        resolve-managers,
+        build-ksud-from-source,
+        build-from-source,
+        collect-source-managers,
+        list-manager-apks,
+        publish-manager-artifacts,
+      ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -1087,6 +1151,7 @@ jobs:
           KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           BAKASU_COMMIT: ${{ inputs.bakasu_commit }}
           SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
+          FINASU_COMMIT: ${{ inputs.finasu_commit }}
           NEXT_SUSFS_COMMIT: ${{ inputs.kernelsu_next_susfs_commit }}
           MANAGER_LIST_FETCH: ${{ needs.resolve-managers.outputs.manager_list }}
         run: |
@@ -1102,6 +1167,7 @@ jobs:
               "KernelSU": env("KSU_COMMIT") or "latest main tip",
               "BakaSU": env("BAKASU_COMMIT") or "latest tip",
               "SukiSU-Ultra": env("SUKISU_ULTRA_COMMIT") or "latest tip",
+              "FinaSU": env("FINASU_COMMIT") or "latest tip",
               "KowSU": "latest tip",
               "KernelSU-Next-SUSFS": env("NEXT_SUSFS_COMMIT") or "latest dev-susfs tip",
           }
@@ -1110,7 +1176,7 @@ jobs:
           if raw:
               try:
                   for m in json.loads(raw):
-                      label = {"next":"KernelSU-Next","kernelsu":"KernelSU","bakasu":"BakaSU","sukisu-ultra":"SukiSU-Ultra","kowsu":"KowSU","next-susfs":"KernelSU-Next-SUSFS"}.get(m.get("flavor",""), "")
+                      label = {"next":"KernelSU-Next","kernelsu":"KernelSU","bakasu":"BakaSU","sukisu-ultra":"SukiSU-Ultra","finasu":"FinaSU","kowsu":"KowSU","next-susfs":"KernelSU-Next-SUSFS"}.get(m.get("flavor",""), "")
                       if label and m.get("stock"):
                           commits[label] = m["stock"]
               except: pass
@@ -1120,7 +1186,7 @@ jobs:
           lines.append("## Features")
           lines.append("")
           if root == "All":
-              lines.append("- All manager flavors (KernelSU-Next, KernelSU, BakaSU, SukiSU-Ultra, KernelSU-Next-SUSFS)")
+              lines.append("- All manager flavors (KernelSU-Next, KernelSU, BakaSU, SukiSU-Ultra, FinaSU, KernelSU-Next-SUSFS)")
           else:
               lines.append(f"- {root}")
           lines.append(f"- {'Built from source' if src else 'Fetched prebuilt (upstream CI)'}")

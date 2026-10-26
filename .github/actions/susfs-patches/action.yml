@@ -23,6 +23,11 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
 
+    # Fake patches restored selectively: only -le (lower sublevel, context-adding)
+    # blocks are enabled. -ge blocks (context-removal, e.g. deleting #include lines
+    # like trace/hooks/blk.h and trace/hooks/mm.h) stay disabled because they break
+    # the SUSFS patch's own context on lts/newer sublevels. Restore individual -ge
+    # blocks from git history only if a specific sublevel regresses without them.
     - name: Apply Android 12 5.10 Fake Patches
       shell: bash
       if: inputs.version == 'android12-5.10'
@@ -34,11 +39,7 @@ runs:
         fi
         if [ "${{ inputs.sublevel }}" -le "117" ]; then
           echo "Applying fdinfo.c Android 12 5.10 Fake Patch"
-          perl -0777 -i -pe 's{(if \(inode\) \{\n)\t\t/\*\n(\t\t \*[^\n]*\n)+\t\t \*/\n}{$1}g; s{^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;\n}{}m' fs/notify/fdinfo.c
-          perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
-          echo "Adding inotify_mark_user_mask function definition"
-          python3 -c 'import re;c=open("fs/notify/fdinfo.c").read();c=re.sub(r"^static void inotify_fdinfo\(struct seq_file \*m, struct fsnotify_mark \*mark\)$",lambda m:"static inline u32 inotify_mark_user_mask(struct fsnotify_mark *mark)\n{\n\treturn mark->mask & IN_ALL_EVENTS;\n}\n\n"+m.group(0),c,count=1,flags=re.MULTILINE);open("fs/notify/fdinfo.c","w").write(c)'
+          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_fdinfo.py" fs/notify/fdinfo.c
         fi
 
     - name: Apply Android 13 5.10 Fake Patches
@@ -49,11 +50,7 @@ runs:
         echo "Applying Android 13 5.10 SUSFS fixes"
         if [ "${{ inputs.sublevel }}" -le "107" ]; then
           echo "Applying fdinfo.c Android 13 5.10 Fake Patch"
-          perl -0777 -i -pe 's{(if \(inode\) \{\n)\t\t/\*\n(\t\t \*[^\n]*\n)+\t\t \*/\n}{$1}g; s{^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;\n}{}m' fs/notify/fdinfo.c
-          perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
-          echo "Adding inotify_mark_user_mask function definition"
-          python3 -c 'import re;c=open("fs/notify/fdinfo.c").read();c=re.sub(r"^static void inotify_fdinfo\(struct seq_file \*m, struct fsnotify_mark \*mark\)$",lambda m:"static inline u32 inotify_mark_user_mask(struct fsnotify_mark *mark)\n{\n\treturn mark->mask & IN_ALL_EVENTS;\n}\n\n"+m.group(0),c,count=1,flags=re.MULTILINE);open("fs/notify/fdinfo.c","w").write(c)'
+          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_fdinfo.py" fs/notify/fdinfo.c
         fi
 
     - name: Apply Android 13 5.15 Fake Patches
@@ -68,20 +65,9 @@ runs:
           echo "Applying open.c Android 13 5.15 Fake Patch"
           sed -i '/^#include <linux\/compat.h>$/a #include <linux/mnt_idmapping.h>' fs/open.c
           echo "Applying fdinfo.c Android 13 5.15 Fake Patch"
-          perl -0777 -i -pe 's{(if \(inode\) \{\n)\t\t/\*\n(\t\t \*[^\n]*\n)+\t\t \*/\n}{$1}g; s{^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;\n}{}m' fs/notify/fdinfo.c
-          perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
-          perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
-          echo "Adding inotify_mark_user_mask function definition"
-          python3 -c 'import re;c=open("fs/notify/fdinfo.c").read();c=re.sub(r"^static void inotify_fdinfo\(struct seq_file \*m, struct fsnotify_mark \*mark\)$",lambda m:"static inline u32 inotify_mark_user_mask(struct fsnotify_mark *mark)\n{\n\treturn mark->mask & IN_ALL_EVENTS;\n}\n\n"+m.group(0),c,count=1,flags=re.MULTILINE);open("fs/notify/fdinfo.c","w").write(c)'
+          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_fdinfo.py" fs/notify/fdinfo.c
         fi
-        if [ "${{ inputs.sublevel }}" -ge "197" ]; then
-          echo "Applying namespace.c Android 13 5.15 Fake Patch"
-          sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
-        fi
-        if [ "${{ inputs.sublevel }}" -ge "197" ]; then
-          echo "Applying task_mmu.c Android 13 5.15 Fake Patch"
-          sed -i '/^#include <trace\/hooks\/mm.h>$/d' fs/proc/task_mmu.c
-        fi
+        # -ge 197 blocks stay disabled (context removal breaks SUSFS patch context)
 
     - name: Apply Android 14 6.1 Fake Patches
       shell: bash
@@ -96,12 +82,7 @@ runs:
           echo "Applying base.c Android 14 6.1 Fake Patch"
           sed -i '/^#include <linux\/cpufreq_times.h>$/a #include <linux/dma-buf.h>' fs/proc/base.c
         fi
-        if [ "${{ inputs.sublevel }}" -ge "157" ]; then
-          echo "Applying namespace.c Android 14 6.1 Fake Patch"
-          sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
-          echo "Applying super.c Android 14 6.1 Fake Patch"
-          sed -i '/^#include <trace\/hooks\/fs.h>$/,+1 d' fs/super.c
-        fi
+        # -ge 157 blocks stay disabled (context removal breaks SUSFS patch context)
 
     - name: Apply Android 15 6.6 Fake Patches
       shell: bash
@@ -111,7 +92,7 @@ runs:
         echo "Applying 6.6 SUSFS fixes"
         if [ "${{ inputs.sublevel }}" -le "30" ]; then
           echo "Applying taskmmu.c Android 15 6.6 Fake Patch"
-          python3 -c 'import re;c=open("fs/proc/task_mmu.c").read();c=re.sub(r"(\t+\t\tif\s*\(\s*vma->vm_end\s*>\s*last_vma_end\s*\))\n(\t+\t\t\tsmap_gather_stats\(vma,\s*&mss,\s*last_vma_end\);)\n(\t+)\}",lambda m:m.group(1)+" {\n"+m.group(2)+"\n"+m.group(3)+"\t\tlast_vma_end = vma->vm_end;\n"+m.group(3)+"\t}\n"+m.group(3)+"}",c,count=1);open("fs/proc/task_mmu.c","w").write(c)'
+          python3 -c 'import re;c=open("fs/proc/task_mmu.c").read();c=re.sub(r"(\t+\t\tif\s*\(\s*vma->vm_end\s*>\s*last_vma_end\s*\))\n(\t+\t\t\tsmap_gather_stats\(vma,\s*&mss,\s*last_vma_end\);\n(\t+)\}",lambda m:m.group(1)+" {\n"+m.group(2)+"\n"+m.group(3)+"\t\tlast_vma_end = vma->vm_end;\n"+m.group(3)+"\t}\n"+m.group(3)+"}",c,count=1);open("fs/proc/task_mmu.c","w").write(c)'
         fi
         if [ "${{ inputs.sublevel }}" -le "30" ] && [ "${{ inputs.os_patch_level }}" = "2024-07" ]; then
           echo "Adding __fold_filemap_fixup_entry stub for 2024-07 kernels"
@@ -126,31 +107,32 @@ runs:
           sed -i '/^#include <linux\/sched\/sysctl.h>$/a #include <linux/zswap.h>' mm/memory.c
         fi
 
-    - name: Apply Android 16 6.12 Fake Patches
-      shell: bash
-      if: inputs.version == 'android16-6.12'
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        echo "Applying 6.12 SUSFS fixes"
-        if [ "${{ inputs.sublevel }}" -ge "58" ]; then
-          echo "Applying exec.c Android 16 6.12 Fake Patch"
-          sed -i '/^#include <linux\/dma-buf.h>$/d' fs/exec.c
-        fi
-        if [ "${{ inputs.sublevel }}" -ge "69" ]; then
-          echo "Applying task_mmu.c Android 16 6.12 Fake Patch"
-          sed -i 's/vma_data_pages/vma_pages/g' fs/proc/task_mmu.c
-        fi
-        # Sublevel 92 (2026-09) and lts refactored show_smaps_rollup to use
-        # proc_maps_locking_ctx / proc_get_vma() / smap_gather_stats_range(),
-        # replacing the do { ... } for_each_vma loop the SUSFS patch is written
-        # against - including the "Case 4" partial-range block, whose work moved
-        # into smap_gather_stats_range(). Reshape it back so those two patch
-        # hunks apply. susfs-revert-patches restores the 92 form immediately
-        # after the patch, before anything is compiled.
-        if [ "${{ inputs.sublevel }}" -ge "92" ]; then
-          echo "Applying task_mmu.c show_smaps_rollup reshape for 6.12 sublevel 92+"
-          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_612.py" fs/proc/task_mmu.c apply
-        fi
+    # Android 16 6.12 fake patches stay fully disabled - all are -ge (context removal)
+    # - name: Apply Android 16 6.12 Fake Patches
+    #   shell: bash
+    #   if: inputs.version == 'android16-6.12'
+    #   working-directory: ${{ github.workspace }}/kernel/common
+    #   run: |
+    #     echo "Applying 6.12 SUSFS fixes"
+    #     if [ "${{ inputs.sublevel }}" -ge "58" ]; then
+    #       echo "Applying exec.c Android 16 6.12 Fake Patch"
+    #       sed -i '/^#include <linux\/dma-buf.h>$/d' fs/exec.c
+    #     fi
+    #     if [ "${{ inputs.sublevel }}" -ge "69" ]; then
+    #       echo "Applying task_mmu.c Android 16 6.12 Fake Patch"
+    #       sed -i 's/vma_data_pages/vma_pages/g' fs/proc/task_mmu.c
+    #     fi
+    #     # Sublevel 92 (2026-09) and lts refactored show_smaps_rollup to use
+    #     # proc_maps_locking_ctx / proc_get_vma() / smap_gather_stats_range(),
+    #     # replacing the do { ... } for_each_vma loop the SUSFS patch is written
+    #     # against - including the "Case 4" partial-range block, whose work moved
+    #     # into smap_gather_stats_range(). Reshape it back so those two patch
+    #     # hunks apply. susfs-revert-patches restores the 92 form immediately
+    #     # after the patch, before anything is compiled.
+    #     if [ "${{ inputs.sublevel }}" -ge "92" ]; then
+    #       echo "Applying task_mmu.c show_smaps_rollup reshape for 6.12 sublevel 92+"
+    #       python3 "${{ github.workspace }}/.github/scripts/susfs_fake_612.py" fs/proc/task_mmu.c apply
+    #     fi
 
     - name: Apply Kernel SUSFS Patches
       shell: bash
@@ -191,7 +173,6 @@ runs:
         # only 2-arg getname_flags(const char *, int). Drop the trailing NULL.
         #if [[ "${{ inputs.version }}" == "android16-6.12" ]]; then
         #  if grep -q 'getname_flags(filename, lookup_flags, NULL)' fs/open.c; then
-        #    echo "Fixing getname_flags 3-arg -> 2-arg for 6.12"
         #    sed -i 's/getname_flags(filename, lookup_flags, NULL)/getname_flags(filename, lookup_flags)/g' fs/open.c
         #  fi
         #fi

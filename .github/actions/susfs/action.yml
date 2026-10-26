@@ -53,6 +53,88 @@ runs:
         echo "Applying SUSFS enable patch to KernelSU (tiann) checkout (kernel/KernelSU/kernel)"
         patch -p1 < "$PATCH"
 
+    - name: Enable SUSFS for FinaSU (LyraVoid)
+      # FinaSU (plain tiann-layout fork) carries no susfs integration of its
+      # own; it gets the same 10_enable treatment as the kernelsu flavour plus
+      # the vendored LingLuo17 drift fixes (selinux_hide symbol exports for the
+      # susfs side's ThinLTO externs, fd-variant exec hooks, seccomp filter
+      # mode, Kbuild restore) and the manager cert injected into the second
+      # trust slot - without it the manager shows "Not installed".
+      if: inputs.root_flavor == 'finasu'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      env:
+        SUSFS4KSU: ${{ github.workspace }}/susfs4ksu
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        bash "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/apply.sh" FinaSU "${{ inputs.version }}" "${{ inputs.sublevel }}"
+
+        # Old-model completion: when the 10_enable selinux_hide rewrite partially
+        # applies, the file can end up without fake_state entirely, while the
+        # susfs kernel patch's security/selinux/selinuxfs.c externs it (and
+        # expects it backed by the sepolicy backup, per the 10_enable old-model
+        # design). Define it globally and initialise it from backup_sepolicy in
+        # enable(), and globalise the fake_status trio for the patch's externs.
+        SEL="FinaSU/kernel/feature/selinux_hide.c"
+        if ! grep -q 'fake_state' "$SEL"; then
+          python3 "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/fix_old_model.py" "$SEL"
+          grep -n '^struct selinux_state fake_state;' "$SEL"
+        fi
+
+        # Manager-cert injection: derive size/sha256 from the current FinaSU
+        # release APK (matches the manager flavour our release ships) and
+        # inject as the second trusted signature. Falls back loudly if the
+        # release has no apk asset.
+        REL_APK="$(mktemp -d)/manager.apk"
+        REL_JSON=""
+        for ATTEMPT in 1 2 3; do
+          REL_JSON="$(curl -s --fail --max-time 30 -H "Authorization: Bearer ${GH_TOKEN:-}" \
+            "https://api.github.com/repos/LyraVoid/FinaSU/releases/latest")" \
+            && [ -n "$REL_JSON" ] && break
+          echo "release lookup failed, retry ($ATTEMPT/3)..." >&2
+          sleep 5
+        done
+        REL_URL="$(printf '%s' "$REL_JSON" | python3 -c \
+          "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d.get('assets',[]) if a['name'].endswith('.apk')))" 2>/dev/null || true)"
+        [ -n "$REL_URL" ] || { echo "ERROR: no apk asset on FinaSU latest release; cannot derive manager cert" >&2; exit 1; }
+        curl -sL --fail --retry 3 --max-time 300 -H "Authorization: Bearer ${GH_TOKEN:-}" -o "$REL_APK" "$REL_URL"
+        CERT_INFO="$(python3 "$GITHUB_WORKSPACE/.github/actions/susfs/finasu_compat/extract_manager_cert.py" "$REL_APK" | head -n1)"
+        [ -n "$CERT_INFO" ] || { echo "ERROR: cert extraction failed" >&2; exit 1; }
+        CERT_SIZE="$(echo "$CERT_INFO" | awk '{print $1}')"
+        CERT_HASH="$(echo "$CERT_INFO" | awk '{print $2}')"
+        echo "Injecting FinaSU manager cert into second trust slot: size=$CERT_SIZE sha256=$CERT_HASH"
+        awk -v size="$CERT_SIZE" -v hash="$CERT_HASH" '
+          !done && /^ccflags-y \+= -DEXPECTED_HASH=/ {
+            print
+            print "# injected by GKI_KernelSU_SUSFS finasu flavour: trust the official FinaSU manager via the second signature slot"
+            print "KSU_EXPECTED_SIZE2 := " size
+            print "KSU_EXPECTED_HASH2 := " hash
+            print "KSU_SECOND_SIGNATURE_RELEASE := 1"
+            done = 1
+            next
+          }
+          { print }
+        ' FinaSU/kernel/Kbuild > FinaSU/kernel/Kbuild.new && mv FinaSU/kernel/Kbuild.new FinaSU/kernel/Kbuild
+        grep -q "^KSU_EXPECTED_SIZE2 := " FinaSU/kernel/Kbuild \
+          && grep -q "^KSU_EXPECTED_HASH2 := " FinaSU/kernel/Kbuild \
+          && grep -q "^KSU_SECOND_SIGNATURE_RELEASE := 1" FinaSU/kernel/Kbuild \
+          || { echo "ERROR: Kbuild cert injection failed (anchor missing)" >&2; exit 1; }
+
+    - name: Enable SUSFS for BakaSU
+      # BakaSU carries SUSFS but ships my_write_context/my_write_access as
+      # static and lacks my_setprocattr + preinit functions that the susfs4ksu
+      # 50_add_susfs_in_gki patch extern-declares. This compat layer makes the
+      # symbols global and adds preinit support so the link succeeds.
+      if: inputs.root_flavor == 'bakasu'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      env:
+        SUSFS4KSU: ${{ github.workspace }}/susfs4ksu
+      run: |
+        set -euo pipefail
+        bash "$GITHUB_WORKSPACE/.github/actions/susfs/bakasu_compat/apply.sh" BakaSU "${{ inputs.version }}" "${{ inputs.sublevel }}"
+
     - name: Enable SUSFS Kernel Configs
       uses: ./.github/actions/susfs-config
 
