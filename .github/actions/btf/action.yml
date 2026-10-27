@@ -124,6 +124,10 @@ runs:
         # Same dpkg-state recovery as setup-build-environment's BTF deps
         # step: runner images occasionally ship with 'dpkg was interrupted'
         # (exit 100), which dpkg --configure -a repairs. Retry up to 3x.
+        # Refresh lists first: images also ship stale lists and the Azure
+        # mirror 404s superseded versions (liblzma-dev), which no dpkg
+        # repair fixes.
+        sudo apt-get update -qq 2>&1 | tail -2 || true
         ok=0
         for attempt in 1 2 3; do
           if sudo apt-get install -y -qq cmake gcc libdw-dev libelf-dev zlib1g-dev dwarves; then ok=1; break; fi
