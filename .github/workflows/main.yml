@@ -132,7 +132,7 @@ jobs:
   # workflow_dispatch is unaffected. Upstream sets the variable to 'true'.
   resolve-sources:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_BUILDS == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       nomount_commit: ${{ steps.resolve.outputs.nomount_commit }}
       kernelsu_commit: ${{ steps.resolve.outputs.kernelsu_commit }}
@@ -675,7 +675,7 @@ jobs:
   list-manager-apks:
     needs: resolve-sources
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && needs.resolve-sources.outputs.manager_list != ''"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       apk_list: ${{ steps.scan.outputs.apk_list }}
     steps:
@@ -810,7 +810,7 @@ jobs:
   publish-manager-artifacts:
     needs: list-manager-apks
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && needs.list-manager-apks.outputs.apk_list != '[]'"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -842,7 +842,7 @@ jobs:
     if: "(github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && !inputs.test_release_notes"
     env:
       NOMOUNT_WANTED: ${{ inputs.use_nomount || (github.event_name == 'schedule' && true) || false }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         if: env.NOMOUNT_WANTED == 'true'
@@ -1111,7 +1111,7 @@ jobs:
       - build-android14-6-1
       - build-android15-6-6
       - build-android16-6-12
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -1436,7 +1436,7 @@ jobs:
 
   update-verified-pins:
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.commit_mode == 'update'"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: write
@@ -1491,7 +1491,7 @@ jobs:
           git push
   rej:
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && always()"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -1575,7 +1575,7 @@ jobs:
           path: AIO-REJ.zip
 
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # always() so a skipped sibling doesn't cascade: on a single-family
     # dispatch the other six build jobs skip, and a skipped need skips
     # this job too, making Pre-Release/Release unreachable outside a
@@ -2031,7 +2031,7 @@ jobs:
   notes-preview:
     if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_BUILDS == 'true'))
     needs: [resolve-sources, build-android12-5-10, build-android13-5-10, build-android13-5-15, build-android14-5-15, build-android14-6-1, build-android15-6-6, build-android16-6-12]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Render release notes preview (always)
@@ -2220,7 +2220,7 @@ jobs:
       needs.notes-preview.result == 'success' &&
       (github.event_name == 'schedule' || inputs.release_type == 'Nightly')
     needs: [notes-preview, resolve-sources]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
