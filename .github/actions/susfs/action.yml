@@ -1,6 +1,10 @@
 name: 'Setup SUSFS'
-description: 'Clone and apply SUSFS patches with version-specific fixes'
+description: 'Resolve, apply and fix SUSFS in one step: commit resolution, per-flavor enable, patches, then the post-patch build fixes (ksu_close_fd, selinux_hide)'
 inputs:
+  enabled:
+    description: 'Whether SUSFS is part of this build ("true"/"false"). When false the patch steps are skipped but the generic post-patch fixes still run.'
+    required: false
+    default: "true"
   susfs_commit:
     description: 'SUSFS commit hash (empty = latest on auto-derived gki-{version} branch)'
     required: false
@@ -24,14 +28,39 @@ inputs:
     description: 'Selected root implementation (kernelsu / next / bakasu / sukisu-ultra). KernelSU (tiann main) needs the 10_enable_susfs_for_ksu patch; other flavors already ship SUSFS.'
     required: false
     default: ""
+outputs:
+  susfs_commit:
+    description: 'Resolved SUSFS commit actually used (latest tip for the next flavor, the pin otherwise)'
+    value: ${{ steps.resolve.outputs.commit }}
 
 runs:
   using: "composite"
   steps:
+    - name: Resolve SUSFS commit
+      id: resolve
+      if: inputs.enabled == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # KernelSU-Next (next) always uses the latest susfs4ksu gki branch tip so
+        # SUSFS stays API-matched to the always-latest KernelSU-Next tree. All
+        # other roots (kernelsu, bakasu, finasu, sukisu-ultra) use the pinned
+        # verified SUSFS commit.
+        if [ "${{ inputs.root_flavor }}" = "next" ]; then
+          BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+          SUSFS_COMMIT="$(git ls-remote https://gitlab.com/simonpunk/susfs4ksu.git "refs/heads/${BRANCH}" | cut -f1)"
+          echo "KernelSU-Next: resolving SUSFS at latest on ${BRANCH} -> ${SUSFS_COMMIT}"
+        else
+          SUSFS_COMMIT="${{ inputs.susfs_commit }}"
+          echo "Using pinned SUSFS commit: ${SUSFS_COMMIT}"
+        fi
+        echo "commit=${SUSFS_COMMIT}" >> "$GITHUB_OUTPUT"
+
     - name: Setup SUSFS Branch
+      if: inputs.enabled == 'true'
       uses: ./.github/actions/susfs-setup
       with:
-        susfs_commit: ${{ inputs.susfs_commit }}
+        susfs_commit: ${{ steps.resolve.outputs.commit }}
         version: ${{ inputs.version }}
         root_flavor: ${{ inputs.root_flavor }}
 
@@ -40,7 +69,7 @@ runs:
       # apply the enable patch from susfs4ksu onto the KernelSU checkout.
       # pershoot dev-susfs (next) and BakaSU already include SUSFS, so this is
       # a no-op for those flavors.
-      if: inputs.root_flavor == 'kernelsu'
+      if: inputs.enabled == 'true' && inputs.root_flavor == 'kernelsu'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/KernelSU
       run: |
@@ -60,7 +89,7 @@ runs:
       # susfs side's ThinLTO externs, fd-variant exec hooks, seccomp filter
       # mode, Kbuild restore) and the manager cert injected into the second
       # trust slot - without it the manager shows "Not installed".
-      if: inputs.root_flavor == 'finasu'
+      if: inputs.enabled == 'true' && inputs.root_flavor == 'finasu'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       env:
@@ -126,7 +155,7 @@ runs:
       # static and lacks my_setprocattr + preinit functions that the susfs4ksu
       # 50_add_susfs_in_gki patch extern-declares. This compat layer makes the
       # symbols global and adds preinit support so the link succeeds.
-      if: inputs.root_flavor == 'bakasu'
+      if: inputs.enabled == 'true' && inputs.root_flavor == 'bakasu'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       env:
@@ -136,9 +165,11 @@ runs:
         bash "$GITHUB_WORKSPACE/.github/actions/susfs/bakasu_compat/apply.sh" BakaSU "${{ inputs.version }}" "${{ inputs.sublevel }}"
 
     - name: Enable SUSFS Kernel Configs
+      if: inputs.enabled == 'true'
       uses: ./.github/actions/susfs-config
 
     - name: Apply SUSFS Patches
+      if: inputs.enabled == 'true'
       uses: ./.github/actions/susfs-patches
       with:
         version: ${{ inputs.version }}
@@ -146,8 +177,85 @@ runs:
         os_patch_level: ${{ inputs.os_patch_level }}
 
     - name: Revert SUSFS Fake Patches
+      if: inputs.enabled == 'true'
       uses: ./.github/actions/susfs-revert-patches
       with:
         version: ${{ inputs.version }}
         sublevel: ${{ inputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
+
+    - name: Restore ksu_close_fd for kernels < 5.15 (kernelsu preinit)
+      if: inputs.enabled == 'true' && inputs.root_flavor == 'kernelsu'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        # SUSFS 10_enable patch rewrites ksu_close_fd(fd) -> close_fd(fd)
+        # in preinit.c. close_fd() is undeclared on kernels < 5.15.
+        # Restore ksu_close_fd(fd) which KernelSU defines via ksyscall(close, fd).
+        set -euo pipefail
+        for d in common/drivers/kernelsu drivers/kernelsu; do
+          F="${{ github.workspace }}/kernel/$d/preinit/preinit.c"
+          if [ -f "$F" ] && grep -qE '^[[:space:]]*close_fd\(fd\);' "$F"; then
+            sed -i 's/^\([[:space:]]*\)close_fd(fd);/\1ksu_close_fd(fd);/' "$F"
+            echo "Restored ksu_close_fd(fd) in $F"
+          else
+            echo "No bare close_fd(fd) in $F; skipping"
+          fi
+        done
+
+    - name: Fix selinux_hide pointer-bool-conversion on 6.6+ (ALL branches)
+      # Runs whether or not SUSFS patches were applied: every root flavor
+      # compiles its own selinux_hide.c, and 6.6+ clang turns the bare
+      # `if (fn)` forms into -Werror. The file list used to be fed from
+      # `find`; a 2026 rewrite to `while read` lost the producer and the
+      # step silently iterated zero files. Enumerate explicitly.
+      shell: bash
+      run: |
+        set -euo pipefail
+        KVER="${{ inputs.kernel_version }}"
+        if [ "$(printf '%s\n' "6.6" "$KVER" | sort -V | head -n1)" != "6.6" ]; then
+          echo "[-] KVER $KVER < 6.6; no selinux_hide fix needed"
+          exit 0
+        fi
+        echo "[*] KVER $KVER >= 6.6, patching selinux_hide.c (all flavors/branches)"
+        mapfile -d '' FILES < <(find "$GITHUB_WORKSPACE/kernel" -name selinux_hide.c \
+          -not -path '*/.git/*' -print0 2>/dev/null || true)
+        if [ "${#FILES[@]}" -eq 0 ]; then
+          echo "[-] no selinux_hide.c under $GITHUB_WORKSPACE/kernel (root_flavor='${{ inputs.root_flavor }}'); nothing to patch"
+          exit 0
+        fi
+        for f in "${FILES[@]}"; do
+          # After SUSFS 10_enable (kernelsu only) the declaration becomes
+          #   extern void security_dump_masked_av_fn(...)   (a function)
+          #   if (func) / if (func != NULL) both trigger -Werror:
+          #     -Wpointer-bool-conversion  vs  -Wtautological-pointer-compare
+          # For the function form,  &func != NULL  silences both (clang note).
+          # For the pointer form (bakasu/next/sukisu-ultra/finasu, no 10_enable) we want ptr != NULL.
+          if grep -q "extern void security_dump_masked_av_fn" "$f"; then
+            echo "[*] $f is extern-function form (10_enable applied), patching with &"
+            sed -i 's/if (security_dump_masked_av_fn)/if (\&security_dump_masked_av_fn)/g' "$f"
+            sed -i 's/if (security_dump_masked_av_fn != NULL)/if (\&security_dump_masked_av_fn != NULL)/g' "$f"
+            sed -i 's/if (context_struct_compute_av_fn)/if (\&context_struct_compute_av_fn)/g' "$f"
+            sed -i 's/if (context_struct_compute_av_fn != NULL)/if (\&context_struct_compute_av_fn != NULL)/g' "$f"
+            echo "[+] Patched $f (function form)"
+          elif grep -q "if (security_dump_masked_av_fn" "$f"; then
+            echo "[*] $f is pointer form, patching with != NULL"
+            sed -i 's/if (security_dump_masked_av_fn)/if (security_dump_masked_av_fn != NULL)/g' "$f"
+            sed -i 's/if (context_struct_compute_av_fn)/if (context_struct_compute_av_fn != NULL)/g' "$f"
+            echo "[+] Patched $f (pointer form)"
+          else
+            echo "[*] $f already patched"
+          fi
+          # Next (and tiann without 10_enable fallback) declares the 3 helpers as
+          # static on 6.6, but kernel hooks.c/selinuxfs.c reference them as extern
+          # after SUSFS (BakaSU uses __maybe_static -> global). Strip static so
+          # the linker can resolve security_context_to_sid_with_policy etc.
+          if grep -q "^static int security_context_to_sid_with_policy" "$f"; then
+            echo "[*] Stripping static from $f helpers (Next 6.6)"
+            sed -i 's/^static int security_context_to_sid_with_policy/int security_context_to_sid_with_policy/g' "$f"
+            sed -i 's/^static int security_sid_to_context_with_policy/int security_sid_to_context_with_policy/g' "$f"
+            sed -i 's/^static void security_compute_av_user_with_policy/void security_compute_av_user_with_policy/g' "$f"
+            # also forward decls (same prefix, same sed covers them)
+            echo "[+] Stripped static from $f"
+          fi
+        done
