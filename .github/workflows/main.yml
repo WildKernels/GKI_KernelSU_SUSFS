@@ -1100,8 +1100,15 @@ jobs:
     # off by a single-family dispatch) are dropped; ran families post even
     # when some jobs failed - the counts carry the bad news. Non-fatal by
     # design: a Telegram outage must never fail a build.
+    #
+    # PATCH-DATE GATE (user request 2026-10-27): announce ONLY when the
+    # dispatch's Patch date is "All" (the no-filter default) or blank
+    # (schedule runs have no inputs). Any narrowed patch date - a single
+    # YYYY-MM, a kernel sublevel, an lts string - is a targeted/test build
+    # and posts nothing, in either group. GitHub string comparison is
+    # case-insensitive, so "All" here also matches all/ALL.
     name: Telegram Announce
-    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_BUILDS == 'true')) }}
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_BUILDS == 'true')) && (github.event_name != 'workflow_dispatch' || inputs.os_patch_level == '' || inputs.os_patch_level == 'All') }}
     needs:
       - resolve-sources
       - build-android12-5-10
@@ -1233,12 +1240,25 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          # Dispatch "Patch date" input (blank on schedule runs). The job-level
+          # if: already gates non-All values; this re-checks so a future edit to
+          # that gate can never leak a targeted patch-date build into the groups.
+          PATCH_LEVEL: ${{ inputs.os_patch_level }}
         run: |
           set -uo pipefail
           if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
             echo "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set; skipping announce."
             exit 0
           fi
+          # Patch-date gate: announce only for the no-filter build (Patch date
+          # "All", any casing, or blank). Narrowed patch dates are test builds.
+          case "$(printf '%s' "${PATCH_LEVEL:-All}" | tr '[:upper:]' '[:lower:]')" in
+            all|"") : ;;
+            *)
+              echo "Patch date '${PATCH_LEVEL}' is not All - targeted build, skipping Telegram announce."
+              exit 0
+              ;;
+          esac
           RUN_ID="${{ github.run_id }}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}"
           NIGHTLY_URL="https://nightly.link/${{ github.repository }}/actions/runs/${RUN_ID}"
