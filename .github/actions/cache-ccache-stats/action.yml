@@ -31,21 +31,45 @@ runs:
         ccache -p || true
         echo "====================="
 
-        STATS="$(ccache -s)"
-        echo "$STATS"
+        # Format note: this repo pins a self-built ccache ("master.<sha>") whose
+        # `-s` prints ONLY the local-storage table -- no "Cacheable calls:" /
+        # "Hits:" lines. The old parser therefore always took the else branch
+        # and reported hit_rate=0.0%, which is how a completely bypassed ccache
+        # looked like a healthy-but-cold cache instead of a bug. Prefer the
+        # machine-readable --print-stats and treat "no cacheable calls after a
+        # build" as an error, not a zero rate.
+        PRINTED="$(ccache --print-stats 2>/dev/null || true)"
+        if [ -n "$PRINTED" ]; then
+          echo "=== ccache --print-stats ==="
+          echo "$PRINTED"
+          HITS=$(awk -F'\t' '$1 ~ /^cache_hit/ {s+=$2} END{print s+0}' <<<"$PRINTED")
+          MISSES=$(awk -F'\t' '$1 ~ /^cache_miss/ {s+=$2} END{print s+0}' <<<"$PRINTED")
+          CACHEABLE=$(( HITS + MISSES ))
+          DIRECT=$(awk -F'\t' '$1 ~ /^cache_hit_direct/ {s+=$2} END{print s+0}' <<<"$PRINTED")
+        else
+          STATS="$(ccache -s 2>/dev/null || true)"
+          echo "=== ccache -s ==="
+          echo "$STATS"
+          CACHEABLE=$(echo "$STATS" | awk '/Cacheable calls:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
+          HITS=$(echo "$STATS" | awk '/^[[:space:]]*Hits:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
+          DIRECT=$(echo "$STATS" | awk '/Direct:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
+        fi
 
-        CACHEABLE=$(echo "$STATS" | awk '/Cacheable calls:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
-        HITS=$(echo "$STATS" | awk '/^[[:space:]]*Hits:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
-        DIRECT=$(echo "$STATS" | awk '/Direct:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
+        CACHEABLE=${CACHEABLE:-0}
+        HITS=${HITS:-0}
+        DIRECT=${DIRECT:-0}
 
-        if [ "${CACHEABLE:-0}" -gt 0 ]; then
-          HIT_RATE=$(awk -v h="${HITS:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (h/c)*100}')
-          DIRECT_RATE=$(awk -v d="${DIRECT:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (d/c)*100}')
+        if [ "$CACHEABLE" -gt 0 ]; then
+          HIT_RATE=$(awk -v h="$HITS" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (h/c)*100}')
+          DIRECT_RATE=$(awk -v d="$DIRECT" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (d/c)*100}')
           echo "hit_rate=${HIT_RATE}%"
           echo "direct_rate=${DIRECT_RATE}%"
         else
           echo "hit_rate=0.0%"
           echo "direct_rate=0.0%"
+          if [ "${{ inputs.clear_stats }}" = "false" ]; then
+            echo "::error::ccache saw zero cacheable calls during the build -- the compiler wrapper is not in the compile path"
+          fi
         fi
 
         if [ "${{ inputs.clear_stats }}" = "true" ]; then
