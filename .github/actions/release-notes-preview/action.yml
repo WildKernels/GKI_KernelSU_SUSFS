@@ -1,0 +1,29 @@
+name: 'Release notes preview'
+description: 'Render the release-notes preview body (kernel or managers flavour) to a file + the step summary'
+inputs:
+  mode:
+    description: 'kernel = full GKI release body, managers = manager APK preview'
+    required: false
+    default: 'kernel'
+  output:
+    description: 'File to write the body to'
+    required: false
+    default: 'release_body.md'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Render release notes preview
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "${{ inputs.mode }}" in
+          kernel)   script=".github/scripts/render_kernel_notes.py" ;;
+          managers) script=".github/scripts/render_manager_notes.py" ;;
+          *)
+            echo "ERROR: unknown release-notes mode '${{ inputs.mode }}' (kernel|managers)" >&2
+            exit 1
+            ;;
+        esac
+        python3 "$script" > "${{ inputs.output }}"
+        cat "${{ inputs.output }}"
