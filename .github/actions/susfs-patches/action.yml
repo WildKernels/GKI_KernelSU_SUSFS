@@ -23,6 +23,26 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
 
+    # Pre-i_user_ns() kernels (5.10 / 5.15, and old 6.1) pass the mount namespace
+    # explicitly to i_uid_into_mnt(); fs/susfs.c is written against the newer
+    # i_user_ns() helper, so it fails to compile there:
+    #   error: implicit declaration of function 'i_user_ns'
+    #   error: incompatible integer to pointer conversion passing 'int' to
+    #          parameter of type 'struct user_namespace *'
+    #   make[1]: *** [...: fs/susfs.o] Error 1
+    # Rewrite the two call sites to &init_user_ns when the helper is absent.
+    - name: Adapt fs/susfs.c for kernels without i_user_ns()
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        if grep -q 'i_user_ns' include/linux/fs.h; then
+          echo "i_user_ns() present - fs/susfs.c needs no idmap adaptation"
+          exit 0
+        fi
+        # Python, not sed: '&' in a sed replacement expands to the whole match
+        # and mangles the call site (learned the hard way).
+        python3 "${{ github.workspace }}/.github/scripts/susfs_idmap_compat.py" fs/susfs.c
+
     # Fake patches restored selectively: only -le (lower sublevel, context-adding)
     # blocks are enabled. -ge blocks (context-removal, e.g. deleting #include lines
     # like trace/hooks/blk.h and trace/hooks/mm.h) stay disabled because they break
