@@ -14,6 +14,11 @@ inputs:
   os_patch_level:
     description: 'OS patch level (e.g., 2024-01)'
     required: true
+  use_source_cache:
+    description: 'Restore/save the repo object store (.repo) per kernel family so sync only fetches deltas'
+    required: false
+    type: boolean
+    default: false
 
 outputs:
   deprecated_branch:
@@ -26,6 +31,21 @@ outputs:
 runs:
   using: composite
   steps:
+    # Optional: seed the repo object store from a per-family cache so the sync
+    # below only transfers the delta. Measured full syncs: 80-100 s (5.10/5.15)
+    # and 341 s (6.12) per leg -- that is 1,291 job-minutes in one full sweep.
+    # Off by default (repo variable ENABLE_SOURCE_CACHE) because the saved tree
+    # is a multi-GB asset; flip it on, watch one smoke run, then keep it.
+    - name: Restore kernel source object cache
+      id: restore-source
+      if: inputs.use_source_cache == 'true'
+      continue-on-error: true
+      uses: ./.github/actions/cache-restore
+      with:
+        cache_path: ${{ github.workspace }}/kernel/.repo
+        cache_key: src-${{ inputs.version }}
+        cache_bucket: kernel-src-${{ inputs.version }}
+
     - name: Initialize and Sync Kernel Repository
       id: sync
       shell: bash
@@ -91,6 +111,13 @@ runs:
         MAX_RETRIES=5
         SYNC_TIMEOUT="15m"
         RETRY_DELAYS=(15 30 60 120 240)
+        # repo sync's -j is *network* concurrency, not CPU: the runner link is
+        # the bottleneck here, and the previous -j4 left it mostly idle
+        # (measured 80-100 s per 5.10 sync, 341 s for 6.12). Checkout is
+        # disk-bound, so it gets a smaller number. Both are overridable from
+        # the environment for a one-off experiment.
+        REPO_SYNC_JOBS="${REPO_SYNC_JOBS:-16}"
+        REPO_CHECKOUT_JOBS="${REPO_CHECKOUT_JOBS:-8}"
         attempt=1
         # Always shallow: the build only needs the branch tip. Deeper retries
         # just download more data into a strained runner (slower + more disk).
@@ -131,7 +158,7 @@ runs:
             # idling until the 15m wall.
             SYNC_TAG_FLAGS="--no-tags"
             if [ -n "$TAG_FALLBACK" ]; then SYNC_TAG_FLAGS=""; fi
-            if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle $SYNC_TAG_FLAGS --jobs-checkout=4 -j4; then
+            if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle $SYNC_TAG_FLAGS --jobs-checkout="${REPO_CHECKOUT_JOBS}" -j"${REPO_SYNC_JOBS}"; then
               echo "Kernel repository initialization and sync succeeded on attempt $attempt."
               break
             else
@@ -158,6 +185,21 @@ runs:
           fi
           attempt=$((attempt+1))
         done
+
+    # Only on a miss: the key is per kernel family, so this costs ~8 tars in
+    # the first run and nothing afterwards. Saved straight after the sync,
+    # before any patching, so a restored tree is never a patched one.
+    - name: Save kernel source object cache
+      if: inputs.use_source_cache == 'true' && steps.restore-source.outputs.cache-hit != 'true'
+      continue-on-error: true
+      uses: ./.github/actions/cache-save
+      with:
+        cache_path: ${{ github.workspace }}/kernel/.repo
+        cache_key: src-${{ inputs.version }}
+        cache_bucket: kernel-src-${{ inputs.version }}
+        compression_level: 6
+        github_token: ${{ github.token }}
+        delete_after_upload: true
 
     # --- Non-repo steps (commented out; we only use repo now) ---
     # - name: Download manifest.xml for branch (with deprecated fallback)

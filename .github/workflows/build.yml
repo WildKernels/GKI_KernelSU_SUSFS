@@ -130,12 +130,20 @@ jobs:
               ;;
           esac
 
-      - name: Emergency Disk Cleanup
-        if: false
+      # Fast path: parallel rm of the runner-image bloat (~10-20 s, frees the
+      # same trees the external action does). Reports what is left so the
+      # slow path can be skipped when it is not needed.
+      - name: Free Disk Space (fast)
+        id: disk-cleanup
         uses: ./.github/actions/disk-cleanup
 
-      - name: Free Disk Space
-        if: true
+      # Slow path: only when the fast pass left too little room (kleaf legs
+      # unpack a 20-30 GB bazel out dir). This action spends ~106 s in a single
+      # apt transaction -- the glob-heavy package list is what made it the
+      # second-largest cost in a full sweep, so it now runs behind a gate and
+      # without the globs.
+      - name: Free Disk Space (fallback)
+        if: always() && fromJSON(steps.disk-cleanup.outputs.free_gb || '0') < 40
         uses: endersonmenezes/free-disk-space@v4 # Use @main for latest, @v3 for stable
         with:
           remove_android: true
@@ -143,7 +151,7 @@ jobs:
           remove_haskell: true
           remove_tool_cache: true
           remove_swap: true
-          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox"
           remove_packages_one_command: true
           remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
           rm_cmd: "rmz" # Use 'rmz' for faster deletion (default: 'rm')
@@ -170,6 +178,9 @@ jobs:
           android_version: ${{ inputs.android_version }}
           kernel_version: ${{ inputs.kernel_version }}
           os_patch_level: ${{ inputs.os_patch_level }}
+          # Opt-in via a repo variable rather than a new workflow input, so
+          # forks inherit it disabled and no dispatch plumbing changes.
+          use_source_cache: ${{ vars.ENABLE_SOURCE_CACHE == 'true' }}
 
       - name: Spoof /proc/config.gz With Stock Config
         uses: ./.github/actions/stock-config
@@ -439,8 +450,16 @@ jobs:
           cache_path: /home/runner/.ccache
           cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}
           cache_bucket: ccache-cache-${{ inputs.version }}-${{ inputs.variant }}
+          # Seed order: exact key -> same sublevel, other patch level -> the
+          # newest cache of the same family (any sublevel). That last line is
+          # what makes a brand-new month start warm instead of cold: every row
+          # in .github/config/*.json is its own sublevel, so without it each
+          # month paid a full 12-17 min cold compile. The variant stays pinned
+          # -- root flavors change autoconf.h (CONFIG_KSU*), which invalidates
+          # every translation unit, so cross-flavor reuse would only poison.
           restore_keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
+            ${{ inputs.android_version }}-${{ inputs.kernel_version }}.
 
       - name: Restore bazel-cache
         id: restore-bazel
@@ -453,6 +472,7 @@ jobs:
           cache_bucket: bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
           restore_keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
+            ${{ inputs.android_version }}-${{ inputs.kernel_version }}.
 
       - name: Check cache hit
         run: |
