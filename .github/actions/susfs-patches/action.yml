@@ -91,8 +91,10 @@ runs:
       run: |
         echo "Applying 6.6 SUSFS fixes"
         if [ "${{ inputs.sublevel }}" -le "30" ]; then
-          echo "Applying taskmmu.c Android 15 6.6 Fake Patch"
-          python3 -c 'import re;c=open("fs/proc/task_mmu.c").read();c=re.sub(r"(\t+\t\tif\s*\(\s*vma->vm_end\s*>\s*last_vma_end\s*\))\n(\t+\t\t\tsmap_gather_stats\(vma,\s*&mss,\s*last_vma_end\);\n(\t+)\}",lambda m:m.group(1)+" {\n"+m.group(2)+"\n"+m.group(3)+"\t\tlast_vma_end = vma->vm_end;\n"+m.group(3)+"\t}\n"+m.group(3)+"}",c,count=1);open("fs/proc/task_mmu.c","w").write(c)'
+          # Brace the show_smaps_rollup "Case 4" block so the patch's hunk #6
+          # matches. The previous inline python one-liner had an unbalanced
+          # regex and raised on every run, so this reshape never happened.
+          python3 "${{ github.workspace }}/.github/scripts/susfs_fake_66_smaps.py" fs/proc/task_mmu.c apply
         fi
         if [ "${{ inputs.sublevel }}" -le "30" ] && [ "${{ inputs.os_patch_level }}" = "2024-07" ]; then
           echo "Adding __fold_filemap_fixup_entry stub for 2024-07 kernels"
@@ -133,6 +135,18 @@ runs:
     #       echo "Applying task_mmu.c show_smaps_rollup reshape for 6.12 sublevel 92+"
     #       python3 "${{ github.workspace }}/.github/scripts/susfs_fake_612.py" fs/proc/task_mmu.c apply
     #     fi
+
+    - name: Restore patch include context
+      # Google keeps dropping `#include <trace/hooks/*.h>` lines from the GKI
+      # sources while the SUSFS patch still lists them as hunk #1 context, so
+      # patch fails on those sublevels (namespace.c, task_mmu.c, super.c...).
+      # Re-insert the missing include lines in the order the patch expects and
+      # stub any header that no longer exists. Idempotent, no version gates.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/susfs_restore_context.py" \
+          "50_add_susfs_in_gki-${{ inputs.version }}.patch" "$PWD"
 
     - name: Apply Kernel SUSFS Patches
       shell: bash

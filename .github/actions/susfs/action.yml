@@ -176,13 +176,9 @@ runs:
         sublevel: ${{ inputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
 
-    - name: Revert SUSFS Fake Patches
-      if: inputs.enabled == 'true'
-      uses: ./.github/actions/susfs-revert-patches
-      with:
-        version: ${{ inputs.version }}
-        sublevel: ${{ inputs.sublevel }}
-        os_patch_level: ${{ inputs.os_patch_level }}
+    # (susfs-revert-patches removed 2026-10-27: its only live step rewrote
+    # `goto show_pad;`, a line SUSFS stopped emitting in ef16cbc (2026-05-10);
+    # the gated sources no longer contain it either, so the step was a no-op.)
 
     - name: Restore ksu_close_fd for kernels < 5.15 (kernelsu preinit)
       if: inputs.enabled == 'true' && inputs.root_flavor == 'kernelsu'
