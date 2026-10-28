@@ -1,0 +1,133 @@
+name: 'List manager APKs'
+description: 'Download every selected root flavor''s upstream manager APK artifacts/release assets, dedupe spoofed-vs-stock names, and emit the flat apk_list'
+inputs:
+  manager_list:
+    description: 'JSON records from resolve-managers'
+    required: true
+outputs:
+  apk_list:
+    description: 'Flat JSON array of {owner,repo,apk} for the downloaded APKs'
+    value: ${{ steps.scan.outputs.apk_list }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download and scan all manager APKs
+      id: scan
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        MANAGER_LIST: ${{ inputs.manager_list }}
+      run: |
+        set -euo pipefail
+        MANAGER_LIST=${MANAGER_LIST#\[,/[}
+        if ! echo "$MANAGER_LIST" | jq empty 2>/dev/null; then
+          echo "ERROR: Invalid MANAGER_LIST JSON"
+          echo "Raw: $MANAGER_LIST"
+          exit 0
+        fi
+        OUT_APKS="${GITHUB_WORKSPACE:-$PWD}/manager_apks"
+        MANIFEST="${GITHUB_WORKSPACE:-$PWD}/manifest.txt"
+        rm -rf "$OUT_APKS" "$MANIFEST"
+        mkdir -p "$OUT_APKS"
+        : > "$MANIFEST"
+        echo "$MANAGER_LIST" | jq -c '.[] | select(.run_id != null and .run_id != "null")' | while read -r M; do
+          OWNER=$(echo "$M" | jq -r .owner)
+          REPO=$(echo "$M" | jq -r .repo)
+          SRC=$(echo "$M" | jq -r .source)
+          RUN_ID=$(echo "$M" | jq -r .run_id)
+          WANT=$(echo "$M" | jq -r '.want // ""')
+          DLDIR="dl_${REPO}"
+          mkdir -p "$DLDIR"
+          (
+            cd "$DLDIR"
+            if [ "$SRC" = "release" ]; then
+              curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+                -H "Authorization: Bearer ${GH_TOKEN}" \
+                "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" > rel.json
+              for URL in $(jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' rel.json); do
+                NAME="${URL##*/}"
+                curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$NAME" "$URL"
+                cp -f "$NAME" "$OUT_APKS/$NAME"
+                echo "$OWNER|$REPO|$NAME" >> "$MANIFEST"
+              done
+            else
+              AJSON=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+                -H "Authorization: Bearer ${GH_TOKEN}" \
+                "https://api.github.com/repos/${OWNER}/${REPO}/actions/runs/${RUN_ID}/artifacts")
+              if [ -z "$WANT" ]; then
+                ART_IDS=$(echo "$AJSON" | jq -r '.artifacts[] | "\(.id) \(.name)"')
+              else
+                ART_IDS=$(echo "$AJSON" | jq -r --arg want "$WANT" '
+                  ($want | split(",")) as $wl |
+                  .artifacts[] | select(.name as $n | any($wl[]; $n == .)) | "\(.id) \(.name)"')
+              fi
+              echo "$ART_IDS" | while read -r AID ART_NAME; do
+                [ -n "$AID" ] || continue
+                curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+                  -H "Authorization: Bearer ${GH_TOKEN}" \
+                  -o "_${AID}.zip" \
+                  "https://api.github.com/repos/${OWNER}/${REPO}/actions/artifacts/${AID}/zip"
+                mkdir -p "_${AID}"
+                unzip -o -q "_${AID}.zip" -d "_${AID}" || true
+                rm -f "_${AID}.zip"
+                for apk in "_${AID}"/*.apk; do
+                  [ -f "$apk" ] || continue
+                  NAME="$(basename "$apk")"
+                  # Spoofed-manager artifacts (BakaSU/SukiSU upstream CI)
+                  # package APKs under the SAME filename as the stock
+                  # build. A flat cp -f then silently overwrites stock
+                  # with spoofed (or vice versa) - run 38659164844 lost
+                  # the BakaSU spoofed manager this way and the digest
+                  # had no spoofed download. Disambiguate: when the
+                  # upstream artifact is a spoofed one but the APK name
+                  # does not say so, suffix the filename. The digest's
+                  # FLAVOR_MANAGERS already expects *-spoofed.apk.
+                  case "$ART_NAME" in
+                    *poofed*)
+                      case "$NAME" in
+                        *poofed*) ;;
+                        *) NAME="${NAME%.apk}-spoofed.apk" ;;
+                      esac
+                      ;;
+                  esac
+                  cp -f "$apk" "$OUT_APKS/$NAME"
+                  echo "$OWNER|$REPO|$NAME" >> "$MANIFEST"
+                done
+                rm -rf "_${AID}"
+              done
+            fi
+          )
+        done
+        # Filter BakaSU to release arm64/universal APKs only (drop debug,
+        # 32-bit, riscv64). Upstream re-packaged 2026-10-14: artifacts now
+        # carry per-ABI APKs (arm64-v8a/armeabi-v7a/riscv64) instead of a
+        # single universal APK - keep arm64-v8a (all our devices) plus the
+        # legacy universal name.
+        if grep -q "Baka-SU|BakaSU|" "$MANIFEST" 2>/dev/null; then
+          tmp_manifest="${MANIFEST}.filtered"
+          : > "$tmp_manifest"
+          while IFS='|' read -r o r n; do
+            [ -n "$n" ] || continue
+            if [ "$o" = "Baka-SU" ] && [ "$r" = "BakaSU" ]; then
+              ln=$(echo "$n" | tr '[:upper:]' '[:lower:]')
+              # keep universal (old packaging) or arm64-v8a (new), drop debug
+              if [[ "$ln" != *universal* && "$ln" != *arm64-v8a* ]]; then echo "Dropping BakaSU non-arm64 $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
+              if [[ "$ln" == *debug* ]]; then echo "Dropping BakaSU debug $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
+              # now only arm64/universal release + spoofed remain
+            fi
+            echo "$o|$r|$n" >> "$tmp_manifest"
+          done < "$MANIFEST"
+          mv "$tmp_manifest" "$MANIFEST"
+        fi
+        # Build the flat apk list from the manifest (single source of truth)
+        APK_JSON="[]"
+        while IFS='|' read -r o r n; do
+          [ -n "$n" ] || continue
+          APK_JSON=$(echo "$APK_JSON" | jq -c --arg o "$o" --arg r "$r" --arg n "$n" \
+            '. + [{owner:$o,repo:$r,apk:$n}]')
+        done < "$MANIFEST"
+        echo "apk_list=${APK_JSON}" >> "$GITHUB_OUTPUT"
+        echo "Found $(wc -l < "$MANIFEST") manager APKs"
+        find "$OUT_APKS" -maxdepth 1 -type f -printf "%f\n"
+
