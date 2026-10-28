@@ -103,300 +103,30 @@ jobs:
   # ── path A: fetch prebuilt manager APKs from upstream CI (default) ──
   resolve-managers:
     if: ${{ !inputs.build_from_source }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       manager_list: ${{ steps.manager.outputs.manager_list }}
     steps:
       - name: Resolve manager builds for selected root flavor(s)
         id: manager
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_ROOT_FLAVOR: ${{ inputs.root_flavor }}
-          INPUT_NEXT_COMMIT: ${{ inputs.kernelsu_next_commit }}
-          INPUT_KSU_COMMIT: ${{ inputs.kernelsu_commit }}
-          INPUT_BAKASU_COMMIT: ${{ inputs.bakasu_commit }}
-          INPUT_SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
-          INPUT_FINASU_COMMIT: ${{ inputs.finasu_commit }}
-          INPUT_NEXT_SUSFS_COMMIT: ${{ inputs.kernelsu_next_susfs_commit }}
-        run: |
-          set -euo pipefail
-
-          # Credit: authenticated gh-API manager lookup adapted from EmberHeart-Kernels
-          # commit ae9a341 (nullptr-t-oss/composite_actions fetch_ksu_manager).
-          # Exact extraction of main.yml#resolve-managers / manager step.
-          # Each selected root must ship ALL manager APK builds. KernelSU-Next publishes
-          # its manager APKs (manager + manager-spoofed) from the official dev-tip
-          # build-manager-ci run; kernelsu (KernelSU), BakaSU, SukiSU-Ultra,
-          # and KowSU expose theirs as CI-run artifacts. All are pinned to an exact commit.
-          # No Root ships no manager.
-
-          retry() {
-            local n=0
-            until [ "$n" -ge 5 ]; do
-              "$@" && return 0
-              n=$((n+1))
-              echo "retry $n/5 failed for: $*" >&2
-              sleep 5
-            done
-            return 1
-          }
-
-          resolve_sha() { # repo ref
-            retry git ls-remote "$1" "$2" | awk '{print $1; exit}'
-          }
-
-          resolve_one() { # flavor
-            local flavor="$1"
-            local owner repo wf stock
-            case "$flavor" in
-              next)
-                owner="KernelSU-Next"; repo="KernelSU-Next"; wf="build-manager-ci.yml"
-                if [[ -n "${INPUT_NEXT_COMMIT:-}" ]]; then
-                  stock="$INPUT_NEXT_COMMIT"
-                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
-                    echo "ERROR: kernelsu_next_commit must be a 40-char SHA (got: $stock)" >&2
-                    exit 1
-                  fi
-                else
-                  stock=$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)
-                fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
-                  --jq '.workflow_runs[0].id // empty')
-                if [[ -z "${run_id}" ]]; then
-                  if [[ -z "${INPUT_NEXT_COMMIT:-}" ]]; then
-                    echo "No manager build for dev tip ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev&status=success&per_page=1")
-                    run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
-                    stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
-                    if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
-                  fi
-                  if [[ -z "${run_id}" ]]; then
-                    echo "ERROR: no ${repo} manager build exists for dev commit ${stock}" >&2
-                    exit 1
-                  fi
-                fi
-                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager,manager-spoofed"}' \
-                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
-                ;;
-
-              kernelsu)
-                owner="tiann"; repo="KernelSU"; wf="build-manager.yml"
-                if [[ -n "${INPUT_KSU_COMMIT:-}" ]]; then
-                  stock="$INPUT_KSU_COMMIT"
-                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
-                    echo "ERROR: kernelsu_commit must be a 40-char SHA (got: $stock)" >&2
-                    exit 1
-                  fi
-                else
-                  stock=$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)
-                fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
-                  --jq '.workflow_runs[0].id // empty')
-                if [[ -z "${run_id}" ]]; then
-                  if [[ -z "${INPUT_KSU_COMMIT:-}" ]]; then
-                    echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
-                    run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
-                    stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
-                    if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
-                  fi
-                  if [[ -z "${run_id}" ]]; then
-                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
-                    exit 1
-                  fi
-                fi
-                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager"}' \
-                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
-                ;;
-
-              next-susfs)
-                owner="pershoot"; repo="KernelSU-Next"; wf="build-manager-ci.yml"
-                if [[ -n "${INPUT_NEXT_SUSFS_COMMIT:-}" ]]; then
-                  stock="$INPUT_NEXT_SUSFS_COMMIT"
-                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
-                    echo "ERROR: kernelsu_next_susfs_commit must be a 40-char SHA (got: $stock)" >&2
-                    exit 1
-                  fi
-                else
-                  stock=$(resolve_sha https://github.com/pershoot/KernelSU-Next.git refs/heads/dev-susfs)
-                  # fallback to upstream KernelSU-Next dev-susfs if pershoot fork tip not found
-                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
-                    stock=$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev-susfs)
-                  fi
-                fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
-                  --jq '.workflow_runs[0].id // empty')
-                if [[ -z "${run_id}" ]]; then
-                  if [[ -z "${INPUT_NEXT_SUSFS_COMMIT:-}" ]]; then
-                    echo "No manager build for dev-susfs tip ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev-susfs&status=success&per_page=1")
-                    run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
-                    stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
-                    if [[ -z "$run_id" ]]; then
-                      # dev-susfs has no CI on this fork — try dev fallback
-                      echo "No dev-susfs CI run, trying dev branch fallback" >&2
-                      fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=dev&status=success&per_page=1")
-                      run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
-                      stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
-                    fi
-                    if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
-                  fi
-                  if [[ -z "${run_id}" ]]; then
-                    echo "WARNING: no ${owner}/${repo} manager build for dev-susfs commit ${stock} — will need build_from_source" >&2
-                    # emit empty want so fetch path skips gracefully; source build will handle it
-                    printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":null,"stock":"%s","want":"manager,manager-spoofed","note":"no-ci-run"}' \
-                      "$flavor" "$owner" "$repo" "$stock"
-                    return 0
-                  fi
-                fi
-                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager,manager-spoofed"}' \
-                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
-                ;;
-
-              bakasu)
-                owner="Baka-SU"; repo="BakaSU"; wf="build-manager.yml"
-                if [[ -n "${INPUT_BAKASU_COMMIT:-}" ]]; then
-                  stock="$INPUT_BAKASU_COMMIT"
-                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
-                    echo "ERROR: bakasu_commit must be a 40-char SHA (got: $stock)" >&2
-                    exit 1
-                  fi
-                else
-                  stock=$(resolve_sha https://github.com/Baka-SU/BakaSU.git refs/heads/main)
-                fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
-                  --jq '.workflow_runs[0].id // empty')
-                if [[ -z "${run_id}" ]]; then
-                  if [[ -z "${INPUT_BAKASU_COMMIT:-}" ]]; then
-                    echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
-                    run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
-                    stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
-                    if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
-                  fi
-                  if [[ -z "${run_id}" ]]; then
-                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
-                    exit 1
-                  fi
-                fi
-                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"Manager-release,Spoofed-Manager-release"}' \
-                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
-                ;;
-
-              sukisu-ultra)
-                owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
-                if [[ -n "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
-                  stock="$INPUT_SUKISU_ULTRA_COMMIT"
-                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
-                    echo "ERROR: sukisu_ultra_commit must be a 40-char SHA (got: $stock)" >&2
-                    exit 1
-                  fi
-                else
-                  stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)
-                fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
-                  --jq '.workflow_runs[0].id // empty')
-                if [[ -z "${run_id}" ]]; then
-                  if [[ -z "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
-                    echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
-                    run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
-                    stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
-                    if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
-                  fi
-                  if [[ -z "${run_id}" ]]; then
-                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
-                    exit 1
-                  fi
-                fi
-                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"Manager,Spoofed-Manager"}' \
-                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
-                ;;
-
-              finasu)
-                owner="LyraVoid"; repo="FinaSU"; wf="build-manager.yml"
-                if [[ -n "${INPUT_FINASU_COMMIT:-}" ]]; then
-                  stock="$INPUT_FINASU_COMMIT"
-                  if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
-                    echo "ERROR: finasu_commit must be a 40-char SHA (got: $stock)" >&2
-                    exit 1
-                  fi
-                else
-                  stock=$(resolve_sha https://github.com/LyraVoid/FinaSU.git refs/heads/master)
-                fi
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
-                  --jq '.workflow_runs[0].id // empty')
-                if [[ -z "${run_id}" ]]; then
-                  if [[ -z "${INPUT_FINASU_COMMIT:-}" ]]; then
-                    echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=master&status=success&per_page=1")
-                    run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
-                    stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
-                    if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
-                  fi
-                  if [[ -z "${run_id}" ]]; then
-                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
-                    exit 1
-                  fi
-                fi
-                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager"}' \
-                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
-                ;;
-
-              kowsu)
-                # KowSU has no SUSFS support and always tracks latest master.
-                owner="KOWX712"; repo="KernelSU"; wf="build-manager.yml"
-                stock=$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)
-                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}&status=success" \
-                  --jq '.workflow_runs[0].id // empty')
-                if [[ -z "${run_id}" ]]; then
-                  echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                  fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=master&status=success&per_page=1")
-                  run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
-                  stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
-                  if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
-                  if [[ -z "${run_id}" ]]; then
-                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
-                    exit 1
-                  fi
-                fi
-                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"manager"}' \
-                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
-                ;;
-
-              *)
-                echo "skipping unknown flavor: $flavor" >&2
-                return 0
-                ;;
-            esac
-          }
-
-          FLAVORS="${INPUT_ROOT_FLAVOR:-All}"
-          echo "Root flavor: ${FLAVORS}"
-          LIST=""
-          case "${FLAVORS}" in
-            All) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)"$'\n'"$(resolve_one next-susfs)"$'\n'"$(resolve_one kernelsu)"$'\n'"$(resolve_one bakasu)") ;;
-            KernelSU-Next) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)") ;;
-            KernelSU-Next-SUSFS) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next-susfs)") ;;
-            KernelSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kernelsu)") ;;
-            BakaSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one bakasu)") ;;
-            SukiSU-Ultra) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one sukisu-ultra)") ;;
-            KowSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kowsu)") ;;
-            FinaSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one finasu)") ;;
-            *) echo "Skipping manager resolution (no root flavor / none)." ;;
-          esac
-          if [ -n "$LIST" ]; then
-            echo "manager_list=$LIST" >> "$GITHUB_OUTPUT"
-            echo "Manager sources resolved: $LIST"
-          else
-            echo "manager_list=[]" >> "$GITHUB_OUTPUT"
-          fi
+        # Shared implementation with main.yml: .github/actions/resolve-managers.
+        # Explicit commit inputs stay strict (no fallback to a different commit).
+        uses: ./.github/actions/resolve-managers
+        with:
+          root_flavor: ${{ inputs.root_flavor }}
+          all_flavors: next,next-susfs,kernelsu,bakasu
+          allow_fallback: 'false'
+          next_commit: ${{ inputs.kernelsu_next_commit }}
+          next_susfs_commit: ${{ inputs.kernelsu_next_susfs_commit }}
+          kernelsu_commit: ${{ inputs.kernelsu_commit }}
+          bakasu_commit: ${{ inputs.bakasu_commit }}
+          sukisu_ultra_commit: ${{ inputs.sukisu_ultra_commit }}
+          finasu_commit: ${{ inputs.finasu_commit }}
 
   list-manager-apks:
     needs: resolve-managers
     if: ${{ !inputs.build_from_source && needs.resolve-managers.outputs.manager_list != '' && needs.resolve-managers.outputs.manager_list != '[]' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       apk_list: ${{ steps.scan.outputs.apk_list }}
     steps:
@@ -509,7 +239,7 @@ jobs:
   # We mirror that order so manager embeds ksud correctly. No extra gradle.properties edits beside your key.
   build-ksud-from-source:
     if: ${{ inputs.build_from_source }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -696,7 +426,7 @@ jobs:
   build-from-source:
     needs: build-ksud-from-source
     if: ${{ always() && inputs.build_from_source }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -1047,7 +777,7 @@ jobs:
   collect-source-managers:
     needs: build-from-source
     if: ${{ inputs.build_from_source }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       apk_list: ${{ steps.scan.outputs.apk_list }}
     steps:
@@ -1106,7 +836,7 @@ jobs:
       - list-manager-apks
       - collect-source-managers
     if: ${{ always() && ( (needs.list-manager-apks.outputs.apk_list != '' && needs.list-manager-apks.outputs.apk_list != '[]') || (needs.collect-source-managers.outputs.apk_list != '' && needs.collect-source-managers.outputs.apk_list != '[]') ) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -1139,7 +869,7 @@ jobs:
         list-manager-apks,
         publish-manager-artifacts,
       ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 

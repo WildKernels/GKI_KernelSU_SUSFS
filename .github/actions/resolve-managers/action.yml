@@ -1,0 +1,243 @@
+name: 'Resolve KSU manager builds'
+description: 'Find the upstream CI run that published each selected root flavor''s manager APK(s), and emit a JSON manager_list for the fetch path'
+inputs:
+  root_flavor:
+    description: 'Selected root flavor ("All" builds the all_flavors set). Empty/none ships no manager.'
+    required: false
+    default: 'All'
+  all_flavors:
+    description: 'Comma-separated flavors built when root_flavor is All'
+    required: false
+    default: 'next,kernelsu,bakasu'
+  allow_fallback:
+    description: 'true = fall back to the latest successful manager run even for an explicit pin; false = an explicit pin must have its own run (only unpinned flavors fall back)'
+    required: false
+    default: 'true'
+  next_commit:
+    description: 'KernelSU-Next commit to match (empty = resolve the dev tip)'
+    required: false
+    default: ''
+  next_susfs_commit:
+    description: 'pershoot KernelSU-Next dev-susfs commit to match (empty = resolve the dev-susfs tip)'
+    required: false
+    default: ''
+  kernelsu_commit:
+    description: 'tiann/KernelSU commit to match (empty = resolve the main tip)'
+    required: false
+    default: ''
+  bakasu_commit:
+    description: 'BakaSU commit to match (empty = resolve the main tip)'
+    required: false
+    default: ''
+  sukisu_ultra_commit:
+    description: 'SukiSU-Ultra commit to match (empty = resolve the main tip)'
+    required: false
+    default: ''
+  finasu_commit:
+    description: 'FinaSU commit to match (empty = resolve the master tip)'
+    required: false
+    default: ''
+outputs:
+  manager_list:
+    description: 'JSON array of {flavor,owner,repo,source,run_id,stock,want} records, or [] when nothing applies'
+    value: ${{ steps.manager.outputs.manager_list }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve manager builds for selected root flavor(s)
+      id: manager
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INPUT_ROOT_FLAVOR: ${{ inputs.root_flavor }}
+        INPUT_ALL_FLAVORS: ${{ inputs.all_flavors }}
+        INPUT_ALLOW_FALLBACK: ${{ inputs.allow_fallback }}
+        INPUT_NEXT_COMMIT: ${{ inputs.next_commit }}
+        INPUT_NEXT_SUSFS_COMMIT: ${{ inputs.next_susfs_commit }}
+        INPUT_KSU_COMMIT: ${{ inputs.kernelsu_commit }}
+        INPUT_BAKASU_COMMIT: ${{ inputs.bakasu_commit }}
+        INPUT_SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
+        INPUT_FINASU_COMMIT: ${{ inputs.finasu_commit }}
+      run: |
+        set -euo pipefail
+
+        # Credit: authenticated gh-API manager lookup adapted from EmberHeart-Kernels
+        # commit ae9a341 (nullptr-t-oss/composite_actions fetch_ksu_manager).
+        # Each selected root must ship ALL manager APK builds. KernelSU-Next publishes
+        # its manager APKs (manager + manager-spoofed) from the official dev-tip
+        # build-manager-ci run; kernelsu (KernelSU), BakaSU, SukiSU-Ultra, FinaSU and
+        # KowSU expose theirs as CI-run artifacts. All are pinned to an exact commit.
+        # No Root ships no manager.
+        #
+        # Shared by main.yml (build pipeline) and managers.yml (APK pipeline). Every
+        # log line goes to stderr; stdout carries only the JSON records.
+
+        retry() {
+          local n=0
+          until [ "$n" -ge 5 ]; do
+            "$@" && return 0
+            n=$((n+1))
+            echo "retry $n/5 failed for: $*" >&2
+            sleep 5
+          done
+          return 1
+        }
+
+        resolve_sha() { # repo ref
+          retry git ls-remote "$1" "$2" | awk '{print $1; exit}'
+        }
+
+        # Sets STOCK (sha, may be empty) and PINNED (1 = caller supplied an exact
+        # commit, 0 = resolved from the branch tip). A malformed explicit SHA is fatal.
+        STOCK=""
+        PINNED=0
+        resolve_stock() { # given name url branch
+          local given="$1" name="$2" url="$3" branch="$4"
+          if [[ -n "${given:-}" ]]; then
+            if ! [[ "$given" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "ERROR: ${name} must be a 40-char SHA (got: ${given})" >&2
+              exit 1
+            fi
+            STOCK="$given"; PINNED=1
+            return 0
+          fi
+          STOCK="$(resolve_sha "$url" "refs/heads/${branch}")"
+          PINNED=0
+          if [[ -z "$STOCK" ]]; then
+            echo "WARN: could not resolve ${url} refs/heads/${branch}; will use the latest successful run" >&2
+          fi
+        }
+
+        # Exact-commit run lookup. Empty STOCK yields no match (skips the query).
+        find_run() { # owner repo wf stock
+          [[ -z "$4" ]] && return 0
+          gh api "repos/$1/$2/actions/workflows/$3/runs?head_sha=$4&status=success" \
+            --jq '.workflow_runs[0].id // empty'
+        }
+
+        # Latest successful run on a branch: echoes "<run_id> <head_sha>".
+        fallback_run() { # owner repo wf branch
+          local fb
+          fb=$(gh api "repos/$1/$2/actions/workflows/$3/runs?branch=$4&status=success&per_page=1")
+          printf '%s %s' "$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')" \
+            "$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')"
+        }
+
+        # Emits into REC (never stdout): a function called as $(resolve_one) runs
+        # in a subshell, where `exit 1` would only kill the substitution and the
+        # strict-mode/validation failures below would silently pass.
+        REC=""
+        resolve_one() { # flavor
+          local flavor="$1"
+          local owner repo wf branch want stock pinned run_id
+          case "$flavor" in
+            next)
+              owner="KernelSU-Next"; repo="KernelSU-Next"; wf="build-manager-ci.yml"
+              branch="dev"; want="manager,manager-spoofed"
+              resolve_stock "${INPUT_NEXT_COMMIT:-}" kernelsu_next_commit https://github.com/KernelSU-Next/KernelSU-Next.git dev
+              ;;
+            next-susfs)
+              owner="pershoot"; repo="KernelSU-Next"; wf="build-manager-ci.yml"
+              branch="dev-susfs"; want="manager,manager-spoofed"
+              resolve_stock "${INPUT_NEXT_SUSFS_COMMIT:-}" kernelsu_next_susfs_commit https://github.com/pershoot/KernelSU-Next.git dev-susfs
+              if [[ -z "$STOCK" && -z "${INPUT_NEXT_SUSFS_COMMIT:-}" ]]; then
+                # pershoot fork unreachable: fall back to upstream dev-susfs tip.
+                echo "pershoot dev-susfs tip not found; trying upstream KernelSU-Next dev-susfs" >&2
+                STOCK="$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev-susfs)"
+              fi
+              ;;
+            kernelsu)
+              owner="tiann"; repo="KernelSU"; wf="build-manager.yml"
+              branch="main"; want="manager"
+              resolve_stock "${INPUT_KSU_COMMIT:-}" kernelsu_commit https://github.com/tiann/KernelSU.git main
+              ;;
+            bakasu)
+              owner="Baka-SU"; repo="BakaSU"; wf="build-manager.yml"
+              branch="main"; want="Manager-release,Spoofed-Manager-release"
+              resolve_stock "${INPUT_BAKASU_COMMIT:-}" bakasu_commit https://github.com/Baka-SU/BakaSU.git main
+              ;;
+            sukisu-ultra)
+              owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
+              branch="main"; want="Manager,Spoofed-Manager"
+              resolve_stock "${INPUT_SUKISU_ULTRA_COMMIT:-}" sukisu_ultra_commit https://github.com/SukiSU-Ultra/SukiSU-Ultra.git main
+              ;;
+            finasu)
+              owner="LyraVoid"; repo="FinaSU"; wf="build-manager.yml"
+              branch="master"; want="manager"
+              resolve_stock "${INPUT_FINASU_COMMIT:-}" finasu_commit https://github.com/LyraVoid/FinaSU.git master
+              ;;
+            kowsu)
+              # KowSU has no SUSFS support and always tracks latest master.
+              owner="KOWX712"; repo="KernelSU"; wf="build-manager.yml"
+              branch="master"; want="manager"
+              resolve_stock "" kowsu_commit https://github.com/KOWX712/KernelSU.git master
+              ;;
+            *)
+              echo "skipping unknown flavor: $flavor" >&2
+              REC=""
+              return 0
+              ;;
+          esac
+          stock="$STOCK"; pinned="$PINNED"
+
+          run_id="$(find_run "$owner" "$repo" "$wf" "$stock")"
+          if [[ -z "$run_id" ]]; then
+            if [[ "$pinned" == "1" && "${INPUT_ALLOW_FALLBACK:-true}" != "true" ]]; then
+              echo "ERROR: no ${owner}/${repo} manager build exists for pinned commit ${stock}" >&2
+              exit 1
+            fi
+            echo "No manager build for ${stock:-unknown tip}, falling back to latest successful run" >&2
+            read -r run_id stock <<< "$(fallback_run "$owner" "$repo" "$wf" "$branch")"
+            if [[ "$flavor" == "next-susfs" && -z "$run_id" ]]; then
+              # dev-susfs has no CI on this fork - try the dev branch.
+              echo "No dev-susfs CI run, trying dev branch fallback" >&2
+              read -r run_id stock <<< "$(fallback_run "$owner" "$repo" "$wf" dev)"
+            fi
+            if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
+            if [[ -z "$run_id" ]]; then
+              if [[ "$flavor" == "next-susfs" ]]; then
+                echo "WARNING: no ${owner}/${repo} manager build for dev-susfs commit ${stock} - will need build_from_source" >&2
+                printf -v REC '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":null,"stock":"%s","want":"%s","note":"no-ci-run"}' \
+                  "$flavor" "$owner" "$repo" "$stock" "$want"
+                return 0
+              fi
+              echo "ERROR: no ${repo} manager build exists for commit ${stock}" >&2
+              exit 1
+            fi
+          fi
+          printf -v REC '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"%s"}' \
+            "$flavor" "$owner" "$repo" "$run_id" "$stock" "$want"
+          return 0
+        }
+
+        FLAVORS="${INPUT_ROOT_FLAVOR:-All}"
+        echo "Root flavor: ${FLAVORS}" >&2
+        LIST=""
+        case "${FLAVORS}" in
+          All|All*)
+            JOINED=""
+            IFS=',' read -ra ALL_FLAVORS <<< "${INPUT_ALL_FLAVORS:-next,kernelsu,bakasu}"
+            for f in "${ALL_FLAVORS[@]}"; do
+              f="${f//[[:space:]]/}"
+              [[ -z "$f" ]] && continue
+              resolve_one "$f"
+              [[ -n "$REC" ]] && JOINED+="${REC}"$'\n'
+            done
+            LIST=$(jq -c -n '[inputs]' <<< "$JOINED")
+            ;;
+          KernelSU-Next) resolve_one next; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          KernelSU-Next-SUSFS) resolve_one next-susfs; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          KernelSU) resolve_one kernelsu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          BakaSU) resolve_one bakasu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          SukiSU-Ultra) resolve_one sukisu-ultra; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          KowSU) resolve_one kowsu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          FinaSU) resolve_one finasu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          *) echo "Skipping manager resolution (no root flavor / none)." >&2 ;;
+        esac
+        if [ -n "$LIST" ]; then
+          echo "manager_list=$LIST" >> "$GITHUB_OUTPUT"
+          echo "Manager sources resolved: $LIST"
+        else
+          echo "manager_list=[]" >> "$GITHUB_OUTPUT"
+        fi
