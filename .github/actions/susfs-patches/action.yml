@@ -192,7 +192,8 @@ runs:
           python3 "${{ github.workspace }}/.github/scripts/apply_susfs_compat.py" \
             "$PWD" "50_add_susfs_in_gki-${{ inputs.version }}.patch"
         else
-          # no --forward here: a reversed/already-applied hunk must fail loudly
+          # Deliberately no --forward (PR #342 uses --batch --forward here):
+          # a reversed/already-applied hunk must fail loudly, not be skipped.
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
         fi
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BakaSU kernel-side SUSFS compat layer
-# Provides the global symbols that the susfs4ksu 50_add_susfs_in_gki patch
-# extern-declares, which BakaSU (dac2d186) doesn't ship:
+# Provides weak fallbacks for symbols extern-declared by susfs4ksu's
+# 50_add_susfs_in_gki patch, but missing in older BakaSU (dac2d186):
 #   my_write_context, my_write_access  (static in selinux_hide.c)
 #   my_setprocattr                     (doesn't exist; BakaSU uses ksu_handle_selinux_setprocattr)
 #   ksu_setup_preinit_file, ksu_preinit_handle_post_execveat  (no preinit dir)
@@ -40,9 +40,8 @@ cat > "$BAKASU_KSU/bakasu_susfs_compat.c" <<'COMPAT'
  * as extern, expecting a root flavor to provide them globally. This file
  * provides the definitions so the link succeeds.
  *
- * The static versions in selinux_hide.c remain (internal linkage, used by
- * BakaSU's own code); these global versions satisfy the SUSFS patch's extern
- * declarations from selinuxfs.c/hooks.c/exec.c.
+ * Weak fallbacks satisfy the SUSFS patch's externs for older BakaSU revisions;
+ * newer BakaSU's real global definitions override them.
  *
  * Stubs return simple values so SUSFS static wrappers fall back to original
  * behavior when CONFIG_KSU_SUSFS is enabled but BakaSU can't provide full
