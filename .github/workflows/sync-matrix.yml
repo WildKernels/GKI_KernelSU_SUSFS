@@ -24,7 +24,7 @@ jobs:
     # variable). Forks inherit the workflow but not the variable, so their
     # daily matrix-sync cron skips instead of opening PRs on the fork.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_BUILDS == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout main
         uses: actions/checkout@v7

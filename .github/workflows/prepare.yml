@@ -94,7 +94,7 @@ on:
 
 jobs:
   generate-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.final.outputs.matrix }}
       version_slug: ${{ steps.final.outputs.version_slug }}
@@ -183,7 +183,7 @@ jobs:
     # Branches that call prepare.yml directly keep the default (true).
     needs: generate-matrix
     if: inputs.produce_stock_configs != 'false'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version_slug: ${{ steps.prep.outputs.version_slug }}
     steps:

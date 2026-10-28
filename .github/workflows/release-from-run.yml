@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Deliberately independent of the build jobs. The artifacts already exist
     # in the source run, so there is nothing to wait for - and a `needs:` on
     # any build job would make this unreachable outside a full 7-family
