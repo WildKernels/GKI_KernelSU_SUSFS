@@ -2,7 +2,7 @@ name: 'Build summary'
 description: 'Write the per-build markdown summary (status, versions, root/SUSFS/NoMount commits) and expose the summary base name'
 inputs:
   job_status:
-    description: 'Status of the parent job (success/cancelled/failure) - pass ${{ job.status }}'
+    description: 'Status of the parent job (success/cancelled/failure); the workflow passes job.status here'
     required: true
   file_name:
     description: 'Artifact base name from the extract-sublevel-file-name step'
