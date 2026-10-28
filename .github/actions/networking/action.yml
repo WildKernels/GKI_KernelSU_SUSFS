@@ -13,6 +13,10 @@ inputs:
   sublevel:
     description: 'Kernel sublevel'
     required: true
+  os_patch_level:
+    description: 'OS patch level ("lts" selects the lts variant patches when present)'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -26,6 +30,7 @@ runs:
         version: ${{ inputs.version }}
         kernel_version: ${{ inputs.kernel_version }}
         sublevel: ${{ inputs.sublevel }}
+        os_patch_level: ${{ inputs.os_patch_level }}
 
     - name: Setup CIFS Configs
       uses: ./.github/actions/cifs

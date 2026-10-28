@@ -10,6 +10,10 @@ inputs:
   sublevel:
     description: 'Kernel sublevel'
     required: true
+  os_patch_level:
+    description: 'OS patch level ("lts" selects the lts variant patches when present)'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -24,34 +28,53 @@ runs:
     - name: Apply BBRv3 Patch
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
+      env:
+        KP: ${{ github.workspace }}/kernel_patches/common/bbrv3
+        APATCHES: ${{ github.action_path }}/patches
+        PATCH_LEVEL: ${{ inputs.os_patch_level }}
       run: |
         set -euo pipefail
+        # The *-lts branches drift from the monthly ones (e.g. 5.10-lts carries
+        # tcp_min_rcvbuf between one_day_secs and the /* obsolete */ block, so
+        # the monthly patch's sysctl_net_ipv4.c hunk no longer matches). When a
+        # "<base>-lts.patch" exists next to the monthly patch, use it.
+        # <monthly-base> is the patch used for monthly branches; <lts-base>
+        # defaults to it but differs where two families share one monthly patch
+        # (13-5.10 reuses the 12-5.10 patch) yet their lts branches do not.
+        pick() { # <dir> <monthly-base> [lts-base]
+          local dir="$1" monthly="$2" ltsbase="${3:-$2}"
+          if [ "$PATCH_LEVEL" = "lts" ] && [ -f "$dir/${ltsbase}-lts.patch" ]; then
+            echo "$dir/${ltsbase}-lts.patch"
+          else
+            echo "$dir/${monthly}.patch"
+          fi
+        }
         if [[ ${{ inputs.version }} == "android16-6.12" ]]; then
           #patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"
           #patch -p1 < ${{ github.action_path }}/patches/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch
           echo "skipped"
         elif [[ ${{ inputs.version }} == "android15-6.6" ]]; then
-          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"
+          patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android15-6.6)"
         elif [[ ${{ inputs.version }} == "android14-6.1" ]]; then
-          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android14-6.1.patch"
+          patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android14-6.1)"
         elif [[ ${{ inputs.version }} == "android14-5.15" ]]; then
           #patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android13-5.15.patch"
-          patch -p1 < ${{ github.action_path }}/patches/0001-net-tcp-backport-BBRv3-to-android14-5.15.patch
+          patch -p1 < "$(pick "$APATCHES" 0001-net-tcp-backport-BBRv3-to-android14-5.15)"
         elif [[ ${{ inputs.version }} == "android13-5.15" ]]; then
-          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android13-5.15.patch"
+          patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android13-5.15)"
           if [[ ${{ inputs.sublevel }} -le "43" ]]; then
             patch -p1 < ${{ github.action_path }}/patches/0002-net-tcp-add-tcp_snd_cwnd-and-tcp_snd_cwnd_set-helper-functions.patch
           fi
         elif [[ ${{ inputs.version }} == "android13-5.10" ]]; then
-          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android12-5.10.patch"
+          patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android12-5.10 0001-net-tcp-backport-BBRv3-to-android13-5.10)"
         elif [[ ${{ inputs.version }} == "android12-5.10" ]]; then
-          patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android12-5.10.patch"
+          patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android12-5.10)"
         fi
 
         if [[ ${{ inputs.version }} == "android12-5.10" || ${{ inputs.version }} == "android13-5.10" ]]; then
           if ! grep -qF 'int proc_dou8vec_minmax(' ./include/linux/sysctl.h; then
-            patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/sysctl_add_proc_dou8vec_minmax.patch"
-            patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/sysctl_fix_data-races_in_proc_dou8vec_minmax.patch"
+            patch -p1 < "$(pick "$KP" sysctl_add_proc_dou8vec_minmax)"
+            patch -p1 < "$(pick "$KP" sysctl_fix_data-races_in_proc_dou8vec_minmax)"
           fi
         fi
 

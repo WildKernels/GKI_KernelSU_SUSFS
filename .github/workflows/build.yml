@@ -312,6 +312,7 @@ jobs:
         if: contains(inputs.feature_set, 'NET') || inputs.feature_set == 'All'
         uses: ./.github/actions/networking
         with:
+          os_patch_level: ${{ inputs.os_patch_level }}
           version: ${{ inputs.version }}
           kernel_version: ${{ inputs.kernel_version }}
           android_version: ${{ inputs.android_version }}
