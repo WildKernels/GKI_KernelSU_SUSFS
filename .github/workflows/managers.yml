@@ -107,6 +107,8 @@ jobs:
     outputs:
       manager_list: ${{ steps.manager.outputs.manager_list }}
     steps:
+      - uses: actions/checkout@v7
+
       - name: Resolve manager builds for selected root flavor(s)
         id: manager
         # Shared implementation with main.yml: .github/actions/resolve-managers.

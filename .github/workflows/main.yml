@@ -172,6 +172,8 @@ jobs:
       feature_set: ${{ steps.features.outputs.feature_set }}
       manager_list: ${{ steps.manager.outputs.manager_list }}
     steps:
+      - uses: actions/checkout@v7
+
       - name: Validate page size selection
         shell: bash
         run: |
