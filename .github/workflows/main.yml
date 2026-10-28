@@ -234,63 +234,67 @@ jobs:
           }
 
           # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
-          # NoMount: dev tip (2026-10-20, "kernel: use store_release for
-          # d_flags in nm_hijack_dentry_ops"; module-side only, no kernel contract).
-          PIN_NOMOUNT="e240bb031820fd3f7de5dadb007281b33bb70634"
-          # KernelSU: official main tip (46636100, 2026-10-20,
-          # "manager: remove DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION (#3927)").
-          # The susfs patch (10_enable_susfs_for_ksu) was verified to apply at
-          # the old 0c0fdb96 pin; this tip is several manager commits ahead of
-          # that layout - re-confirm the patch applies before relying on this
-          # pin for susfs/root builds. BBG is kernel-side and unaffected.
-          PIN_KERNELSU="4663610011d03771a64e7c36a2aa65bd1794022d"
-          # BakaSU: official main tip (2026-10-20,
-          # "manager: support multiple module repositories, one-shot scripts and
-          # other minimal fixes (#600)"). Advanced per user request to track
-          # latest despite the fa12ffd fake_state removal - the 5 older branches
+          # Refreshed 2026-10-27 to each upstream branch tip.
+          # NoMount: dev tip (e7f7c676, 2026-10-27, "module/webui: add option to
+          # dump rules into android log for debugging"; module-side only, no
+          # kernel contract).
+          PIN_NOMOUNT="e7f7c67681e19ed1e1ee9c902c030e44647035d4"
+          # KernelSU: official main tip (10efe664, 2026-10-27, "Fix ads").
+          # 10_enable_susfs_for_ksu was dry-run against this exact tree when the
+          # pin moved and still applies 30/30 files with no rejects.
+          PIN_KERNELSU="10efe6648aa52e0497bbd686f940832ad05848cf"
+          # BakaSU: official main tip (d5e9e025, 2026-10-24, "kernel: limit code
+          # generators on CONFIG_KSU (#639)"). Still tracks latest despite the
+          # fa12ffd fake_state removal - the 5 older branches
           # (12-5.10/13-5.10/13-5.15/14-5.15/14-6.1) fs patches reference
           # `fake_state` and will fail to link with latest BakaSU; 6.6/6.12 are
           # unaffected. Watch those 5 families for build failures.
-          PIN_BAKASU="dac2d186406a0d2b0ce3c67cad5a1fa1adbf9f4d"
-          # SukiSU-Ultra: builtin tip (2026-10-21,
-          # "kernel: switch sig_fallback hook from weak symbol to static_call");
-          # defines fake_state itself, calls the susfs_def.h no_su API -> OK on tips.
-          PIN_SUKISU_ULTRA="05f5cdf082d32bbc651c205ba4bdd1dc66cca7f5"
+          PIN_BAKASU="d5e9e025b8b49155f8014684d64c91742b465f65"
+          # SukiSU-Ultra: builtin tip (b5917072, 2026-10-27, "feat(extension):
+          # publish capabilities and ABI from the kernel"); defines fake_state
+          # itself, calls the susfs_def.h no_su API -> OK on tips.
+          PIN_SUKISU_ULTRA="b59170724cdc05bf5dee8d8a8b182c5f1ddd60e3"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
-          # master tip 3f06a69d (2026-10-21, manager install-page animation;
-          # kernel ABI unchanged).
-          PIN_FINASU="3f06a69d40db4cbb5b86d239694c5adf911b2cce"
+          # master tip be19eb90 (2026-10-25, "ksud: Add FinaSU Hide bootloader
+          # state spoofing"; FinaSU/kernel layout and Kbuild anchors unchanged).
+          PIN_FINASU="be19eb90b9c7b96f265c86b733aa0640a2839bdb"
+          # SUSFS (gitlab simonpunk/susfs4ksu): branch tips, 4 commits ahead of
+          # the previous pins - "susfs: Add priority uid filter" (2026-10-24),
+          # "kernel & KernelSU: Sync with upstream", "Update README.md", plus the
+          # 2026-10-27 fix "priority uid filter: Fix UAF bugs and worker not able
+          # to run". The new filter is guarded by CONFIG_KSU_SUSFS only (no new
+          # config symbol) and susfs_is_priority_uid_filtered() is defined in
+          # fs/susfs.c, so the config list needs no change.
           declare -A PIN_SUSFS=(
-            [susfs_commit_android12_5_10]="f43926dc94b8ffbf9b74321313536600f69367b1"
-            [susfs_commit_android13_5_10]="cbe3fe7b9fa599d316f68b08b06cde48218eaff5"
-            [susfs_commit_android13_5_15]="86b5b10068459dedb545dc5db46a0f0254428eda"
-            [susfs_commit_android14_5_15]="10b4f2156470338a5db2040f3d85992c285aa595"
-            [susfs_commit_android14_6_1]="b57ed1998b82c4e3a2a81cdbf11172a560979c40"
-            [susfs_commit_android15_6_6]="4a4cb1be85a4694372d3efb9420de69982eac29a"
-            [susfs_commit_android16_6_12]="9c9f19d8395693327c78df36569b44e94c187b8a"
+            [susfs_commit_android12_5_10]="eb95da080c76724c4962d0c62e9af3be37d9d439"
+            [susfs_commit_android13_5_10]="a9bc1852785cc5288b587169752c74353b2110d6"
+            [susfs_commit_android13_5_15]="f3ceb5d0463e02570e75fb364ff45840d6edd923"
+            [susfs_commit_android14_5_15]="ab5ccf718887c173234b01dccf853a9044efafcf"
+            [susfs_commit_android14_6_1]="8b25990241174fe88d2131a9929e36b5e5ffb1d0"
+            [susfs_commit_android15_6_6]="0606e19afae93ffc88e53883dbf3cfced62a7b59"
+            [susfs_commit_android16_6_12]="519c86c5d8ad3832ff4a2e1a81dc1b81076f1693"
           )
           # BakaSU keeps its own SUSFS pin set (kept separate so it can diverge
-          # again). Values = the same verified branch tips as PIN_SUSFS, now
-          # tracking latest alongside PIN_BAKASU.
+          # again). Values = the same verified branch tips as PIN_SUSFS.
           declare -A PIN_SUSFS_BAKASU=(
-            [susfs_commit_android12_5_10]="f43926dc94b8ffbf9b74321313536600f69367b1"
-            [susfs_commit_android13_5_10]="cbe3fe7b9fa599d316f68b08b06cde48218eaff5"
-            [susfs_commit_android13_5_15]="86b5b10068459dedb545dc5db46a0f0254428eda"
-            [susfs_commit_android14_5_15]="10b4f2156470338a5db2040f3d85992c285aa595"
-            [susfs_commit_android14_6_1]="b57ed1998b82c4e3a2a81cdbf11172a560979c40"
-            [susfs_commit_android15_6_6]="4a4cb1be85a4694372d3efb9420de69982eac29a"
-            [susfs_commit_android16_6_12]="9c9f19d8395693327c78df36569b44e94c187b8a"
+            [susfs_commit_android12_5_10]="eb95da080c76724c4962d0c62e9af3be37d9d439"
+            [susfs_commit_android13_5_10]="a9bc1852785cc5288b587169752c74353b2110d6"
+            [susfs_commit_android13_5_15]="f3ceb5d0463e02570e75fb364ff45840d6edd923"
+            [susfs_commit_android14_5_15]="ab5ccf718887c173234b01dccf853a9044efafcf"
+            [susfs_commit_android14_6_1]="8b25990241174fe88d2131a9929e36b5e5ffb1d0"
+            [susfs_commit_android15_6_6]="0606e19afae93ffc88e53883dbf3cfced62a7b59"
+            [susfs_commit_android16_6_12]="519c86c5d8ad3832ff4a2e1a81dc1b81076f1693"
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
-            [susfs_commit_android12_5_10]="f43926dc94b8ffbf9b74321313536600f69367b1"
-            [susfs_commit_android13_5_10]="cbe3fe7b9fa599d316f68b08b06cde48218eaff5"
-            [susfs_commit_android13_5_15]="86b5b10068459dedb545dc5db46a0f0254428eda"
-            [susfs_commit_android14_5_15]="10b4f2156470338a5db2040f3d85992c285aa595"
-            [susfs_commit_android14_6_1]="b57ed1998b82c4e3a2a81cdbf11172a560979c40"
-            [susfs_commit_android15_6_6]="4a4cb1be85a4694372d3efb9420de69982eac29a"
-            [susfs_commit_android16_6_12]="9c9f19d8395693327c78df36569b44e94c187b8a"
+            [susfs_commit_android12_5_10]="eb95da080c76724c4962d0c62e9af3be37d9d439"
+            [susfs_commit_android13_5_10]="a9bc1852785cc5288b587169752c74353b2110d6"
+            [susfs_commit_android13_5_15]="f3ceb5d0463e02570e75fb364ff45840d6edd923"
+            [susfs_commit_android14_5_15]="ab5ccf718887c173234b01dccf853a9044efafcf"
+            [susfs_commit_android14_6_1]="8b25990241174fe88d2131a9929e36b5e5ffb1d0"
+            [susfs_commit_android15_6_6]="0606e19afae93ffc88e53883dbf3cfced62a7b59"
+            [susfs_commit_android16_6_12]="519c86c5d8ad3832ff4a2e1a81dc1b81076f1693"
           )
 
           pick() { # pinned repo ref  -> pinned when verified, else latest
