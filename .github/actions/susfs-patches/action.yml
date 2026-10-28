@@ -64,6 +64,18 @@ runs:
           sed -i '/^#include <linux\/shmem_fs.h>$/a #include <linux/mnt_idmapping.h>' fs/namespace.c
           echo "Applying open.c Android 13 5.15 Fake Patch"
           sed -i '/^#include <linux\/compat.h>$/a #include <linux/mnt_idmapping.h>' fs/open.c
+          # These sublevels have the idmapped-mount helpers in include/linux/fs.h
+          # but never shipped include/linux/mnt_idmapping.h (it appears only on
+          # later branches). The include is needed as patch hunk context, so stub
+          # the header when it is absent - an empty header is enough because
+          # i_uid_into_mnt() comes from fs.h. Without this, the leg patches and
+          # then dies with "fatal error: 'linux/mnt_idmapping.h' file not found"
+          # (job 122615422468, 5.15.41-android13-2022-10).
+          if [ ! -f include/linux/mnt_idmapping.h ]; then
+            printf '/* Stub: mnt idmap helpers live in linux/fs.h on this sublevel. */\n' \
+              > include/linux/mnt_idmapping.h
+            echo "  stubbed include/linux/mnt_idmapping.h"
+          fi
           echo "Applying fdinfo.c Android 13 5.15 Fake Patch"
           python3 "${{ github.workspace }}/.github/scripts/susfs_fake_fdinfo.py" fs/notify/fdinfo.c
         fi
