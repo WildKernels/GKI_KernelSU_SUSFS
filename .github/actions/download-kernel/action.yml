@@ -111,20 +111,12 @@ runs:
         MAX_RETRIES=5
         SYNC_TIMEOUT="15m"
         RETRY_DELAYS=(15 30 60 120 240)
-        # repo sync's -j is *network* concurrency: how many projects are fetched
-        # in parallel. It is not a CPU budget, so nproc is the wrong input -- the
-        # old -j4 was the manifest's own `sync-j="4"` (AOSP's default for every
-        # client), not the runner. What actually bounds the win: the manifests
-        # carry 10 projects (5.10) / 50 (6.12), and the bytes are concentrated --
-        # on 6.12 the .repo object store is 6.4 GB of which rust (2.3 GB) and
-        # clang (2.0 GB) are two single serial fetches. -j only parallelises the
-        # tail of ~40 small projects, so expect a modest gain, not a multiple.
-        # --jobs-checkout is the local-work knob, and there cores ARE the right
-        # input: repo's own default is min(cpu_count, 8) (repo/command.py
-        # DEFAULT_LOCAL_JOBS). Both are overridable from the environment.
+        # --jobs-checkout is the local-work knob (git checkout), so cores are the
+        # right input; -j above stays network concurrency. Every GitHub-hosted
+        # runner this repo uses is 4 vCPU, so nproc == repo's own
+        # min(cpu_count, 8) default there and the cap was dead weight.
         REPO_SYNC_JOBS="${REPO_SYNC_JOBS:-16}"
-        CPU_COUNT="$(nproc 2>/dev/null || echo 4)"
-        REPO_CHECKOUT_JOBS="${REPO_CHECKOUT_JOBS:-$(( CPU_COUNT < 8 ? CPU_COUNT : 8 ))}"
+        REPO_CHECKOUT_JOBS="${REPO_CHECKOUT_JOBS:-$(nproc)}"
         attempt=1
         # Always shallow: the build only needs the branch tip. Deeper retries
         # just download more data into a strained runner (slower + more disk).
