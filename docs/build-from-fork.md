@@ -68,7 +68,7 @@ Recommended settings for a first build:
 
 | Input | Recommended value | Reason |
 | --- | --- | --- |
-| Release Type | `Action` | Runs the build without creating a numbered `rN` release. It still replaces the fork's `nightly` prerelease. |
+| Release Type | `CI` | Runs the build without creating a numbered `rN` release. It still replaces the fork's `nightly` prerelease. |
 | Use cache | `false` for the first build | Avoids creating cache releases while testing the fork. Enable it later to speed up repeat builds. |
 | Kernel Version | One exact family | Prevents an all-family fan-out. |
 | OS patch level | One unique date or `lts` | Selects one matrix row. A numeric sublevel can match multiple dates. |
@@ -120,7 +120,7 @@ Android 15 / Linux 6.6 LTS:
 gh workflow run main.yml \
   -R YOUR_USERNAME/GKI_KernelSU_SUSFS \
   --ref main \
-  -f release_type=Action \
+  -f release_type=CI \
   -f kernel_build_version=6.6.x-android15 \
   -f os_patch_level=lts \
   -f brand_name=MyKernel \
@@ -135,7 +135,7 @@ Android 14 / Linux 6.1.118:
 gh workflow run main.yml \
   -R YOUR_USERNAME/GKI_KernelSU_SUSFS \
   --ref main \
-  -f release_type=Action \
+  -f release_type=CI \
   -f kernel_build_version=6.1.x-android14 \
   -f os_patch_level=118 \
   -f brand_name=MyKernel \
@@ -170,12 +170,12 @@ Even `verified` is not a complete lockfile: the Android kernel branch, KernelSU-
 
 ### Release type
 
-- `Action` builds Actions artifacts and replaces the fork's `nightly` prerelease/tag with a link to that run. Use this mode for the single-family builds in this guide.
+- `CI` builds Actions artifacts and replaces the fork's `nightly` prerelease/tag with a link to that run. Use this mode for the single-family builds in this guide.
 - `Pre-Release` creates the next numbered `rN` prerelease and uploads release assets when the workflow runs the all-family path.
 - `Release` creates the next numbered `rN` stable release and uploads release assets when the workflow runs the all-family path.
 
 > [!IMPORTANT]
-> In the current workflow, selecting one exact kernel family causes the numbered release job to be skipped because the other family jobs are skipped. Do not select `Pre-Release` or `Release` for a single-family run; use `Action`. Running all families solely to create a numbered release is expensive and is not recommended for an initial fork build.
+> In the current workflow, selecting one exact kernel family causes the numbered release job to be skipped because the other family jobs are skipped. Do not select `Pre-Release` or `Release` for a single-family run; use `CI`. Running all families solely to create a numbered release is expensive and is not recommended for an initial fork build.
 
 ### Build cache
 
