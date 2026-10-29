@@ -251,6 +251,12 @@ runs:
             sed -i 's/^static int security_context_to_sid_with_policy/int security_context_to_sid_with_policy/g' "$f"
             sed -i 's/^static int security_sid_to_context_with_policy/int security_sid_to_context_with_policy/g' "$f"
             sed -i 's/^static void security_compute_av_user_with_policy/void security_compute_av_user_with_policy/g' "$f"
+            # tiann's definition carries __nocfi on 6.6+, so the plain pattern
+            # above misses it and the prototype loses static while the
+            # definition keeps it:
+            #   error: static declaration of 'security_compute_av_user_with_policy'
+            #          follows non-static declaration
+            sed -i 's/^static void __nocfi security_compute_av_user_with_policy/void __nocfi security_compute_av_user_with_policy/g' "$f"
             # also forward decls (same prefix, same sed covers them)
             echo "[+] Stripped static from $f"
           fi
