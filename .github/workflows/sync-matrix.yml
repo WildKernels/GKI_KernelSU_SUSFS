@@ -50,6 +50,7 @@ jobs:
           COMMON_URL = "https://android.googlesource.com/kernel/common"
           MONTH = re.compile(r"^(\d{4}-\d{2})$")
           added = []
+          replaced = []
 
           def ls_heads(pattern):
               r = subprocess.run(
@@ -115,6 +116,24 @@ jobs:
                       if sub is None:
                           print(f"WARNING: no SUBLEVEL in {head}; skipping")
                           continue
+                      # One row per sublevel: a re-published sublevel replaces the
+                      # old row(s) instead of stacking a duplicate, so a numeric
+                      # sublevel always resolves to exactly one month.
+                      superseded = [e for e in cfg["include"] if e.get("sublevel") == sub]
+                      if superseded:
+                          cfg["include"] = [
+                              e for e in cfg["include"] if e.get("sublevel") != sub
+                          ]
+                          for old in superseded:
+                              replaced.append(
+                                  f"{version} {month} (sublevel {sub}) replaces "
+                                  f"{old['date']} (sublevel {sub})"
+                                  + (" [was disabled]" if old.get("disabled") else "")
+                              )
+                              print(
+                                  f"REPLACE: {version} sublevel {sub} "
+                                  f"{old['date']} -> {month}"
+                              )
                       cfg["include"].append({"sublevel": sub, "date": month})
                       added.append(f"{version} {month} (sublevel {sub})")
                       version_added = True
@@ -134,6 +153,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"changed={'true' if added else 'false'}\n")
               f.write(f"added={'; '.join(added)}\n")
+              f.write(f"replaced={'; '.join(replaced)}\n")
           EOF
 
       - name: Open or update sync PR
@@ -148,9 +168,16 @@ jobs:
           git push --force-with-lease origin "$BRANCH" || git push origin "$BRANCH"
           if [ "$(gh pr list --head "$BRANCH" --base main --json number --jq 'length')" = "0" ]; then
             BODY=$(printf '%s' "${{ steps.sync.outputs.added }}" | sed 's/; /\n- /g; s/^/- /')
+            REPLACED="${{ steps.sync.outputs.replaced }}"
+            if [ -n "$REPLACED" ]; then
+              REPLACED_BODY=$(printf '%s' "$REPLACED" | sed 's/; /\n- /g; s/^/- /')
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\n### Replaced rows\n\nOne row per sublevel: the new month supersedes these older rows, which were removed.\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY" "$REPLACED_BODY")
+            else
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")
+            fi
             gh pr create --head "$BRANCH" --base main \
               --title "Sync kernel matrix: add new upstream months" \
-              --body "$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")"
+              --body "$PR_BODY"
           else
             echo "Sync PR already open; updated in place."
           fi
