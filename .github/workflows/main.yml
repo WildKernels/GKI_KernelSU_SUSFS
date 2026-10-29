@@ -1680,8 +1680,15 @@ jobs:
             [ -z "$name" ] && continue
             if [ ! -d "release-assets/${name}" ]; then
               echo "Re-fetching missed artifact: $name"
-              if ! gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?name=${name}" \
-                --jq '.[0].archive_download_url' | xargs -r curl -fsSL -o "release-assets/${name}.zip"; then
+              # The artifacts endpoint returns {"total_count":N,"artifacts":[...]},
+              # NOT a bare array: '.[0]' threw "expected an array but got: object"
+              # on every call, which is what made run 40835740313 record 139
+              # re-fetch failures and abort the release with 482 of 621 downloaded.
+              # Download through gh (not bare curl): the archive URL needs auth.
+              artifact_id=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?name=${name}" \
+                --jq '.artifacts[0].id // empty' || true)
+              if [ -z "$artifact_id" ] \
+                || ! gh api "repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" > "release-assets/${name}.zip" 2>/dev/null; then
                 echo "ERROR: failed to re-fetch $name" >&2
                 missing=$((missing + 1))
               else
