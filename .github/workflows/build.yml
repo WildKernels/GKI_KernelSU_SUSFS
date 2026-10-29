@@ -80,7 +80,7 @@ on:
         description: "Enable ccache/bazel cache (restore/save via release buckets)"
         required: false
         type: boolean
-        default: true
+        default: false
       page_size:
         description: "ARM64 page size: 4k (default) or 16k (Kleaf --page_size)"
         required: false

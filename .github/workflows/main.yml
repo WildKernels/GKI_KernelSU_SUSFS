@@ -18,7 +18,7 @@ on:
       use_cache:
         description: "Use ccache/bazel cache (restore/save)"
         type: boolean
-        default: true
+        default: false
       allow_version_mismatch:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         type: boolean
@@ -654,7 +654,7 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -686,7 +686,7 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -718,7 +718,7 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -750,7 +750,7 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -782,7 +782,7 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -814,7 +814,7 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -846,7 +846,7 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
+      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 

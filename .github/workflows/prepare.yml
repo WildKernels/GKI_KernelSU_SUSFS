@@ -80,7 +80,7 @@ on:
         description: "Enable ccache/bazel cache"
         required: false
         type: boolean
-        default: true
+        default: false
       os_patch_level:
         description: "Optional filter: patch date (YYYY-MM), kernel sublevel, lts (LTS branch), or all"
         required: false
