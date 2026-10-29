@@ -448,18 +448,29 @@ jobs:
         uses: ./.github/actions/cache-restore
         with:
           cache_path: /home/runner/.ccache
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}
+          # Key carries what actually invalidates an entry, which 8d8e0339 named
+          # as the blocker for trusting the cache at all: the runner image (host
+          # perl/glibc/toolchain -- the 5.15.216/BakaSU asset that reproduced a
+          # perl XS handshake failure was written under a different image) and a
+          # manual generation token. Bump vars.CACHE_GEN to abandon every asset
+          # at once; switching runner images now starts a fresh key instead of
+          # restoring a tree built by another toolchain. Source pins stay out of
+          # the key on purpose: ccache hashes source and compiler content itself,
+          # so a pin bump already misses -- adding it here would only multiply
+          # immortal assets.
+          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}-${{ inputs.runner || 'ubuntu-24.04' }}-g${{ vars.CACHE_GEN || '1' }}
           cache_bucket: ccache-cache-${{ inputs.version }}-${{ inputs.variant }}
-          # Seed order: exact key -> same sublevel, other patch level -> the
-          # newest cache of the same family (any sublevel). That last line is
-          # what makes a brand-new month start warm instead of cold: every row
-          # in .github/config/*.json is its own sublevel, so without it each
-          # month paid a full 12-17 min cold compile. The variant stays pinned
-          # -- root flavors change autoconf.h (CONFIG_KSU*), which invalidates
-          # every translation unit, so cross-flavor reuse would only poison.
+          # Seed order: exact key -> same sublevel, other patch level -> (opt-in,
+          # vars.ALLOW_CACHE_SEEDING) newest cache of the same family, any
+          # sublevel. The family-wide line is what makes a brand-new month start
+          # warm instead of cold -- every row in .github/config/*.json is its own
+          # sublevel -- but it also spreads a poisoned asset into neighbouring
+          # sublevels, so it is off unless asked for. Empty lines are skipped by
+          # cache-restore. The variant stays pinned: root flavors change
+          # autoconf.h (CONFIG_KSU*), which invalidates every translation unit.
           restore_keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-            ${{ inputs.android_version }}-${{ inputs.kernel_version }}.
+            ${{ vars.ALLOW_CACHE_SEEDING == 'true' && format('{0}-{1}.', inputs.android_version, inputs.kernel_version) || '' }}
 
       - name: Restore bazel-cache
         id: restore-bazel
@@ -468,15 +479,15 @@ jobs:
         uses: ./.github/actions/cache-restore
         with:
           cache_path: /home/runner/.cache/bazel
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
+          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}-${{ inputs.runner || 'ubuntu-24.04' }}-g${{ vars.CACHE_GEN || '1' }}
           cache_bucket: bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
           restore_keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-            ${{ inputs.android_version }}-${{ inputs.kernel_version }}.
+            ${{ vars.ALLOW_CACHE_SEEDING == 'true' && format('{0}-{1}.', inputs.android_version, inputs.kernel_version) || '' }}
 
       - name: Check cache hit
         run: |
-          echo "Cache restore status:"
+          echo "Cache restore status (image=${{ inputs.runner }} gen=${{ vars.CACHE_GEN || '1' }}):"
           CCACHE_HIT="${{ steps.restore-ccache.outputs.cache-hit || 'skipped' }}"
           BAZEL_HIT="${{ steps.restore-bazel.outputs.cache-hit || 'skipped' }}"
           echo "  ccache: $CCACHE_HIT"
