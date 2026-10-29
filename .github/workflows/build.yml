@@ -171,6 +171,36 @@ jobs:
           kernel_patches_commit: ${{ inputs.kernel_patches_commit }}
           anykernel3_commit: ${{ inputs.anykernel3_commit }}
 
+      # --- prebuilt object cache -------------------------------------------
+      # The prebuilt/toolchain half of `repo sync` is the same bytes for long
+      # stretches of months (measured from the manifests: 5.10 pins one set from
+      # 2021-08 to 2023-01, 6.12 one set from 2025-07 to 2026-09) and it is
+      # 78-88% of the object store -- 1.5 of 1.7 GB on 5.10, 6.2 of 6.5 GB on
+      # 6.12. Keying on those pins lets a leg skip that download entirely.
+      # Separate from use_cache on purpose: these are git objects (content
+      # addressed, so a stale or corrupt entry cannot produce a wrong tree),
+      # unlike the ccache objects that 8d8e0339 had to disable.
+      - name: Resolve prebuilt cache key
+        id: prebuilt-cache
+        if: vars.ENABLE_PREBUILT_CACHE == 'true'
+        shell: bash
+        run: |
+          set -uo pipefail
+          KEY="$(python3 "${GITHUB_WORKSPACE}/.github/scripts/prebuilt_cache_key.py" \
+            "${{ inputs.version }}" "${{ inputs.os_patch_level }}")"
+          echo "prebuilt cache key: '${KEY}'"
+          echo "key=${KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore prebuilt object cache
+        id: restore-prebuilts
+        continue-on-error: true
+        if: vars.ENABLE_PREBUILT_CACHE == 'true' && steps.prebuilt-cache.outputs.key != ''
+        uses: ./.github/actions/cache-restore
+        with:
+          cache_path: ${{ github.workspace }}/kernel/.repo/project-objects
+          cache_key: pb-${{ steps.prebuilt-cache.outputs.key }}-${{ inputs.runner || 'ubuntu-24.04' }}-g${{ vars.CACHE_GEN || '1' }}
+          cache_bucket: kernel-prebuilts-${{ inputs.version }}
+
       - name: Download Kernel Repository
         uses: ./.github/actions/download-kernel
         with:
@@ -181,6 +211,20 @@ jobs:
           # Opt-in via a repo variable rather than a new workflow input, so
           # forks inherit it disabled and no dispatch plumbing changes.
           use_source_cache: ${{ vars.ENABLE_SOURCE_CACHE == 'true' }}
+
+      - name: Save prebuilt object cache
+        if: success() && vars.ENABLE_PREBUILT_CACHE == 'true' && steps.prebuilt-cache.outputs.key != '' && steps.restore-prebuilts.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: ./.github/actions/cache-save
+        with:
+          cache_path: ${{ github.workspace }}/kernel/.repo/project-objects
+          cache_key: pb-${{ steps.prebuilt-cache.outputs.key }}-${{ inputs.runner || 'ubuntu-24.04' }}-g${{ vars.CACHE_GEN || '1' }}
+          cache_bucket: kernel-prebuilts-${{ inputs.version }}
+          # packfiles are already zlib-compressed: measured zstd-6 = 99.6% of raw
+          # on a real 2 GB clang pack, so compress nothing and save the minutes.
+          compression_level: 0
+          github_token: ${{ github.token }}
+          delete_after_upload: true
 
       - name: Spoof /proc/config.gz With Stock Config
         uses: ./.github/actions/stock-config
