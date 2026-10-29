@@ -118,6 +118,13 @@ on:
         description: "Performance"
         type: boolean
         default: false
+      kernel_runner:
+        description: "Runner image for the build legs (ubuntu-24.04 = default, ubuntu-latest = newer image A/B)"
+        type: choice
+        options:
+          - ubuntu-24.04
+          - ubuntu-latest
+        default: ubuntu-24.04
       test_release_notes:
         description: "Render release notes preview only (skip all builds + release)"
         type: boolean
@@ -630,6 +637,7 @@ jobs:
         root: ${{ fromJson(needs.resolve-sources.outputs.root_matrix) }}
     uses: ./.github/workflows/prepare.yml
     with:
+      runner: ${{ inputs.kernel_runner }}
       config_file: .github/config/android12-5.10.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
       susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android12_5_10_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android12_5_10_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android12_5_10) }}
@@ -661,6 +669,7 @@ jobs:
         root: ${{ fromJson(needs.resolve-sources.outputs.root_matrix) }}
     uses: ./.github/workflows/prepare.yml
     with:
+      runner: ${{ inputs.kernel_runner }}
       config_file: .github/config/android13-5.10.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
       susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android13_5_10_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android13_5_10_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android13_5_10) }}
@@ -692,6 +701,7 @@ jobs:
         root: ${{ fromJson(needs.resolve-sources.outputs.root_matrix) }}
     uses: ./.github/workflows/prepare.yml
     with:
+      runner: ${{ inputs.kernel_runner }}
       config_file: .github/config/android13-5.15.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
       susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android13_5_15_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android13_5_15_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android13_5_15) }}
@@ -723,6 +733,7 @@ jobs:
         root: ${{ fromJson(needs.resolve-sources.outputs.root_matrix) }}
     uses: ./.github/workflows/prepare.yml
     with:
+      runner: ${{ inputs.kernel_runner }}
       config_file: .github/config/android14-5.15.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
       susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android14_5_15_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android14_5_15_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android14_5_15) }}
@@ -754,6 +765,7 @@ jobs:
         root: ${{ fromJson(needs.resolve-sources.outputs.root_matrix) }}
     uses: ./.github/workflows/prepare.yml
     with:
+      runner: ${{ inputs.kernel_runner }}
       config_file: .github/config/android14-6.1.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
       susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android14_6_1_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android14_6_1_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android14_6_1) }}
@@ -785,6 +797,7 @@ jobs:
         root: ${{ fromJson(needs.resolve-sources.outputs.root_matrix) }}
     uses: ./.github/workflows/prepare.yml
     with:
+      runner: ${{ inputs.kernel_runner }}
       config_file: .github/config/android15-6.6.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
       susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android15_6_6_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android15_6_6_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android15_6_6) }}
@@ -816,6 +829,7 @@ jobs:
         root: ${{ fromJson(needs.resolve-sources.outputs.root_matrix) }}
     uses: ./.github/workflows/prepare.yml
     with:
+      runner: ${{ inputs.kernel_runner }}
       config_file: .github/config/android16-6.12.json
       feature_set: ${{ needs.resolve-sources.outputs.feature_set }}
       susfs_commit: ${{ matrix.root.root_flavor == 'bakasu' && needs.resolve-sources.outputs.susfs_commit_android16_6_12_bakasu || (matrix.root.root_flavor == 'sukisu-ultra' && needs.resolve-sources.outputs.susfs_commit_android16_6_12_sukisu_ultra || needs.resolve-sources.outputs.susfs_commit_android16_6_12) }}

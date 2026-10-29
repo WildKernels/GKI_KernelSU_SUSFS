@@ -21,6 +21,11 @@ on:
       os_patch_level:
         required: true
         type: string
+      runner:
+        description: 'Runner image label (ubuntu-24.04 or ubuntu-latest); lets a single leg be A/B tested'
+        required: false
+        type: string
+        default: 'ubuntu-24.04'
       variant:
         required: false
         type: string
@@ -90,7 +95,7 @@ on:
 jobs:
   build-gki:
     name: "${{ inputs.kernel_version }}.${{ inputs.sublevel }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ inputs.variant }})"
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 120
     steps:
       - name: Checkout Repository
