@@ -198,7 +198,10 @@ jobs:
         uses: ./.github/actions/cache-restore
         with:
           cache_path: ${{ github.workspace }}/kernel/.repo/project-objects
-          cache_key: pb-${{ steps.prebuilt-cache.outputs.key }}-${{ inputs.runner || 'ubuntu-24.04' }}-g${{ vars.CACHE_GEN || '1' }}
+          # No runner image in this key on purpose: git objects are content
+          # addressed and toolchain independent, so a store written on one image
+          # is usable on another -- only CACHE_GEN (and the pins) invalidate it.
+          cache_key: pb-${{ steps.prebuilt-cache.outputs.key }}-g${{ vars.CACHE_GEN || '1' }}
           cache_bucket: kernel-prebuilts-${{ inputs.version }}
 
       - name: Download Kernel Repository
@@ -218,7 +221,10 @@ jobs:
         uses: ./.github/actions/cache-save
         with:
           cache_path: ${{ github.workspace }}/kernel/.repo/project-objects
-          cache_key: pb-${{ steps.prebuilt-cache.outputs.key }}-${{ inputs.runner || 'ubuntu-24.04' }}-g${{ vars.CACHE_GEN || '1' }}
+          # No runner image in this key on purpose: git objects are content
+          # addressed and toolchain independent, so a store written on one image
+          # is usable on another -- only CACHE_GEN (and the pins) invalidate it.
+          cache_key: pb-${{ steps.prebuilt-cache.outputs.key }}-g${{ vars.CACHE_GEN || '1' }}
           cache_bucket: kernel-prebuilts-${{ inputs.version }}
           # packfiles are already zlib-compressed: measured zstd-6 = 99.6% of raw
           # on a real 2 GB clang pack, so compress nothing and save the minutes.
