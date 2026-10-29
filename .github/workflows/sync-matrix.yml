@@ -171,13 +171,26 @@ jobs:
             REPLACED="${{ steps.sync.outputs.replaced }}"
             if [ -n "$REPLACED" ]; then
               REPLACED_BODY=$(printf '%s' "$REPLACED" | sed 's/; /\n- /g; s/^/- /')
-              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\n### Replaced rows\n\nOne row per sublevel: the new month supersedes these older rows, which were removed.\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY" "$REPLACED_BODY")
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\n### Replaced rows\n\nOne row per sublevel: the new month supersedes these older rows, which were removed. If you need one of them back, say so here and it can be re-enabled as `"disabled": true` instead of being deleted.\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY" "$REPLACED_BODY")
             else
-              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nNo rows were replaced: every new sublevel was unique.\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")
             fi
             gh pr create --head "$BRANCH" --base main \
               --title "Sync kernel matrix: add new upstream months" \
               --body "$PR_BODY"
           else
-            echo "Sync PR already open; updated in place."
+            # A PR already open must get the same replaced-rows note, otherwise a
+            # re-sync that supersedes rows would silently change the matrix with
+            # nothing in the PR to review. Rebuild the body and edit it in place.
+            BODY=$(printf '%s' "${{ steps.sync.outputs.added }}" | sed 's/; /\n- /g; s/^/- /')
+            REPLACED="${{ steps.sync.outputs.replaced }}"
+            if [ -n "$REPLACED" ]; then
+              REPLACED_BODY=$(printf '%s' "$REPLACED" | sed 's/; /\n- /g; s/^/- /')
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\n### Replaced rows\n\nOne row per sublevel: the new month supersedes these older rows, which were removed. If you need one of them back, say so here and it can be re-enabled as `"disabled": true` instead of being deleted.\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY" "$REPLACED_BODY")
+            else
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nNo rows were replaced: every new sublevel was unique.\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")
+            fi
+            PR_NUM=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number')
+            gh pr edit "$PR_NUM" --body "$PR_BODY"
+            echo "Sync PR #${PR_NUM} updated in place (body refreshed with the replaced rows)."
           fi
