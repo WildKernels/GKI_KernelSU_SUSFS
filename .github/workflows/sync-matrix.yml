@@ -116,24 +116,24 @@ jobs:
                       if sub is None:
                           print(f"WARNING: no SUBLEVEL in {head}; skipping")
                           continue
-                      # One row per sublevel: a re-published sublevel replaces the
-                      # old row(s) instead of stacking a duplicate, so a numeric
-                      # sublevel always resolves to exactly one month.
+                      # One ACTIVE row per sublevel: a re-published sublevel keeps
+                      # the old row in the file but switches it off ("disabled":
+                      # true), so a numeric sublevel still resolves to exactly one
+                      # month and the older snapshot can be restored by deleting
+                      # one word. Nothing is ever deleted here.
                       superseded = [e for e in cfg["include"] if e.get("sublevel") == sub]
-                      if superseded:
-                          cfg["include"] = [
-                              e for e in cfg["include"] if e.get("sublevel") != sub
-                          ]
-                          for old in superseded:
-                              replaced.append(
-                                  f"{version} {month} (sublevel {sub}) replaces "
-                                  f"{old['date']} (sublevel {sub})"
-                                  + (" [was disabled]" if old.get("disabled") else "")
-                              )
-                              print(
-                                  f"REPLACE: {version} sublevel {sub} "
-                                  f"{old['date']} -> {month}"
-                              )
+                      for old in superseded:
+                          was_disabled = bool(old.get("disabled"))
+                          old["disabled"] = True
+                          replaced.append(
+                              f"{version} {month} (sublevel {sub}) disables "
+                              f"{old['date']} (sublevel {sub})"
+                              + (" [was already disabled]" if was_disabled else "")
+                          )
+                          print(
+                              f"DISABLE: {version} sublevel {sub} "
+                              f"{old['date']} (superseded by {month})"
+                          )
                       cfg["include"].append({"sublevel": sub, "date": month})
                       added.append(f"{version} {month} (sublevel {sub})")
                       version_added = True

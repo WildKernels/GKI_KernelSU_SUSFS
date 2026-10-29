@@ -47,9 +47,14 @@ def sort_key(row: dict) -> tuple[int, str]:
     return (0, date)
 
 
-def dedupe(rows: list[dict], notes: list[str]) -> list[dict]:
-    """One row per sublevel: the newest date wins; older duplicates are removed."""
+def dedupe(rows: list[dict], notes: list[str], delete: bool = False) -> list[dict]:
+    """One ACTIVE row per sublevel: the newest date wins.
+
+    Older duplicates are kept in the file with "disabled": true so they can be
+    re-enabled by deleting one word -- deletion only happens with --delete.
+    """
     newest: dict[str, dict] = {}
+    losers: list[dict] = []
     for row in rows:
         sub = str(row.get("sublevel"))
         if sub == LTS_SUBLEVEL:
@@ -57,18 +62,24 @@ def dedupe(rows: list[dict], notes: list[str]) -> list[dict]:
         cur = newest.get(sub)
         if cur is None or str(row.get("date", "")) > str(cur.get("date", "")):
             if cur is not None:
+                losers.append(cur)
                 notes.append(
-                    f"- dropped duplicate `{sub}` @ {cur.get('date')} "
+                    f"- {'removed' if delete else 'disabled'} duplicate `{sub}` @ {cur.get('date')} "
                     f"(superseded by {row.get('date')})"
                 )
             newest[sub] = row
         else:
+            losers.append(row)
             notes.append(
-                f"- dropped duplicate `{sub}` @ {row.get('date')} "
+                f"- {'removed' if delete else 'disabled'} duplicate `{sub}` @ {row.get('date')} "
                 f"(superseded by {cur.get('date')})"
             )
     lts = [r for r in rows if str(r.get("sublevel")) == LTS_SUBLEVEL]
-    return sorted([*newest.values(), *lts], key=sort_key)
+    if delete:
+        return sorted([*newest.values(), *lts], key=sort_key)
+    for row in losers:
+        row["disabled"] = True
+    return sorted([*newest.values(), *losers, *lts], key=sort_key)
 
 
 def main() -> int:
@@ -78,6 +89,7 @@ def main() -> int:
     ap.add_argument("--date", help="YYYY-MM of the release (required with --sublevel)")
     ap.add_argument("--variant", help="optional variant marker carried on the new row")
     ap.add_argument("--dedupe", action="store_true", help="collapse existing duplicates")
+    ap.add_argument("--delete", action="store_true", help="remove superseded rows instead of disabling them")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--pr-note", help="append a markdown summary to this file")
     args = ap.parse_args()
@@ -100,11 +112,21 @@ def main() -> int:
             if str(row.get("sublevel")) == sub:
                 if str(row.get("date")) == str(args.date) and not row.get("disabled"):
                     existed_identical = True
-                notes.append(
-                    f"- replaced `{sub}` @ {row.get('date')}"
-                    + (" (was disabled)" if row.get("disabled") else "")
-                    + f" with `{sub}` @ {args.date}"
-                )
+                if args.delete:
+                    notes.append(
+                        f"- removed `{sub}` @ {row.get('date')}"
+                        + (" (was disabled)" if row.get("disabled") else "")
+                        + f" (superseded by {args.date})"
+                    )
+                else:
+                    # Keep the row, switch it off: re-enabling is deleting one word.
+                    notes.append(
+                        f"- disabled `{sub}` @ {row.get('date')}"
+                        + (" (already disabled)" if row.get("disabled") else "")
+                        + f" (superseded by {args.date})"
+                    )
+                    row["disabled"] = True
+                    kept.append(row)
             else:
                 kept.append(row)
         if existed_identical:
@@ -117,7 +139,7 @@ def main() -> int:
         rows = kept
 
     if args.dedupe or args.sublevel:
-        rows = dedupe(rows, notes)
+        rows = dedupe(rows, notes, delete=args.delete)
 
     doc["include"] = rows
     replaced = before - len(rows) + (1 if args.sublevel else 0)
