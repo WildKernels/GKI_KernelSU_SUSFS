@@ -130,17 +130,18 @@ jobs:
               ;;
           esac
 
-      # Disabled deliberately. Measured from a leg's own log: the runner is a
-      # 145 GB disk with ~55 GB used before this step, so ~90 GB is already free,
-      # and the 16 GiB LTO swapfile leaves ~74 GB at build start -- enough for
-      # the legacy build.sh families (~9 GB tree + ~12 GB out + ccache) with room
-      # to spare. The families that get tight are the kleaf ones (21 GB tree +
-      # 6.4 GB .repo + 25-40 GB bazel out), so if a 6.6/6.12 leg ever hits
-      # ENOSPC, gate this on family rather than paying 106 s on all 621 legs.
-      # Package globs dropped: postgresql*/mysql*/*llvm*/temurin-*/dotnet-sdk-*
-      # were 46 s of the 106 s step for 6.4 of its 39 GB recovered.
+      # Runs on every leg, trimmed to the parts that pay for themselves.
+      # Measured from a leg's own log: the full option set took 106 s to recover
+      # 39.8 GB, of which the package globs (postgresql*/mysql*/*llvm*/
+      # temurin-*/dotnet-sdk-*) were 46 s for 6.4 GB -- the slowest and least
+      # space-efficient part. Dropping them leaves ~54 s for ~32 GB, and the
+      # explicit package names still remove the browsers and cloud CLIs.
+      # Runner budget for reference: 145 GB disk, ~55 GB used by the image, so
+      # ~90 GB free before this step and ~114 GB after it (the 16 GiB LTO
+      # swapfile takes 16 GB back). The kleaf families are the reason to keep it
+      # on all 621 legs even though the legacy ones have room to spare.
       - name: Free Disk Space
-        if: false
+        if: true
         uses: endersonmenezes/free-disk-space@v4 # Use @main for latest, @v3 for stable
         with:
           remove_android: true
