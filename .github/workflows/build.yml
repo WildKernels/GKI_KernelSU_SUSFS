@@ -21,11 +21,6 @@ on:
       os_patch_level:
         required: true
         type: string
-      runner:
-        description: 'Runner image label (ubuntu-24.04 or ubuntu-latest); lets a single leg be A/B tested'
-        required: false
-        type: string
-        default: 'ubuntu-24.04'
       variant:
         required: false
         type: string
@@ -95,7 +90,7 @@ on:
 jobs:
   build-gki:
     name: "${{ inputs.kernel_version }}.${{ inputs.sublevel }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ inputs.variant }})"
-    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - name: Checkout Repository
@@ -506,7 +501,7 @@ jobs:
           # the key on purpose: ccache hashes source and compiler content itself,
           # so a pin bump already misses -- adding it here would only multiply
           # immortal assets.
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}-${{ inputs.runner || 'ubuntu-24.04' }}-g${{ vars.CACHE_GEN || '1' }}
+          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}-g${{ vars.CACHE_GEN || '1' }}
           cache_bucket: ccache-cache-${{ inputs.version }}-${{ inputs.variant }}
           # Seed order: exact key -> same sublevel, other patch level -> (opt-in,
           # vars.ALLOW_CACHE_SEEDING) newest cache of the same family, any
@@ -527,7 +522,7 @@ jobs:
         uses: ./.github/actions/cache-restore
         with:
           cache_path: /home/runner/.cache/bazel
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}-${{ inputs.runner || 'ubuntu-24.04' }}-g${{ vars.CACHE_GEN || '1' }}
+          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}-g${{ vars.CACHE_GEN || '1' }}
           cache_bucket: bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
           restore_keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
@@ -535,7 +530,7 @@ jobs:
 
       - name: Check cache hit
         run: |
-          echo "Cache restore status (image=${{ inputs.runner }} gen=${{ vars.CACHE_GEN || '1' }}):"
+          echo "Cache restore status (image=ubuntu-latest gen=${{ vars.CACHE_GEN || '1' }}):"
           CCACHE_HIT="${{ steps.restore-ccache.outputs.cache-hit || 'skipped' }}"
           BAZEL_HIT="${{ steps.restore-bazel.outputs.cache-hit || 'skipped' }}"
           echo "  ccache: $CCACHE_HIT"

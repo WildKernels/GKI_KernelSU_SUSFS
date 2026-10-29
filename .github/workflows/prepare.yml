@@ -3,11 +3,6 @@ name: Prepare and Build
 on:
   workflow_call:
     inputs:
-      runner:
-        description: 'Runner image label for the build jobs (ubuntu-24.04 or ubuntu-latest)'
-        required: false
-        type: string
-        default: 'ubuntu-24.04'
       config_file:
         description: "Path to the JSON config file"
         required: true
@@ -99,7 +94,7 @@ on:
 
 jobs:
   generate-matrix:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.final.outputs.matrix }}
       version_slug: ${{ steps.final.outputs.version_slug }}
@@ -188,7 +183,7 @@ jobs:
     # Branches that call prepare.yml directly keep the default (true).
     needs: generate-matrix
     if: inputs.produce_stock_configs != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       version_slug: ${{ steps.prep.outputs.version_slug }}
     steps:
@@ -327,7 +322,6 @@ jobs:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     uses: ./.github/workflows/build.yml
     with:
-      runner: ${{ inputs.runner }}
       version: ${{ matrix.version }}
       android_version: ${{ matrix.android_version }}
       kernel_version: ${{ matrix.kernel_version }}
