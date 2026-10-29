@@ -130,20 +130,17 @@ jobs:
               ;;
           esac
 
-      # Fast path: parallel rm of the runner-image bloat (~10-20 s, frees the
-      # same trees the external action does). Reports what is left so the
-      # slow path can be skipped when it is not needed.
-      - name: Free Disk Space (fast)
-        id: disk-cleanup
-        uses: ./.github/actions/disk-cleanup
-
-      # Slow path: only when the fast pass left too little room (kleaf legs
-      # unpack a 20-30 GB bazel out dir). This action spends ~106 s in a single
-      # apt transaction -- the glob-heavy package list is what made it the
-      # second-largest cost in a full sweep, so it now runs behind a gate and
-      # without the globs.
-      - name: Free Disk Space (fallback)
-        if: always() && fromJSON(steps.disk-cleanup.outputs.free_gb || '0') < 40
+      # Disabled deliberately. Measured from a leg's own log: the runner is a
+      # 145 GB disk with ~55 GB used before this step, so ~90 GB is already free,
+      # and the 16 GiB LTO swapfile leaves ~74 GB at build start -- enough for
+      # the legacy build.sh families (~9 GB tree + ~12 GB out + ccache) with room
+      # to spare. The families that get tight are the kleaf ones (21 GB tree +
+      # 6.4 GB .repo + 25-40 GB bazel out), so if a 6.6/6.12 leg ever hits
+      # ENOSPC, gate this on family rather than paying 106 s on all 621 legs.
+      # Package globs dropped: postgresql*/mysql*/*llvm*/temurin-*/dotnet-sdk-*
+      # were 46 s of the 106 s step for 6.4 of its 39 GB recovered.
+      - name: Free Disk Space
+        if: false
         uses: endersonmenezes/free-disk-space@v4 # Use @main for latest, @v3 for stable
         with:
           remove_android: true
