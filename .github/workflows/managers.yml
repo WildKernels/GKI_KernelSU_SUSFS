@@ -103,7 +103,7 @@ jobs:
   # ── path A: fetch prebuilt manager APKs from upstream CI (default) ──
   resolve-managers:
     if: ${{ !inputs.build_from_source }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       manager_list: ${{ steps.manager.outputs.manager_list }}
     steps:
@@ -128,7 +128,7 @@ jobs:
   list-manager-apks:
     needs: resolve-managers
     if: ${{ !inputs.build_from_source && needs.resolve-managers.outputs.manager_list != '' && needs.resolve-managers.outputs.manager_list != '[]' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       apk_list: ${{ steps.scan.outputs.apk_list }}
     steps:
@@ -152,7 +152,7 @@ jobs:
   # We mirror that order so manager embeds ksud correctly. No extra gradle.properties edits beside your key.
   build-ksud-from-source:
     if: ${{ inputs.build_from_source }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -339,7 +339,7 @@ jobs:
   build-from-source:
     needs: build-ksud-from-source
     if: ${{ always() && inputs.build_from_source }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -690,7 +690,7 @@ jobs:
   collect-source-managers:
     needs: build-from-source
     if: ${{ inputs.build_from_source }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       apk_list: ${{ steps.scan.outputs.apk_list }}
     steps:
@@ -749,7 +749,7 @@ jobs:
       - list-manager-apks
       - collect-source-managers
     if: ${{ always() && ( (needs.list-manager-apks.outputs.apk_list != '' && needs.list-manager-apks.outputs.apk_list != '[]') || (needs.collect-source-managers.outputs.apk_list != '' && needs.collect-source-managers.outputs.apk_list != '[]') ) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -782,7 +782,7 @@ jobs:
         list-manager-apks,
         publish-manager-artifacts,
       ]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
