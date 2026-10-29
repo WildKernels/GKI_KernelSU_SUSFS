@@ -121,7 +121,10 @@ jobs:
             --argjson cfg "$CONFIG_JSON" \
             --arg requested_variant "${{ inputs.variant }}" '
             ($cfg.version | split("-")) as $version_parts
-            | ($cfg.include) as $targets
+            # A row marked "disabled": true is a temporary switch-off (duplicate
+            # sublevel already covered by another month, or a month being
+            # retired). The row stays in the file so re-enabling it is one word.
+            | ($cfg.include | map(select(.disabled != true))) as $targets
             | {
               include: (
                 [

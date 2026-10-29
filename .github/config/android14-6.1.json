@@ -3,19 +3,23 @@
   "include": [
     {
       "sublevel": "25",
-      "date": "2023-06"
+      "date": "2023-06",
+      "disabled": true
     },
     {
       "sublevel": "25",
-      "date": "2023-07"
+      "date": "2023-07",
+      "disabled": true
     },
     {
       "sublevel": "25",
-      "date": "2023-08"
+      "date": "2023-08",
+      "disabled": true
     },
     {
       "sublevel": "25",
-      "date": "2023-09"
+      "date": "2023-09",
+      "disabled": true
     },
     {
       "sublevel": "25",
@@ -27,7 +31,8 @@
     },
     {
       "sublevel": "57",
-      "date": "2023-12"
+      "date": "2023-12",
+      "disabled": true
     },
     {
       "sublevel": "57",
@@ -35,7 +40,8 @@
     },
     {
       "sublevel": "68",
-      "date": "2024-02"
+      "date": "2024-02",
+      "disabled": true
     },
     {
       "sublevel": "68",
@@ -43,7 +49,8 @@
     },
     {
       "sublevel": "75",
-      "date": "2024-04"
+      "date": "2024-04",
+      "disabled": true
     },
     {
       "sublevel": "75",
@@ -107,7 +114,8 @@
     },
     {
       "sublevel": "145",
-      "date": "2025-08"
+      "date": "2025-08",
+      "disabled": true
     },
     {
       "sublevel": "145",
