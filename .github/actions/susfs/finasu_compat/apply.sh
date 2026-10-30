@@ -36,23 +36,6 @@ cp "$UPSTREAM_PATCH" "$KERNEL_ROOT/$KSU_DIR/10_enable_susfs_for_ksu.patch"
 (cd "$KERNEL_ROOT/$KSU_DIR" && patch -p1 --forward <10_enable_susfs_for_ksu.patch) || true
 rm -f "$KERNEL_ROOT/$KSU_DIR/10_enable_susfs_for_ksu.patch"
 
-# 1.5) 5.10 preinit close_fd compat (FINASU_PREINIT_CLOSE_FD): the 10_enable
-#   patch rewrites FinaSU's ksu_close_fd(fd) -> bare close_fd(fd) in
-#   kernel/preinit/preinit.c (it applies cleanly, no reject). close_fd is a
-#   public symbol only on 5.15+; on 5.10 it is undeclared (only __close_fd is
-#   exported), so -Werror fails the build:
-#     preinit.c:130:9: error: implicit declaration of function 'close_fd'
-#   Restore the ksu_close_fd macro (ksyscall(close, fd)) for 5.10; leave 5.15+
-#   on the patch's bare close_fd, which is the correct kernel-internal API.
-FINASU_PREINIT="$KERNEL_ROOT/$KSU_DIR/kernel/preinit/preinit.c"
-if [ -f "$FINASU_PREINIT" ] &&
-   { [ "$KSU_VERSION" = "android12-5.10" ] || [ "$KSU_VERSION" = "android13-5.10" ]; }; then
-  if grep -qE '^[[:space:]]*close_fd\(fd\);' "$FINASU_PREINIT"; then
-    sed -i 's/^\([[:space:]]*\)close_fd(fd);/\1ksu_close_fd(fd);/' "$FINASU_PREINIT"
-    echo "FinaSU preinit.c: restored ksu_close_fd(fd) for 5.10 (close_fd undeclared)"
-  fi
-fi
-
 echo "步骤 2/2: FinaSU 内联适配修复..."
 if [ "$KSU_VARIANT" == "FinaSU" ]; then
   FINASU_KSU="$KERNEL_ROOT/$KSU_DIR/kernel"
