@@ -79,10 +79,14 @@ __weak int my_setprocattr(const char *name, void *value, size_t size)
     return ksu_handle_selinux_setprocattr(name, value, size);
 }
 
-/* Preinit: only reached when BakaSU builds with KSU_NO_PREINIT (headers_install
- * unavailable), where preinit.h's static-inline stubs cannot satisfy the
- * patch's externs. With headers installed, preinit.o's strong definitions win. */
+/* Preinit: only exists on the KSU_NO_PREINIT path. BakaSU's preinit_runner.mk
+ * puts -DKSU_NO_PREINIT into this module's ccflags-y when it cannot find
+ * $(objtree)/usr/include/linux/unistd.h, and preinit.h then only offers
+ * static-inline stubs that the patch's fs/exec.c externs cannot see. Gated so
+ * the normal build - where preinit.o supplies strong definitions - carries no
+ * dead stubs at all. */
 
+#ifdef KSU_NO_PREINIT
 __weak int ksu_setup_preinit_file(struct filename **filename_ptr,
                            struct user_arg_ptr *argv_user)
 {
@@ -95,6 +99,7 @@ __weak int ksu_preinit_handle_post_execveat(int *fd, struct filename **filename_
 {
     return 0;
 }
+#endif /* KSU_NO_PREINIT */
 COMPAT
 
 # Register compat object in Kbuild
