@@ -53,13 +53,12 @@ on:
         type: boolean
         default: false
       commit_mode:
-        description: "latest = branch tips, verified = audited pins, update = build latest then promote verified pins on success"
+        description: "latest = branch tips, verified = audited pins"
         required: false
         type: choice
         options:
           - latest
           - verified
-          - update
         default: verified
       root_flavor:
         description: "Root Flavor"
@@ -232,15 +231,18 @@ jobs:
             echo "$1=$2" >> "$GITHUB_OUTPUT"
           }
 
-          # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
-          # Refreshed 2026-10-27 to each upstream branch tip.
+          # Audited pins. Used only when commit_mode=verified.
+          # Refreshed 2026-10-30 to each upstream branch tip.
           # NoMount: dev tip (9c69668e, 2026-10-28, "module: set MODDIR in
-          # boot-completed.sh"; module-side only, no kernel contract).
+          # boot-completed.sh"; module-side only, no kernel contract - unchanged
+          # by this refresh).
           PIN_NOMOUNT="9c69668eefdc524c6155f7925cc7649200c6d737"
-          # KernelSU: official main tip (10efe664, 2026-10-27, "Fix ads").
-          # 10_enable_susfs_for_ksu was dry-run against this exact tree when the
-          # pin moved and still applies 30/30 files with no rejects.
-          PIN_KERNELSU="10efe6648aa52e0497bbd686f940832ad05848cf"
+          # KernelSU: official main tip (7bab12df, 2026-10-30, "js: auto publish
+          # npm"; 4 commits on from 10efe664 - manager/WebUI side only, no kernel
+          # contract change). 10_enable_susfs_for_ksu applied 30/30 with no
+          # rejects at the previous pin; the patch touches fs/ paths that did not
+          # move here.
+          PIN_KERNELSU="7bab12df939668a4406cec4c07f4e2b3c555e6b7"
           # BakaSU: official main tip (d5e9e025, 2026-10-24, "kernel: limit code
           # generators on CONFIG_KSU (#639)"). Still tracks latest despite the
           # fa12ffd fake_state removal - the 5 older branches
@@ -248,51 +250,53 @@ jobs:
           # `fake_state` and will fail to link with latest BakaSU; 6.6/6.12 are
           # unaffected. Watch those 5 families for build failures.
           PIN_BAKASU="d5e9e025b8b49155f8014684d64c91742b465f65"
-          # SukiSU-Ultra: builtin tip (b5917072, 2026-10-27, "feat(extension):
-          # publish capabilities and ABI from the kernel"); defines fake_state
-          # itself, calls the susfs_def.h no_su API -> OK on tips.
-          PIN_SUKISU_ULTRA="b59170724cdc05bf5dee8d8a8b182c5f1ddd60e3"
+          # SukiSU-Ultra: builtin tip (b16e899a, 2026-10-30, "feat(extension):
+          # drive the extensions page from the kernel handler table"); defines
+          # fake_state itself, calls the susfs_def.h no_su API -> OK on tips.
+          PIN_SUKISU_ULTRA="b16e899a555e9b96aa1225f049cd7274820ca5b8"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
-          # master tip be19eb90 (2026-10-25, "ksud: Add FinaSU Hide bootloader
-          # state spoofing"; FinaSU/kernel layout and Kbuild anchors unchanged).
-          PIN_FINASU="be19eb90b9c7b96f265c86b733aa0640a2839bdb"
-          # SUSFS (gitlab simonpunk/susfs4ksu): branch tips, 4 commits ahead of
-          # the previous pins - "susfs: Add priority uid filter" (2026-10-24),
-          # "kernel & KernelSU: Sync with upstream", "Update README.md", plus the
-          # 2026-10-27 fix "priority uid filter: Fix UAF bugs and worker not able
-          # to run". The new filter is guarded by CONFIG_KSU_SUSFS only (no new
-          # config symbol) and susfs_is_priority_uid_filtered() is defined in
-          # fs/susfs.c, so the config list needs no change.
+          # master tip 9b32bde4 (2026-10-30, "manager: Align page scale slider to
+          # two-percent steps"; 16 manager-side commits, FinaSU/kernel layout and
+          # Kbuild anchors unchanged).
+          PIN_FINASU="9b32bde453ab1b1b470d267df853655bb9aef0eb"
+          # SUSFS (gitlab simonpunk/susfs4ksu): every gki-<family> branch moved
+          # one commit, "KernelSU: Fix compiler error" (2026-10-30) - a compile
+          # fix for newer KernelSU headers, no new config symbol, no ABI change.
+          # The previous refresh (2026-10-27) added the priority uid filter
+          # ("susfs: Add priority uid filter" + its "Fix UAF bugs and worker not
+          # able to run" follow-up), guarded by CONFIG_KSU_SUSFS only;
+          # susfs_is_priority_uid_filtered() lives in fs/susfs.c, so the config
+          # list still needs no change.
           declare -A PIN_SUSFS=(
-            [susfs_commit_android12_5_10]="eb95da080c76724c4962d0c62e9af3be37d9d439"
-            [susfs_commit_android13_5_10]="a9bc1852785cc5288b587169752c74353b2110d6"
-            [susfs_commit_android13_5_15]="f3ceb5d0463e02570e75fb364ff45840d6edd923"
-            [susfs_commit_android14_5_15]="ab5ccf718887c173234b01dccf853a9044efafcf"
-            [susfs_commit_android14_6_1]="8b25990241174fe88d2131a9929e36b5e5ffb1d0"
-            [susfs_commit_android15_6_6]="0606e19afae93ffc88e53883dbf3cfced62a7b59"
-            [susfs_commit_android16_6_12]="519c86c5d8ad3832ff4a2e1a81dc1b81076f1693"
+            [susfs_commit_android12_5_10]="8930474a298d07ab9f1beca926779cbc3656b79e"
+            [susfs_commit_android13_5_10]="cfa82d53371b2dacb3ed79e31cb62a9cc349b5d5"
+            [susfs_commit_android13_5_15]="e30f1502a870434150efb16bd4a0d33277d7da57"
+            [susfs_commit_android14_5_15]="251a2ec4038ba241609fb4ad032ea0990cffa691"
+            [susfs_commit_android14_6_1]="ee155a1ad4219804a7c54cb39dd4fa1b5c2a3fa4"
+            [susfs_commit_android15_6_6]="93114563fd6b08092b9ce8c0309738c921ac8bd1"
+            [susfs_commit_android16_6_12]="6b60a305d418148bd311f4fc9bddedc82d99e1fc"
           )
           # BakaSU keeps its own SUSFS pin set (kept separate so it can diverge
           # again). Values = the same verified branch tips as PIN_SUSFS.
           declare -A PIN_SUSFS_BAKASU=(
-            [susfs_commit_android12_5_10]="eb95da080c76724c4962d0c62e9af3be37d9d439"
-            [susfs_commit_android13_5_10]="a9bc1852785cc5288b587169752c74353b2110d6"
-            [susfs_commit_android13_5_15]="f3ceb5d0463e02570e75fb364ff45840d6edd923"
-            [susfs_commit_android14_5_15]="ab5ccf718887c173234b01dccf853a9044efafcf"
-            [susfs_commit_android14_6_1]="8b25990241174fe88d2131a9929e36b5e5ffb1d0"
-            [susfs_commit_android15_6_6]="0606e19afae93ffc88e53883dbf3cfced62a7b59"
-            [susfs_commit_android16_6_12]="519c86c5d8ad3832ff4a2e1a81dc1b81076f1693"
+            [susfs_commit_android12_5_10]="8930474a298d07ab9f1beca926779cbc3656b79e"
+            [susfs_commit_android13_5_10]="cfa82d53371b2dacb3ed79e31cb62a9cc349b5d5"
+            [susfs_commit_android13_5_15]="e30f1502a870434150efb16bd4a0d33277d7da57"
+            [susfs_commit_android14_5_15]="251a2ec4038ba241609fb4ad032ea0990cffa691"
+            [susfs_commit_android14_6_1]="ee155a1ad4219804a7c54cb39dd4fa1b5c2a3fa4"
+            [susfs_commit_android15_6_6]="93114563fd6b08092b9ce8c0309738c921ac8bd1"
+            [susfs_commit_android16_6_12]="6b60a305d418148bd311f4fc9bddedc82d99e1fc"
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
-            [susfs_commit_android12_5_10]="eb95da080c76724c4962d0c62e9af3be37d9d439"
-            [susfs_commit_android13_5_10]="a9bc1852785cc5288b587169752c74353b2110d6"
-            [susfs_commit_android13_5_15]="f3ceb5d0463e02570e75fb364ff45840d6edd923"
-            [susfs_commit_android14_5_15]="ab5ccf718887c173234b01dccf853a9044efafcf"
-            [susfs_commit_android14_6_1]="8b25990241174fe88d2131a9929e36b5e5ffb1d0"
-            [susfs_commit_android15_6_6]="0606e19afae93ffc88e53883dbf3cfced62a7b59"
-            [susfs_commit_android16_6_12]="519c86c5d8ad3832ff4a2e1a81dc1b81076f1693"
+            [susfs_commit_android12_5_10]="8930474a298d07ab9f1beca926779cbc3656b79e"
+            [susfs_commit_android13_5_10]="cfa82d53371b2dacb3ed79e31cb62a9cc349b5d5"
+            [susfs_commit_android13_5_15]="e30f1502a870434150efb16bd4a0d33277d7da57"
+            [susfs_commit_android14_5_15]="251a2ec4038ba241609fb4ad032ea0990cffa691"
+            [susfs_commit_android14_6_1]="ee155a1ad4219804a7c54cb39dd4fa1b5c2a3fa4"
+            [susfs_commit_android15_6_6]="93114563fd6b08092b9ce8c0309738c921ac8bd1"
+            [susfs_commit_android16_6_12]="6b60a305d418148bd311f4fc9bddedc82d99e1fc"
           )
 
           pick() { # pinned repo ref  -> pinned when verified, else latest
@@ -1220,61 +1224,6 @@ jobs:
           fi
           echo "announced ${sent} message(s)"
 
-  update-verified-pins:
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.commit_mode == 'update'"
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: write
-    needs:
-      - resolve-sources
-      - build-android12-5-10
-      - build-android13-5-10
-      - build-android13-5-15
-      - build-android14-5-15
-      - build-android14-6-1
-      - build-android15-6-6
-      - build-android16-6-12
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.ref }}
-          token: ${{ github.token }}
-
-      - name: Promote verified pins on success
-        id: promote
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 .github/scripts/update_verified_pins.py
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NOMOUNT_SHA: ${{ needs.resolve-sources.outputs.nomount_commit }}
-          KERNELSU_SHA: ${{ needs.resolve-sources.outputs.ksu_commit }}
-          BAKASU_SHA: ${{ needs.resolve-sources.outputs.bakasu_commit }}
-          SUKISU_ULTRA_SHA: ${{ needs.resolve-sources.outputs.sukisu_ultra_commit }}
-          FINASU_SHA: ${{ needs.resolve-sources.outputs.finasu_commit }}
-          APPROVE_NOMOUNT: ${{ inputs.use_nomount }}
-          APPROVE_KERNELSU: ${{ (inputs.root_flavor == 'KernelSU' || startsWith(inputs.root_flavor, 'All')) }}
-          APPROVE_BAKASU: ${{ (inputs.root_flavor == 'BakaSU' || startsWith(inputs.root_flavor, 'All')) }}
-          APPROVE_SUKISU_ULTRA: ${{ inputs.root_flavor == 'SukiSU-Ultra' }}
-          APPROVE_FINASU: ${{ inputs.root_flavor == 'FinaSU' }}
-
-      - name: Commit promoted pins
-        if: always() && steps.promote.conclusion == 'success'
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
-          git add .github/workflows/main.yml .github/pins/history
-          if git diff --cached --quiet; then
-            echo "No pin changes to commit."
-            exit 0
-          fi
-          git commit -m "chore(pins): promote verified commits to latest built (${STAMP})"
-          git push
   rej:
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && always()"
     runs-on: ubuntu-latest
