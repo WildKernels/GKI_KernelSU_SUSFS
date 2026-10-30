@@ -150,30 +150,6 @@ runs:
           && grep -q "^KSU_SECOND_SIGNATURE_RELEASE := 1" FinaSU/kernel/Kbuild \
           || { echo "ERROR: Kbuild cert injection failed (anchor missing)" >&2; exit 1; }
 
-    # DISABLED 2026-10-30 (owner request): BakaSU kernel-side SUSFS compat layer.
-    # Kept here, commented out, because re-enabling is just uncommenting.
-    # Re-enable with: .github/actions/susfs/bakasu_compat/apply.sh — it copies
-    # bakasu_compat/bakasu_susfs_compat.c into kernel/BakaSU/kernel/ and adds it
-    # to BakaSU's Kbuild. Without it, a bakasu + SUSFS leg has no definition of
-    # my_setprocattr (the susfs 50_add patch calls it from
-    # handle_selinux_setprocattr, wired via LSM_HOOK_INIT(setprocattr, ...)), so
-    # the vmlinux link is expected to fail with 'undefined symbol: my_setprocattr'.
-    # - name: Enable SUSFS for BakaSU
-    #   # BakaSU integrates SUSFS itself (no 10_enable patch). What it lacks is the
-    #   # symbol *name* the susfs4ksu 50_add patch asks for: it exports
-    #   # ksu_handle_selinux_setprocattr and only keeps `my_setprocattr` as a local
-    #   # setprocattr_fn plus a #define. The compat layer adds the missing symbol
-    #   # (delegating to the real function) and preinit stubs for KSU_NO_PREINIT.
-    #   if: inputs.enabled == 'true' && inputs.root_flavor == 'bakasu'
-    #   shell: bash
-    #   working-directory: ${{ github.workspace }}/kernel
-    #   env:
-    #     SUSFS4KSU: ${{ github.workspace }}/susfs4ksu
-    #   run: |
-    #     set -euo pipefail
-    #     bash "$GITHUB_WORKSPACE/.github/actions/susfs/bakasu_compat/apply.sh" BakaSU "${{ inputs.version }}" "${{ inputs.sublevel }}"
-    #
-
     - name: Enable SUSFS Kernel Configs
       if: inputs.enabled == 'true'
       uses: ./.github/actions/susfs-config
