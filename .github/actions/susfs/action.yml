@@ -166,25 +166,6 @@ runs:
     # `goto show_pad;`, a line SUSFS stopped emitting in ef16cbc (2026-05-10);
     # the gated sources no longer contain it either, so the step was a no-op.)
 
-    - name: Restore ksu_close_fd for kernels < 5.15 (kernelsu preinit)
-      if: inputs.enabled == 'true' && inputs.root_flavor == 'kernelsu'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        # SUSFS 10_enable patch rewrites ksu_close_fd(fd) -> close_fd(fd)
-        # in preinit.c. close_fd() is undeclared on kernels < 5.15.
-        # Restore ksu_close_fd(fd) which KernelSU defines via ksyscall(close, fd).
-        set -euo pipefail
-        for d in common/drivers/kernelsu drivers/kernelsu; do
-          F="${{ github.workspace }}/kernel/$d/preinit/preinit.c"
-          if [ -f "$F" ] && grep -qE '^[[:space:]]*close_fd\(fd\);' "$F"; then
-            sed -i 's/^\([[:space:]]*\)close_fd(fd);/\1ksu_close_fd(fd);/' "$F"
-            echo "Restored ksu_close_fd(fd) in $F"
-          else
-            echo "No bare close_fd(fd) in $F; skipping"
-          fi
-        done
-
     - name: Fix selinux_hide pointer-bool-conversion on 6.6+ (ALL branches)
       # Runs whether or not SUSFS patches were applied: every root flavor
       # compiles its own selinux_hide.c, and 6.6+ clang turns the bare
