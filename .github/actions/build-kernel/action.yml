@@ -61,29 +61,12 @@ runs:
             echo "ERROR: page_size=${PAGE_SIZE} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
             exit 1
           fi
-          # --- ccache wiring ---------------------------------------------------
-          # The CC/CXX/HOSTCC/HOSTCXX exports below never reached the compiler.
-          # Two independent reasons, both measured on run 40056822635:
-          #   1. build/build.sh (and build/_setup_env.sh on 13-5.10/13-5.15)
-          #      takes the LLVM branch, which *resets* CC=clang / HOSTCC=clang
-          #      after the environment is read and forwards only LLVM=1 to make
-          #      (no CC= on the command line) -- so the wrapper is discarded.
-          #   2. `make ... LLVM=1` makes the kernel Makefile assign CC/HOSTCC
-          #      unconditionally:  ifneq ($(LLVM),) / CC = clang / HOSTCC = clang
-          #      and a make-level assignment beats the environment.
-          # Net effect was ccache as pure overhead: cache dir identical before
-          # and after a 988 s build (0.6 / 12.0 GB), no counters at all, ~2.8k
-          # translation units compiled with no caching.
-          # .github/scripts/ccache_wire.py fixes both halves (origin guards in
-          # the Makefile + an optional wrapper prefix in the build scripts) and
-          # fails loudly if the tree stops matching what it expects.
-          if command -v ccache >/dev/null 2>&1; then
-            python3 "${GITHUB_WORKSPACE}/.github/scripts/ccache_wire.py" .
-            export CCACHE_PREFIX="/usr/bin/ccache "
-            echo "[+] ccache prefix: '${CCACHE_PREFIX}'"
-          else
-            echo "[!] ccache is not installed; building without it"
-          fi
+          # Compiler caching was removed on purpose: the ccache save/restore keys
+          # never matched (save omitted the -g<gen> suffix), so no leg ever
+          # restored one and every build was cold anyway; the bazel cache bought
+          # a handful of actions for a multi-GB restore/save. A build that can be
+          # reproduced only when a cache happens to be warm is worse than a slow
+          # build, so the tree now compiles with plain clang every time.
           BUILD_GKI_ARTIFACTS="" \
           BUILD_GKI_CERTIFICATION_TOOLS=0 \
           BUILD_SYSTEM_DLKM=0 \
@@ -93,10 +76,6 @@ runs:
           OUT_DIR="/home/runner/out" \
           LTO=thin \
           BUILD_CONFIG=common/build.config.gki.aarch64 \
-          CC="/usr/bin/ccache clang" \
-          CXX="/usr/bin/ccache clang++" \
-          HOSTCC="/usr/bin/ccache clang" \
-          HOSTCXX="/usr/bin/ccache clang++" \
           build/build.sh -j"$(nproc)"
         else
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel

@@ -125,8 +125,7 @@ gh workflow run main.yml \
   -f os_patch_level=lts \
   -f brand_name=MyKernel \
   -f commit_mode=verified \
-  -f root_flavor=KernelSU \
-  -f use_cache=false
+  -f root_flavor=KernelSU
 ```
 
 Android 14 / Linux 6.1.118:
@@ -140,8 +139,7 @@ gh workflow run main.yml \
   -f os_patch_level=118 \
   -f brand_name=MyKernel \
   -f commit_mode=verified \
-  -f root_flavor=KernelSU \
-  -f use_cache=false
+  -f root_flavor=KernelSU
 ```
 
 Find and watch the run:

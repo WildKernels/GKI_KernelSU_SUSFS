@@ -15,10 +15,6 @@ on:
           - Pre-Release
           - Release
         default: CI
-      use_cache:
-        description: "Use ccache/bazel cache (restore/save)"
-        type: boolean
-        default: false
       allow_version_mismatch:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         type: boolean
@@ -681,7 +677,6 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -712,7 +707,6 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -743,7 +737,6 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -774,7 +767,6 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -805,7 +797,6 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -836,7 +827,6 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -867,7 +857,6 @@ jobs:
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
 
@@ -1852,7 +1841,6 @@ jobs:
           USE_UNICODE: ${{ inputs.use_unicode || (github.event_name == 'schedule' && true) || false }}
           USE_BPF: ${{ inputs.use_bpf || (github.event_name == 'schedule' && true) || false }}
           USE_PERF: ${{ inputs.use_perf || false }}
-          USE_CACHE: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
           PAGE_SIZE: ${{ inputs.page_size || '4k' }}
           KERNEL_BUILD_VERSION: ${{ inputs.kernel_build_version || 'All' }}
           NOMOUNT_COMMIT: ${{ needs.resolve-sources.outputs.nomount_commit }}

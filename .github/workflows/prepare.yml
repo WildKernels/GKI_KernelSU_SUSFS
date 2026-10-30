@@ -71,11 +71,6 @@ on:
         required: false
         type: boolean
         default: false
-      use_cache:
-        description: "Enable ccache/bazel cache"
-        required: false
-        type: boolean
-        default: false
       os_patch_level:
         description: "Optional filter: patch date (YYYY-MM), kernel sublevel, lts (LTS branch), or all"
         required: false
@@ -343,7 +338,6 @@ jobs:
       brand_name: ${{ inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size }}
       stock_config_artifact: stock-configs-${{ needs.generate-matrix.outputs.version_slug }}
     secrets: inherit

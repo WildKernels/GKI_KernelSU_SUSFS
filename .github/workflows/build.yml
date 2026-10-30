@@ -71,11 +71,6 @@ on:
         required: false
         type: boolean
         default: false
-      use_cache:
-        description: "Enable ccache/bazel cache (restore/save via release buckets)"
-        required: false
-        type: boolean
-        default: false
       page_size:
         description: "ARM64 page size: 4k (default) or 16k (Kleaf --page_size)"
         required: false
@@ -422,72 +417,6 @@ jobs:
           if-no-files-found: ignore
           compression-level: 9
 
-      - name: "Setup Cache and Build Environment"
-        if: inputs.use_cache
-        uses: ./.github/actions/cache-setup
-        with:
-          version: ${{ inputs.version }}
-          android_version: ${{ inputs.android_version }}
-          kernel_version: ${{ inputs.kernel_version }}
-          sublevel: ${{ steps.extract.outputs.sublevel }}
-
-      - name: Restore ccache
-        id: restore-ccache
-        continue-on-error: true
-        if: inputs.use_cache && (inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15')
-        uses: ./.github/actions/cache-restore
-        with:
-          cache_path: /home/runner/.ccache
-          # Key carries what actually invalidates an entry, which 8d8e0339 named
-          # as the blocker for trusting the cache at all: the runner image (host
-          # perl/glibc/toolchain -- the 5.15.216/BakaSU asset that reproduced a
-          # perl XS handshake failure was written under a different image) and a
-          # manual generation token. Bump vars.CACHE_GEN to abandon every asset
-          # at once; switching runner images now starts a fresh key instead of
-          # restoring a tree built by another toolchain. Source pins stay out of
-          # the key on purpose: ccache hashes source and compiler content itself,
-          # so a pin bump already misses -- adding it here would only multiply
-          # immortal assets.
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}-g${{ vars.CACHE_GEN || '1' }}
-          cache_bucket: ccache-cache-${{ inputs.version }}-${{ inputs.variant }}
-          # Seed order: exact key -> same sublevel, other patch level -> (opt-in,
-          # vars.ALLOW_CACHE_SEEDING) newest cache of the same family, any
-          # sublevel. The family-wide line is what makes a brand-new month start
-          # warm instead of cold -- every row in .github/config/*.json is its own
-          # sublevel -- but it also spreads a poisoned asset into neighbouring
-          # sublevels, so it is off unless asked for. Empty lines are skipped by
-          # cache-restore. The variant stays pinned: root flavors change
-          # autoconf.h (CONFIG_KSU*), which invalidates every translation unit.
-          restore_keys: |
-            ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-            ${{ vars.ALLOW_CACHE_SEEDING == 'true' && format('{0}-{1}.', inputs.android_version, inputs.kernel_version) || '' }}
-
-      - name: Restore bazel-cache
-        id: restore-bazel
-        continue-on-error: true
-        if: inputs.use_cache && (inputs.version == 'android14-5.15' || inputs.version == 'android14-6.1' || inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12')
-        uses: ./.github/actions/cache-restore
-        with:
-          cache_path: /home/runner/.cache/bazel
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}-g${{ vars.CACHE_GEN || '1' }}
-          cache_bucket: bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
-          restore_keys: |
-            ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-            ${{ vars.ALLOW_CACHE_SEEDING == 'true' && format('{0}-{1}.', inputs.android_version, inputs.kernel_version) || '' }}
-
-      - name: Check cache hit
-        run: |
-          echo "Cache restore status (image=ubuntu-latest gen=${{ vars.CACHE_GEN || '1' }}):"
-          CCACHE_HIT="${{ steps.restore-ccache.outputs.cache-hit || 'skipped' }}"
-          BAZEL_HIT="${{ steps.restore-bazel.outputs.cache-hit || 'skipped' }}"
-          echo "  ccache: $CCACHE_HIT"
-          echo "  bazel: $BAZEL_HIT"
-
-      - name: Get Cache Stats
-        uses: ./.github/actions/cache-stats
-        with:
-          clear_stats: true
-
       - name: Initialize Config Fragment
         run: touch "${{ github.workspace }}/wild_gki.fragment"
 
@@ -508,44 +437,6 @@ jobs:
         with:
           version: ${{ inputs.version }}
           page_size: ${{ inputs.page_size }}
-
-      - name: Get Cache Stats
-        uses: ./.github/actions/cache-stats
-        with:
-          clear_stats: false
-
-      - name: Prune ccache before save
-        if: always() && inputs.use_cache && (inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15')
-        shell: bash
-        run: |
-          if [ -d /home/runner/.ccache ]; then
-            ccache -c 2>/dev/null || true
-            find /home/runner/.ccache -type f -mtime +0.5 -delete 2>/dev/null || true
-            find /home/runner/.ccache -type d -empty -delete 2>/dev/null || true
-            echo "ccache pruned"; ccache -s 2>/dev/null | head -20 || true
-          fi
-
-      - name: Save ccache
-        continue-on-error: true
-        uses: ./.github/actions/cache-save
-        if: always() && inputs.use_cache && (inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15')
-        with:
-          cache_path: /home/runner/.ccache
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}
-          cache_bucket: "ccache-cache-${{ inputs.version }}-${{ inputs.variant }}"
-          compression_level: 9
-          github_token: ${{ github.token }}
-
-      - name: Save bazel-cache
-        continue-on-error: true
-        uses: ./.github/actions/cache-save
-        if: always() && inputs.use_cache && (inputs.version == 'android14-5.15' || inputs.version == 'android14-6.1' || inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12')
-        with:
-          cache_path: /home/runner/.cache/bazel
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
-          cache_bucket: "bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}"
-          compression_level: 9
-          github_token: ${{ github.token }}
 
       - name: Consolidated Build Summary
         id: build-summary
