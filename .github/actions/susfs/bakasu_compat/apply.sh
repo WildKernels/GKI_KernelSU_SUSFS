@@ -1,18 +1,38 @@
 #!/usr/bin/env bash
 # BakaSU kernel-side SUSFS compat layer
-# Provides weak fallbacks for symbols extern-declared by susfs4ksu's
-# 50_add_susfs_in_gki patch, but missing in older BakaSU (dac2d186):
-#   my_write_context, my_write_access  (static in selinux_hide.c)
-#   my_setprocattr                     (doesn't exist; BakaSU uses ksu_handle_selinux_setprocattr)
-#   ksu_setup_preinit_file, ksu_preinit_handle_post_execveat  (no preinit dir)
+#
+# susfs4ksu's 50_add_susfs_in_gki patch extern-declares symbols that the root
+# implementation is expected to export. Re-checked against BakaSU d5e9e025 and
+# susfs4ksu gki-* @ 2026-10-30 (ee155a1a / 6b60a305 / 8930474a):
+#
+#   my_setprocattr                      NEEDED. BakaSU has no global function of
+#       this name at all: selinux_hide.c only has a local `setprocattr_fn
+#       my_setprocattr` used for patch_text plus a #define alias. The patch calls
+#       it from handle_selinux_setprocattr(), which it wires into
+#       LSM_HOOK_INIT(setprocattr, ...), so the reference is live. Delegate to
+#       BakaSU's real global ksu_handle_selinux_setprocattr() rather than
+#       returning 0, or the hide write silently no-ops while reporting success.
+#
+#   ksu_setup_preinit_file              FALLBACK. BakaSU does build preinit:
+#   ksu_preinit_handle_post_execveat    Kbuild -> tools/code_generation/
+#       code_generation.mk -> preinit_runner.mk adds preinit/preinit.o +
+#       preinit/blob.o once $(objtree)/usr/include/linux/unistd.h exists (it runs
+#       headers_install if not). Those are strong definitions, so these weak ones
+#       only take over on the KSU_NO_PREINIT path, where preinit.h supplies
+#       static-inline stubs that cannot satisfy the patch's externs.
+#
+#   my_write_context, my_write_access   NOT NEEDED. BakaSU declares both
+#       __maybe_static, which expands to nothing when
+#       KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE is set - and BakaSU's own
+#       susfs_compat.mk sets it whenever the applied patch puts
+#       ksu_selinux_hide_running into security/selinux/hooks.c, which the current
+#       patch does. So they are already global. (KernelSU-Next and tiann keep
+#       them static and rely on kernel_patches/KernelSU/10_enable_susfs_for_ksu
+#       to strip `static` instead - a different route to the same symbol.)
 #
 # We drop bakasu_susfs_compat.c directly into kernel/BakaSU/kernel/ (the
 # directory symlinked into common/drivers/kernelsu/) and add it to
 # kernelsu-objs in Kbuild so it's compiled and linked into vmlinux.
-#
-# The stubs return simple values so the SUSFS patch's static wrappers
-# (handle_sel_write_context, handle_sel_write_access, handle_selinux_setprocattr)
-# fall back to original behavior. No SELinux internals needed.
 
 set -eo pipefail
 
@@ -33,19 +53,17 @@ BAKASU_KBUILD="$BAKASU_KSU/Kbuild"
 
 # compat.c: defines all SUSFS-expected symbols that BakaSU lacks
 cat > "$BAKASU_KSU/bakasu_susfs_compat.c" <<'COMPAT'
-/* BakaSU SUSFS compat: global symbol definitions for SUSFS patch extern refs.
+/* BakaSU SUSFS compat: the one symbol BakaSU cannot provide itself.
  *
- * BakaSU ships my_write_context/my_write_access as static in selinux_hide.c
- * and lacks my_setprocattr entirely. The SUSFS kernel patch declares these
- * as extern, expecting a root flavor to provide them globally. This file
- * provides the definitions so the link succeeds.
+ * Unlike my_write_context / my_write_access (globals in BakaSU through
+ * __maybe_static) and the preinit pair (compiled in via preinit_runner.mk),
+ * BakaSU has no global my_setprocattr: selinux_hide.c only keeps a local
+ * `setprocattr_fn my_setprocattr` for patch_text plus a #define alias.
  *
- * Weak fallbacks satisfy the SUSFS patch's externs for older BakaSU revisions;
- * newer BakaSU's real global definitions override them.
- *
- * Stubs return simple values so SUSFS static wrappers fall back to original
- * behavior when CONFIG_KSU_SUSFS is enabled but BakaSU can't provide full
- * SUSFS integration.
+ * The susfs patch calls my_setprocattr() from handle_selinux_setprocattr(),
+ * which it wires into LSM_HOOK_INIT(setprocattr, ...), so routing it to
+ * BakaSU's real implementation is what makes the setprocattr hide work.
+ * Weak, so anything that defines the symbol for real still wins.
  */
 
 #include <linux/fs.h>
@@ -53,42 +71,17 @@ cat > "$BAKASU_KSU/bakasu_susfs_compat.c" <<'COMPAT'
 struct filename;
 struct user_arg_ptr;
 
-/* ------------------------------------------------------------------ */
-/* my_write_context / my_write_access                                 */
-/*   Provided globally for selinuxfs.c handle_sel_write_context /     */
-/*   handle_sel_write_access (added by SUSFS 50_add_susfs patch).     */
-/*   These replace sel_write_context/sel_write_access in write_op[].   */
-/*   Return -EINVAL so callers fall back to original behavior.         */
-/* ------------------------------------------------------------------ */
-
-__weak ssize_t my_write_context(struct file *file, char *buf, size_t size)
-{
-    return -EINVAL;
-}
-
-__weak ssize_t my_write_access(struct file *file, char *buf, size_t size)
-{
-    return -EINVAL;
-}
-
-/* ------------------------------------------------------------------ */
-/* my_setprocattr                                                     */
-/*   Provided globally for hooks.c handle_selinux_setprocattr         */
-/*   (added by SUSFS 50_add_susfs patch).                             */
-/*   Replaces selinux_setprocattr in LSM hooks. Return 0 (allow).     */
-/* ------------------------------------------------------------------ */
+/* BakaSU, kernel/feature/selinux_hide.h (>= 4.11 prototype). */
+extern int ksu_handle_selinux_setprocattr(const char *name, void *value, size_t size);
 
 __weak int my_setprocattr(const char *name, void *value, size_t size)
 {
-    return 0;
+    return ksu_handle_selinux_setprocattr(name, value, size);
 }
 
-/* ------------------------------------------------------------------ */
-/* Preinit support                                                    */
-/*   ksu_setup_preinit_file / ksu_preinit_handle_post_execveat        */
-/*   Referenced by fs/exec.c (SUSFS patch). BakaSU has no preinit     */
-/*   directory, so we provide minimal stubs here.                     */
-/* ------------------------------------------------------------------ */
+/* Preinit: only reached when BakaSU builds with KSU_NO_PREINIT (headers_install
+ * unavailable), where preinit.h's static-inline stubs cannot satisfy the
+ * patch's externs. With headers installed, preinit.o's strong definitions win. */
 
 __weak int ksu_setup_preinit_file(struct filename **filename_ptr,
                            struct user_arg_ptr *argv_user)
