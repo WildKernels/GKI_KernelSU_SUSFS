@@ -94,6 +94,51 @@ runs:
           echo "Root commit mismatch: expected $expected_commit, got $actual_commit." >&2
           exit 1
         fi
+
+        # ---- deterministic KSU version -------------------------------------
+        # kernel/Kbuild derives KSU_VERSION from git: BASE_BRANCH comes from
+        # `rev-parse --abbrev-ref HEAD`, then it counts merge-base(HEAD,
+        # origin/<branch>). On our detached checkout `rev-parse` returns the
+        # literal "HEAD", so BASE_BRANCH stays "HEAD" and the merge-base runs
+        # against refs/remotes/origin/HEAD -- whatever branch the remote happens
+        # to default to -- instead of the branch we actually want. That makes the
+        # reported version depend on clone layout rather than on the commit, and
+        # a still-shallow clone silently counts a truncated history on top of it.
+        # Unshallow, resolve the upstream base explicitly, and pin the result.
+        if [ -f "$directory/.git/shallow" ]; then
+          git -C "$directory" fetch --unshallow --tags origin 2>/dev/null || true
+        fi
+        if [ -f "$directory/.git/shallow" ]; then
+          echo "ERROR: $directory is still a shallow clone -- KSU_VERSION would be wrong." >&2
+          exit 1
+        fi
+        case "$flavor" in
+          next)     upstream_branch="dev" ;;
+          kowsu)    upstream_branch="master" ;;
+          finasu)   upstream_branch="master" ;;
+          *)        upstream_branch="main" ;;
+        esac
+        base_commit="$(git -C "$directory" merge-base HEAD "refs/remotes/origin/${upstream_branch}" 2>/dev/null || echo "$actual_commit")"
+        ksu_count="$(git -C "$directory" rev-list --count "$base_commit")"
+        ksu_tag="$(git -C "$directory" describe --tags --abbrev=0 "$base_commit" 2>/dev/null || echo unknown)"
+        ksu_version=$((30000 + ksu_count))
+        echo "[+] KSU version: ${ksu_version} (30000 + ${ksu_count} commits at ${base_commit:0:12}, upstream ${upstream_branch})"
+        echo "ROOT_BASE_COMMIT=$base_commit" >> "$GITHUB_ENV"
+        echo "ROOT_VERSION_CODE=$ksu_version" >> "$GITHUB_ENV"
+        # Only override files that carry the git-derived heuristic; other root
+        # implementations compute their own version and are left alone.
+        kbuild="$directory/kernel/Kbuild"
+        if [ -f "$kbuild" ] && grep -q 'BASE_BRANCH' "$kbuild" && ! grep -q '^# CI: deterministic KSU_VERSION' "$kbuild"; then
+          {
+            echo ''
+            echo '# CI: deterministic KSU_VERSION (appended by .github/actions/root-setup).'
+            echo '# The git heuristic above reads rev-parse --abbrev-ref HEAD, which is'
+            echo '# "HEAD" on a detached checkout, so it counts the wrong ref.'
+            echo "KSU_VERSION := $ksu_version"
+            echo "KSU_VERSION_TAG := \"$ksu_tag\""
+          } >> "$kbuild"
+          echo "[+] pinned KSU_VERSION=${ksu_version} / tag ${ksu_tag} in $kbuild"
+        fi
         if [ ! -f "$directory/kernel/Kconfig" ] || [ ! -f "$directory/kernel/Makefile" ]; then
           echo "Selected root checkout does not contain a kernel integration." >&2
           exit 1

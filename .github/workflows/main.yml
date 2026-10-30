@@ -136,6 +136,7 @@ jobs:
     outputs:
       nomount_commit: ${{ steps.resolve.outputs.nomount_commit }}
       kernelsu_commit: ${{ steps.resolve.outputs.kernelsu_commit }}
+      next_base_commit: ${{ steps.resolve.outputs.next_base_commit }}
       kernelsu_branch: ${{ steps.resolve.outputs.kernelsu_branch }}
       root_flavor: ${{ steps.resolve.outputs.root_flavor }}
       root_commit: ${{ steps.resolve.outputs.root_commit }}
@@ -362,6 +363,26 @@ jobs:
             NEXT_COMMIT="$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)"
           fi
 
+          # The kernel reports 30000 + count(merge-base(KSU HEAD, upstream dev))
+          # -- see .github/actions/root-setup. The manager has to be resolved at
+          # that same upstream commit, not at the fork tip: the fork tip is a
+          # fork-only SHA with no manager CI behind it, and pairing a manager
+          # from a different commit is what let a kernel reporting 33405 sit
+          # next to a manager reporting 33442.
+          if [ "$SCHED_SUSFS" = "true" ]; then
+            NEXT_BASE="$(gh api "repos/KernelSU-Next/KernelSU-Next/compare/dev...pershoot:dev-susfs" \
+              --jq '.merge_base_commit.sha // empty' 2>/dev/null || true)"
+            if ! [[ "${NEXT_BASE:-}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "WARNING: could not resolve the pershoot dev-susfs merge base; manager tracks the fork tip" >&2
+              NEXT_BASE="$NEXT_COMMIT"
+            else
+              echo "[+] KernelSU-Next manager base ${NEXT_BASE:0:12} (merge-base with upstream dev)"
+            fi
+          else
+            NEXT_BASE="$NEXT_COMMIT"
+          fi
+          emit next_base_commit "$NEXT_BASE"
+
           mk_entry() { # flavor variant commit produce
             printf '{"root_flavor":"%s","variant":"%s","root_commit":"%s","produce":%s}' "$1" "$2" "$3" "$4"
           }
@@ -465,7 +486,8 @@ jobs:
           root_flavor: ${{ inputs.root_flavor }}
           all_flavors: next,kernelsu,bakasu
           allow_fallback: 'true'
-          next_commit: ${{ steps.resolve.outputs.kernelsu_commit }}
+          root_matrix: ${{ steps.resolve.outputs.root_matrix }}
+          next_commit: ${{ steps.resolve.outputs.next_base_commit }}
           finasu_commit: ${{ steps.resolve.outputs.finasu_commit }}
 
       - name: Compose requested feature set
