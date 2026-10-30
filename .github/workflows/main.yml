@@ -237,10 +237,9 @@ jobs:
 
           # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
           # Refreshed 2026-10-27 to each upstream branch tip.
-          # NoMount: dev tip (e7f7c676, 2026-10-27, "module/webui: add option to
-          # dump rules into android log for debugging"; module-side only, no
-          # kernel contract).
-          PIN_NOMOUNT="e7f7c67681e19ed1e1ee9c902c030e44647035d4"
+          # NoMount: dev tip (9c69668e, 2026-10-28, "module: set MODDIR in
+          # boot-completed.sh"; module-side only, no kernel contract).
+          PIN_NOMOUNT="9c69668eefdc524c6155f7925cc7649200c6d737"
           # KernelSU: official main tip (10efe664, 2026-10-27, "Fix ads").
           # 10_enable_susfs_for_ksu was dry-run against this exact tree when the
           # pin moved and still applies 30/30 files with no rejects.
