@@ -370,9 +370,23 @@ jobs:
           # from a different commit is what let a kernel reporting 33405 sit
           # next to a manager reporting 33442.
           if [ "$SCHED_SUSFS" = "true" ]; then
-            NEXT_BASE="$(gh api "repos/KernelSU-Next/KernelSU-Next/compare/dev...pershoot:dev-susfs" \
-              --jq '.merge_base_commit.sha // empty' 2>/dev/null || true)"
-            if ! [[ "${NEXT_BASE:-}" =~ ^[0-9a-f]{40}$ ]]; then
+            # Compare within the fork first: pershoot mirrors upstream dev, and
+            # the path needs no owner:branch colon. Across-repo compare is the
+            # fallback. curl with an explicit token on purpose -- `gh` is not
+            # authenticated inside this job, which silently yielded an empty
+            # base on run 41005208268 and left the pairing to the fallback.
+            NEXT_BASE=""
+            for cmp_url in \
+              "https://api.github.com/repos/pershoot/KernelSU-Next/compare/dev...dev-susfs" \
+              "https://api.github.com/repos/KernelSU-Next/KernelSU-Next/compare/dev...pershoot:dev-susfs"; do
+              NEXT_BASE="$(curl -fsSL --max-time 30 --retry 3 \
+                -H "Authorization: Bearer ${{ github.token }}" \
+                -H "Accept: application/vnd.github+json" \
+                "$cmp_url" 2>/dev/null | jq -r '.merge_base_commit.sha // empty' 2>/dev/null || true)"
+              [[ "${NEXT_BASE:-}" =~ ^[0-9a-f]{40}$ ]] && break
+              NEXT_BASE=""
+            done
+            if [ -z "$NEXT_BASE" ]; then
               echo "WARNING: could not resolve the pershoot dev-susfs merge base; manager tracks the fork tip" >&2
               NEXT_BASE="$NEXT_COMMIT"
             else
