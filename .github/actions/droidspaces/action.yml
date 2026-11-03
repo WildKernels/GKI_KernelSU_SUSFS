@@ -124,8 +124,14 @@ runs:
           # macvlan mode (--net=macvlan); self-contained driver
           CONFIG_MACVLAN=y
 
-          # UFW
-          CONFIG_NETFILTER_XT_TARGET_REJECT=y
+          # UFW - reject target. Upstream's list says NETFILTER_XT_TARGET_REJECT,
+          # which no 5.10/5.15/6.1/6.6/6.12/6.18 tree declares: the iptables
+          # REJECT target is built by ipt_REJECT.o under IP_NF_TARGET_REJECT
+          # (net/ipv4/netfilter/Kconfig) and ip6t_REJECT.o under
+          # IP6_NF_TARGET_REJECT. The old name was a silent no-op - the defconfig
+          # gained a line Kconfig then dropped.
+          CONFIG_IP_NF_TARGET_REJECT=y
+          CONFIG_IP6_NF_TARGET_REJECT=y
           CONFIG_NETFILTER_XT_TARGET_LOG=y
           CONFIG_NETFILTER_XT_MATCH_RECENT=y
 
