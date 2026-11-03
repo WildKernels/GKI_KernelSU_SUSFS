@@ -30,6 +30,12 @@ runs:
           CONFIG_NETFILTER_XT_SET=y
           CONFIG_NETFILTER_XT_TARGET_LOG=y
           CONFIG_NETFILTER_XT_MATCH_RECENT=y
+          # UFW's -j REJECT. The iptables REJECT target is ipt_REJECT.o
+          # (CONFIG_IP_NF_TARGET_REJECT, net/ipv4/netfilter/Kconfig) and
+          # ip6t_REJECT.o (CONFIG_IP6_NF_TARGET_REJECT); there is no
+          # NETFILTER_XT_TARGET_REJECT symbol in any tree we build.
+          CONFIG_IP_NF_TARGET_REJECT=y
+          CONFIG_IP6_NF_TARGET_REJECT=y
           CONFIG_IP6_NF_NAT=y
           CONFIG_IP6_NF_TARGET_MASQUERADE=y
 
