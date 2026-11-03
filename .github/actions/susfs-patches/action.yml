@@ -23,6 +23,19 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
 
+    - name: Guard the priority-uid-filter credential helpers
+      # Upstream added susfs_switch_to_ksu_domain()/susfs_restore_creds() outside
+      # the #ifdef that guards their only callers. BakaSU's kernel tree on the
+      # older branches has no CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER symbol, so the
+      # callers compile out and the definitions become dead code:
+      #   fs/susfs.c:183:21: error: unused function 'susfs_switch_to_ksu_domain'
+      #   fs/susfs.c:217:13: error: unused function 'susfs_restore_creds'
+      # Wrap them in the same switch. No-op where the symbol exists.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/susfs_guard_priority_helpers.py" fs/susfs.c
+
     # Pre-i_user_ns() kernels (5.10 / 5.15, and old 6.1) pass the mount namespace
     # explicitly to i_uid_into_mnt(); fs/susfs.c is written against the newer
     # i_user_ns() helper, so it fails to compile there:
@@ -184,6 +197,11 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
+        # android17-6.18: the SUS_MAP hook in show_smaps_rollup() is NOT in the
+        # patch file. Google keeps reworking that loop (lock_ctx_mm + VMA_ITERATOR
+        # in 6.18), so a context hunk applies with a 40-line offset on one
+        # sublevel and rejects outright on the next. The patch ships without it
+        # and the hook is inserted by anchor below, after the patch applies.
         if [ "${{ inputs.version }}" = "android16-6.12" ]; then
           # Sublevels below 6.12.92 predate the show_smaps_rollup refactor and
           # never had the fs/exec.c dma-buf include, so plain `patch` rejects
@@ -195,6 +213,17 @@ runs:
           # Deliberately no --forward (PR #342 uses --batch --forward here):
           # a reversed/already-applied hunk must fail loudly, not be skipped.
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
+        fi
+
+        if [ "${{ inputs.version }}" = "android17-6.18" ]; then
+          python3 "${{ github.workspace }}/.github/scripts/susfs_618_task_mmu.py" "$PWD"
+          # 6.18 API deltas the 6.12 patch cannot express: the fake-mnt_id
+          # allocators (xarray + struct mount changes), -Wmissing-prototypes on
+          # the susfs_get_non_sus_* helpers, and SELinux's cred/task split.
+          python3 "${{ github.workspace }}/.github/scripts/susfs_618_compile_fixes.py" "$PWD"
+          # 6.18 enables -Wmissing-prototypes by default; the 6.12 source only
+          # declares 19 of fs/susfs.c's ~40 non-static functions.
+          python3 "${{ github.workspace }}/.github/scripts/susfs_618_prototypes.py" "$PWD"
         fi
 
         # SUSFS's OPEN_REDIRECT code unconditionally calls VMA_PAD_START(), which

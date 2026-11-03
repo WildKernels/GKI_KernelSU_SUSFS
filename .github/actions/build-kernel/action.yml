@@ -61,6 +61,12 @@ runs:
             echo "ERROR: page_size=${PAGE_SIZE} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
             exit 1
           fi
+          # Compiler caching was removed on purpose: the ccache save/restore keys
+          # never matched (save omitted the -g<gen> suffix), so no leg ever
+          # restored one and every build was cold anyway; the bazel cache bought
+          # a handful of actions for a multi-GB restore/save. A build that can be
+          # reproduced only when a cache happens to be warm is worse than a slow
+          # build, so the tree now compiles with plain clang every time.
           BUILD_GKI_ARTIFACTS="" \
           BUILD_GKI_CERTIFICATION_TOOLS=0 \
           BUILD_SYSTEM_DLKM=0 \
@@ -70,10 +76,6 @@ runs:
           OUT_DIR="/home/runner/out" \
           LTO=thin \
           BUILD_CONFIG=common/build.config.gki.aarch64 \
-          CC="/usr/bin/ccache clang" \
-          CXX="/usr/bin/ccache clang++" \
-          HOSTCC="/usr/bin/ccache clang" \
-          HOSTCXX="/usr/bin/ccache clang++" \
           build/build.sh -j"$(nproc)"
         else
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
@@ -81,11 +83,23 @@ runs:
           if [ "$PAGE_SIZE" = "16k" ]; then
             PAGE_SIZE_FLAGS+=(--page_size=16k)
           fi
+          # 6.18 stopped declaring the per-file label //common:kernel_aarch64/Image
+          # even though the macro still emits that file (verified with
+          # `tools/bazel query` / `cquery --output=files` on the 6.18 tree:
+          # the label errors out with "did you mean kernel_aarch64_images?",
+          # cquery lists bazel-out/.../kernel_aarch64/Image). Build the macro
+          # target there; the rest of this action already reads the image from
+          # bazel-bin/common/kernel_aarch64/Image, which is unchanged.
+          if [ "${{ inputs.version }}" = "android17-6.18" ]; then
+            BAZEL_TARGET=//common:kernel_aarch64
+          else
+            BAZEL_TARGET=//common:kernel_aarch64/Image
+          fi
           tools/bazel build \
             --config=fast \
             "${PAGE_SIZE_FLAGS[@]}" \
             --disk_cache=/home/runner/.cache/bazel \
-            //common:kernel_aarch64/Image
+            "$BAZEL_TARGET"
         fi
 
     - name: 'Verify Page Size in Generated .config'

@@ -39,6 +39,17 @@ runs:
           patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android12-5.10.patch
         elif [[ ${{ inputs.version }} = "android14-5.15" ]]; then
           patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android13-5.15.patch
+        elif [[ ${{ inputs.version }} = "android17-6.18" ]]; then
+          # 6.18 ships ntsync upstream: drivers/misc/ntsync.c and
+          # include/uapi/linux/ntsync.h are already in the GKI tree (checked in
+          # kernels/android17-6.18/common), and there is no
+          # ntsync_compat_android17-6.18.patch in kernel_patches. Nothing to
+          # backport - skip the whole chain and let the config step below enable
+          # CONFIG_NTSYNC. This else-branch used to fall through to
+          # ntsync_compat_<version>.patch and died on the missing file
+          # (run 41325955380, legs 32 / 21 / lts).
+          echo "ntsync is already in-tree for android17-6.18; skipping backport patches"
+          exit 0
         else
           patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_${{ inputs.version }}.patch
         fi

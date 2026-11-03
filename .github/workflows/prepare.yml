@@ -3,11 +3,6 @@ name: Prepare and Build
 on:
   workflow_call:
     inputs:
-      runner:
-        description: 'Runner image label for the build jobs (ubuntu-24.04 or ubuntu-latest)'
-        required: false
-        type: string
-        default: 'ubuntu-24.04'
       config_file:
         description: "Path to the JSON config file"
         required: true
@@ -76,11 +71,6 @@ on:
         required: false
         type: boolean
         default: false
-      use_cache:
-        description: "Enable ccache/bazel cache"
-        required: false
-        type: boolean
-        default: false
       os_patch_level:
         description: "Optional filter: patch date (YYYY-MM), kernel sublevel, lts (LTS branch), or all"
         required: false
@@ -99,7 +89,7 @@ on:
 
 jobs:
   generate-matrix:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.final.outputs.matrix }}
       version_slug: ${{ steps.final.outputs.version_slug }}
@@ -126,7 +116,10 @@ jobs:
             --argjson cfg "$CONFIG_JSON" \
             --arg requested_variant "${{ inputs.variant }}" '
             ($cfg.version | split("-")) as $version_parts
-            | ($cfg.include) as $targets
+            # A row marked "disabled": true is a temporary switch-off (duplicate
+            # sublevel already covered by another month, or a month being
+            # retired). The row stays in the file so re-enabling it is one word.
+            | ($cfg.include | map(select(.disabled != true))) as $targets
             | {
               include: (
                 [
@@ -188,7 +181,7 @@ jobs:
     # Branches that call prepare.yml directly keep the default (true).
     needs: generate-matrix
     if: inputs.produce_stock_configs != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       version_slug: ${{ steps.prep.outputs.version_slug }}
     steps:
@@ -327,7 +320,6 @@ jobs:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     uses: ./.github/workflows/build.yml
     with:
-      runner: ${{ inputs.runner }}
       version: ${{ matrix.version }}
       android_version: ${{ matrix.android_version }}
       kernel_version: ${{ matrix.kernel_version }}
@@ -346,7 +338,6 @@ jobs:
       brand_name: ${{ inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
-      use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size }}
       stock_config_artifact: stock-configs-${{ needs.generate-matrix.outputs.version_slug }}
     secrets: inherit

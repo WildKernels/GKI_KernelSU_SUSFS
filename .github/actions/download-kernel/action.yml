@@ -12,7 +12,7 @@ inputs:
     description: 'Combined version (e.g., android14-6.1)'
     required: true
   os_patch_level:
-    description: 'OS patch level (e.g., 2024-01)'
+    description: 'OS patch level (e.g. 2024-01)'
     required: true
 
 outputs:
@@ -91,6 +91,12 @@ runs:
         MAX_RETRIES=5
         SYNC_TIMEOUT="15m"
         RETRY_DELAYS=(15 30 60 120 240)
+        # --jobs-checkout is the local-work knob (git checkout), so cores are the
+        # right input; -j above stays network concurrency. Every GitHub-hosted
+        # runner this repo uses is 4 vCPU, so nproc == repo's own
+        # min(cpu_count, 8) default there and the cap was dead weight.
+        REPO_SYNC_JOBS="${REPO_SYNC_JOBS:-16}"
+        REPO_CHECKOUT_JOBS="${REPO_CHECKOUT_JOBS:-$(nproc)}"
         attempt=1
         # Always shallow: the build only needs the branch tip. Deeper retries
         # just download more data into a strained runner (slower + more disk).
@@ -131,8 +137,17 @@ runs:
             # idling until the 15m wall.
             SYNC_TAG_FLAGS="--no-tags"
             if [ -n "$TAG_FALLBACK" ]; then SYNC_TAG_FLAGS=""; fi
-            if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle $SYNC_TAG_FLAGS --jobs-checkout=4 -j4; then
-              echo "Kernel repository initialization and sync succeeded on attempt $attempt."
+            # GKI manifests declare `sync-j="4"` themselves (that is where the
+            # old hard-coded -j4 came from -- AOSP's default for every client,
+            # not a CPU budget). repo caps concurrency at the project count, so
+            # the effective parallelism is min(REPO_SYNC_JOBS, projects): 10 for
+            # 5.10, 50 for 6.12. Log both plus the elapsed time so a smoke run
+            # says whether the link or the server was the limit.
+            PROJECT_COUNT=$(grep -c '<project' "$DEFAULT_MANIFEST_PATH" 2>/dev/null || true)
+            echo "[*] repo sync: ${PROJECT_COUNT:-?} project(s), -j${REPO_SYNC_JOBS}, --jobs-checkout=${REPO_CHECKOUT_JOBS}"
+            SYNC_START=$(date +%s)
+            if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle $SYNC_TAG_FLAGS --jobs-checkout="${REPO_CHECKOUT_JOBS}" -j"${REPO_SYNC_JOBS}"; then
+              echo "Kernel repository initialization and sync succeeded on attempt $attempt in $(( $(date +%s) - SYNC_START ))s."
               break
             else
               rc=$?

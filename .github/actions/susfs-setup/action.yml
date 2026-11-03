@@ -16,7 +16,35 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Materialise local SUSFS tree (6.18 port)
+      # simonpunk/susfs4ksu has no gki-android17-6.18 branch, so the 6.12 patch
+      # was ported in-tree (27 files, 17 hunks re-anchored: fs/stat.c's
+      # vfs_getattr_nosec rewrite, fs/namespace.c's IDA->xarray mount-id move,
+      # show_smaps_rollup and the open/readdir/namei hook anchors). The bundle is
+      # laid out exactly like an upstream checkout so every downstream step works
+      # unchanged.
+      if: inputs.version == 'android17-6.18'
+      shell: bash
+      run: |
+        set -euo pipefail
+        BUNDLE="${{ github.workspace }}/.github/actions/susfs/susfs618/kernel_patches"
+        DEST="${{ github.workspace }}/susfs4ksu/kernel_patches"
+        [ -d "$BUNDLE" ] || { echo "ERROR: missing local SUSFS bundle: $BUNDLE" >&2; exit 1; }
+        mkdir -p "$DEST"
+        cp -a "$BUNDLE/." "$DEST/"
+        for f in 50_add_susfs_in_gki-android17-6.18.patch fs/susfs.c \
+                 include/linux/susfs.h include/linux/susfs_def.h \
+                 KernelSU/10_enable_susfs_for_ksu.patch; do
+          [ -s "$DEST/$f" ] || { echo "ERROR: bundle incomplete, missing $f" >&2; exit 1; }
+        done
+        # Report the real upstream revision this port was generated from, so the
+        # build metadata carries genuine provenance (the metadata check wants a
+        # 40-hex sha; "local-618" is only a sentinel for the setup branch above).
+        echo "SUSFS_COMMIT=68f62fae75ada3959f816841a3c64299383521ed" >> "$GITHUB_ENV"
+        echo "Local SUSFS tree ready (ported from gki-android16-6.12)"
+
     - name: Clone SUSFS Branch
+      if: inputs.version != 'android17-6.18'
       shell: bash
       run: |
         set -euo pipefail
@@ -64,7 +92,10 @@ runs:
         #        and its file-overwrite workaround is no longer wanted.)
         # Fail-loud: a failed pick must kill the job, never march on with a
         # half-merged tree.
-        if [ "${{ inputs.root_flavor }}" = "next" ]; then
+        # The local 6.18 tree is not a git checkout and its fs/susfs.c already
+        # carries these two fixes (branched from the 6.12 tip, which is later
+        # than both), so the picks only run for real clones.
+        if [ "${{ inputs.root_flavor }}" = "next" ] && [ "${{ inputs.version }}" != "android17-6.18" ]; then
           git fetch https://gitlab.com/pershoot/susfs4ksu.git \
             6387756d64b3ab9ececefc4523627a9ee05a7519 \
             161c058fed5544a6573d87124f346dadd5c4962d

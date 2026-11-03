@@ -101,6 +101,34 @@ for v in variants:
     lines.append(_row)
 lines.append("")
 lines.append("")
+# --- build availability -----------------------------------------------------
+# Config rows carry "disabled": true when the same kernel version is also built
+# from another month (temporary trim). Say so in the notes so a missing month
+# does not look like a failed build, and give people a way to ask for it back.
+_disabled={}
+try:
+    import glob as _glob
+    _root=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    for _p in sorted(_glob.glob(os.path.join(_root,".github","config","*.json")) or _glob.glob(".github/config/*.json")):
+        try: _cfg=json.load(open(_p))
+        except Exception: continue
+        _rows=sorted(e.get("date","") for e in _cfg.get("include",[]) if e.get("disabled") is True)
+        if _rows: _disabled[_cfg.get("version","")]=_rows
+except Exception:
+    _disabled={}
+lines.append("## Build availability")
+lines.append("")
+if _disabled:
+    _total=sum(len(v) for v in _disabled.values())
+    lines.append(f"**{_total} matrix rows are currently switched off.** Each of them duplicates a kernel version that is also built from another month, so the version ships once — from the newest month whose upstream branch still exists — instead of once per month:")
+    lines.append("")
+    for _fam in sorted(_disabled):
+        lines.append(f"- `{_fam}`: {', '.join(_disabled[_fam])}")
+    lines.append("")
+    lines.append("The list lives in `.github/config/*.json` as `\"disabled\": true`, so it is easy to restore. **If you need one of these month snapshots, open an issue and it will be re-enabled:** https://github.com/WildKernels/GKI_KernelSU_SUSFS/issues")
+else:
+    lines.append("Every configured matrix row is built in this release.")
+lines.append("")
 output="\n".join(lines)+"\n"
 print(output,end="")
 s=os.environ.get("GITHUB_STEP_SUMMARY")

@@ -3,23 +3,28 @@
   "include": [
     {
       "sublevel": "41",
-      "date": "2022-06"
+      "date": "2022-06",
+      "disabled": true
     },
     {
       "sublevel": "41",
-      "date": "2022-07"
+      "date": "2022-07",
+      "disabled": true
     },
     {
       "sublevel": "41",
-      "date": "2022-08"
+      "date": "2022-08",
+      "disabled": true
     },
     {
       "sublevel": "41",
-      "date": "2022-09"
+      "date": "2022-09",
+      "disabled": true
     },
     {
       "sublevel": "41",
-      "date": "2022-10"
+      "date": "2022-10",
+      "disabled": true
     },
     {
       "sublevel": "41",
@@ -27,7 +32,8 @@
     },
     {
       "sublevel": "74",
-      "date": "2022-12"
+      "date": "2022-12",
+      "disabled": true
     },
     {
       "sublevel": "74",
@@ -35,7 +41,8 @@
     },
     {
       "sublevel": "78",
-      "date": "2023-02"
+      "date": "2023-02",
+      "disabled": true
     },
     {
       "sublevel": "78",
@@ -43,7 +50,8 @@
     },
     {
       "sublevel": "94",
-      "date": "2023-04"
+      "date": "2023-04",
+      "disabled": true
     },
     {
       "sublevel": "94",
@@ -51,7 +59,8 @@
     },
     {
       "sublevel": "104",
-      "date": "2023-06"
+      "date": "2023-06",
+      "disabled": true
     },
     {
       "sublevel": "104",
@@ -59,7 +68,8 @@
     },
     {
       "sublevel": "119",
-      "date": "2023-08"
+      "date": "2023-08",
+      "disabled": true
     },
     {
       "sublevel": "119",
@@ -67,7 +77,8 @@
     },
     {
       "sublevel": "123",
-      "date": "2023-10"
+      "date": "2023-10",
+      "disabled": true
     },
     {
       "sublevel": "123",
@@ -75,7 +86,8 @@
     },
     {
       "sublevel": "137",
-      "date": "2023-12"
+      "date": "2023-12",
+      "disabled": true
     },
     {
       "sublevel": "137",
@@ -83,7 +95,8 @@
     },
     {
       "sublevel": "144",
-      "date": "2024-02"
+      "date": "2024-02",
+      "disabled": true
     },
     {
       "sublevel": "144",
@@ -91,7 +104,8 @@
     },
     {
       "sublevel": "148",
-      "date": "2024-04"
+      "date": "2024-04",
+      "disabled": true
     },
     {
       "sublevel": "148",
@@ -99,7 +113,8 @@
     },
     {
       "sublevel": "149",
-      "date": "2024-06"
+      "date": "2024-06",
+      "disabled": true
     },
     {
       "sublevel": "149",

@@ -14,6 +14,20 @@ runs:
         delay: 5
         workdir: ${{ github.workspace }}/kernel
     
+    - name: Apply 6.18 compatibility shim
+      # Upstream BBG calls blkdev_get_no_open() without declaring it; the
+      # prototype lived in include/linux/blkdev.h until 6.18 moved it into the
+      # private block/blk.h and 6.15 added a `bool autoload` argument. Re-declare
+      # it version-aware and route the unguarded call through a wrapper.
+      # No-op on older kernels (identical prototype / unused inline helper).
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        BBG_DIR="common/security/baseband-guard"
+        [ -d "$BBG_DIR" ] || { echo "ERROR: $BBG_DIR not found after setup.sh" >&2; exit 1; }
+        python3 "${GITHUB_WORKSPACE}/.github/scripts/bbg_618_compat.py" "$BBG_DIR"
+
     - name: Configure Baseband Guard
       shell: bash
       working-directory: ${{ github.workspace }}/kernel

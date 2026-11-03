@@ -21,11 +21,6 @@ on:
       os_patch_level:
         required: true
         type: string
-      runner:
-        description: 'Runner image label (ubuntu-24.04 or ubuntu-latest); lets a single leg be A/B tested'
-        required: false
-        type: string
-        default: 'ubuntu-24.04'
       variant:
         required: false
         type: string
@@ -76,11 +71,6 @@ on:
         required: false
         type: boolean
         default: false
-      use_cache:
-        description: "Enable ccache/bazel cache (restore/save via release buckets)"
-        required: false
-        type: boolean
-        default: false
       page_size:
         description: "ARM64 page size: 4k (default) or 16k (Kleaf --page_size)"
         required: false
@@ -95,7 +85,7 @@ on:
 jobs:
   build-gki:
     name: "${{ inputs.kernel_version }}.${{ inputs.sublevel }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ inputs.variant }})"
-    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - name: Checkout Repository
@@ -122,18 +112,24 @@ jobs:
           # Kleaf exposes --page_size only on the build branches used by these
           # GKI families (main-kernel-build-2023/2024, main-kernel-2025).
           case "${{ inputs.version }}" in
-            android14-6.1|android15-6.6|android16-6.12) ;;
+            android14-6.1|android15-6.6|android16-6.12|android17-6.18) ;;
             *)
               echo "ERROR: page_size=16k is not supported for ${{ inputs.version }}." >&2
-              echo "Supported families: android14-6.1, android15-6.6, android16-6.12." >&2
+              echo "Supported families: android14-6.1, android15-6.6, android16-6.12, android17-6.18." >&2
               exit 1
               ;;
           esac
 
-      - name: Emergency Disk Cleanup
-        if: false
-        uses: ./.github/actions/disk-cleanup
-
+      # Runs on every leg, trimmed to the parts that pay for themselves.
+      # Measured from a leg's own log: the full option set took 106 s to recover
+      # 39.8 GB, of which the package globs (postgresql*/mysql*/*llvm*/
+      # temurin-*/dotnet-sdk-*) were 46 s for 6.4 GB -- the slowest and least
+      # space-efficient part. Dropping them leaves ~54 s for ~32 GB, and the
+      # explicit package names still remove the browsers and cloud CLIs.
+      # Runner budget for reference: 145 GB disk, ~55 GB used by the image, so
+      # ~90 GB free before this step and ~114 GB after it (the 16 GiB LTO
+      # swapfile takes 16 GB back). The kleaf families are the reason to keep it
+      # on all 621 legs even though the legacy ones have room to spare.
       - name: Free Disk Space
         if: true
         uses: endersonmenezes/free-disk-space@v4 # Use @main for latest, @v3 for stable
@@ -143,7 +139,7 @@ jobs:
           remove_haskell: true
           remove_tool_cache: true
           remove_swap: true
-          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox"
           remove_packages_one_command: true
           remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
           rm_cmd: "rmz" # Use 'rmz' for faster deletion (default: 'rm')
@@ -292,6 +288,81 @@ jobs:
             CONFIG_KSU_SUSFS_OPEN_REDIRECT=n
             CONFIG_KSU_SUSFS_SUS_MAP=n
 
+      - name: 6.18 exports the ipc_ns symbols rust_binder needs
+        # android17-6.18's gki_defconfig builds CONFIG_ANDROID_BINDER_IPC_RUST=m
+        # and the Rust driver references init_ipc_ns / put_ipc_ns, which this
+        # tree does not export, so modpost fails:
+        #   ERROR: modpost: "put_ipc_ns" [drivers/android/binder/rust_binder.ko] undefined!
+        # Turning the module off is NOT an option - Kleaf's GKI target expects
+        # drivers/android/binder/rust_binder.ko in its outputs and the build dies
+        # with "Unable to find drivers/android/binder/rust_binder.ko in any of
+        # the following directories". Export both symbols instead (GPL-only).
+        if: inputs.version == 'android17-6.18'
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel/common
+        run: |
+          python3 "${{ github.workspace }}/.github/scripts/binder_ipc_ns_exports.py" "$PWD"
+
+      - name: Single manager for BakaSU (multi-manager off)
+        # BakaSU's Kconfig ships CONFIG_KSU_MULTI_MANAGER_SUPPORT=y, which
+        # compiles three rows into apk_sign_keys[]: its own key plus
+        # tiann/KernelSU's and KOWX712/KernelSU's, with an optional custom row
+        # under EXPECTED_SIZE. Turning it off leaves exactly one row -
+        # EXPECTED_SIZE_BAKASU / EXPECTED_HASH_BAKASU (0x377 / d3469712…), which
+        # is the key their main-branch manager APK is signed with (checked
+        # against run 41207077584), so the manager we ship stays trusted.
+        if: inputs.root_flavor == 'bakasu'
+        uses: ./.github/actions/set-kernel-config
+        with:
+          config_list: |
+            CONFIG_KSU_MULTI_MANAGER_SUPPORT=n
+
+      - name: Enable KernelSU toolkit support for BakaSU
+        # BakaSU's ksu_toolkit interface (backslashxx/ksu_toolkit), off upstream.
+        # Adds sys_reboot extensions behind a uid-0 check in
+        # kernel/supercall/supercall.c:114-118: CHANGE_MANAGER_UID,
+        # CHANGE_KSUVER, CHANGE_SPOOF_UNAME, CHANGE_KSUFLAGS. It does not add a
+        # trusted signature - the toolkit slot is registered at runtime by a
+        # root process (ksu_register_manager, index 253) - so the single-manager
+        # guarantee from the step above is unaffected.
+        if: inputs.root_flavor == 'bakasu'
+        uses: ./.github/actions/set-kernel-config
+        with:
+          config_list: |
+            CONFIG_KSU_TOOLKIT_SUPPORT=y
+
+      - name: Single manager for SukiSU-Ultra (trim cert table)
+        # SukiSU hardcodes seven trusted manager certificates in
+        # kernel/manager/apk_sign.c (SukiSU, RKSU, KSU, WKSU, KowSU, KSUN, MKSU)
+        # and is_manager_apk() accepts the first match - no flags, no Kconfig,
+        # no Kbuild knob. The signature-fallback crowner in
+        # kernel/extension/dynamic_sig_fallback.c reuses is_manager_apk(), so
+        # trimming to one row narrows that path too. We keep SukiSU's own cert
+        # (0x35c / 947ae944…), the key the manager APK we ship is signed with.
+        # The script self-verifies and exits 1 if the table shape changes.
+        if: inputs.root_flavor == 'sukisu-ultra'
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel
+        run: |
+          set -euo pipefail
+          python3 "${GITHUB_WORKSPACE}/.github/scripts/trim_sukisu_managers.py" SukiSU-Ultra
+
+      - name: Single manager for FinaSU (dynamic manager off)
+        # Upstream ships CONFIG_KSU_DYNAMIC_MANAGER=y, which compiles a
+        # nine-row signature table: FINASU_TRUSTED_* as the only trusted row
+        # plus KernelSU/KowSU/KernelSU-Next/ReSukiSU/SukiSU/MKSU/RKSU/xxKSU as
+        # recognition-only presets the user can authorise at runtime. We want
+        # one manager and no runtime path to add another, so disable it: the
+        # classic two-slot table compiles instead, and with slot 1 replaced by
+        # the FinaSU cert (see the SUSFS action) that table is a single trusted
+        # entry. dynamic_manager.o still builds - FinaSU guards that file with
+        # no CONFIG symbol - it is simply no longer reachable from apk_sign.c.
+        if: inputs.root_flavor == 'finasu'
+        uses: ./.github/actions/set-kernel-config
+        with:
+          config_list: |
+            CONFIG_KSU_DYNAMIC_MANAGER=n
+
       - name: SUSFS
         # One step, one action: resolve the SUSFS commit, apply it for the
         # selected root, then run the post-patch fixes (ksu_close_fd restore,
@@ -421,52 +492,6 @@ jobs:
           if-no-files-found: ignore
           compression-level: 9
 
-      - name: "Setup Cache and Build Environment"
-        if: inputs.use_cache
-        uses: ./.github/actions/cache-setup
-        with:
-          version: ${{ inputs.version }}
-          android_version: ${{ inputs.android_version }}
-          kernel_version: ${{ inputs.kernel_version }}
-          sublevel: ${{ steps.extract.outputs.sublevel }}
-
-      - name: Restore ccache
-        id: restore-ccache
-        continue-on-error: true
-        if: inputs.use_cache && (inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15')
-        uses: ./.github/actions/cache-restore
-        with:
-          cache_path: /home/runner/.ccache
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}
-          cache_bucket: ccache-cache-${{ inputs.version }}-${{ inputs.variant }}
-          restore_keys: |
-            ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-
-      - name: Restore bazel-cache
-        id: restore-bazel
-        continue-on-error: true
-        if: inputs.use_cache && (inputs.version == 'android14-5.15' || inputs.version == 'android14-6.1' || inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12')
-        uses: ./.github/actions/cache-restore
-        with:
-          cache_path: /home/runner/.cache/bazel
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
-          cache_bucket: bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
-          restore_keys: |
-            ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
-
-      - name: Check cache hit
-        run: |
-          echo "Cache restore status:"
-          CCACHE_HIT="${{ steps.restore-ccache.outputs.cache-hit || 'skipped' }}"
-          BAZEL_HIT="${{ steps.restore-bazel.outputs.cache-hit || 'skipped' }}"
-          echo "  ccache: $CCACHE_HIT"
-          echo "  bazel: $BAZEL_HIT"
-
-      - name: Get Cache Stats
-        uses: ./.github/actions/cache-stats
-        with:
-          clear_stats: true
-
       - name: Initialize Config Fragment
         run: touch "${{ github.workspace }}/wild_gki.fragment"
 
@@ -481,50 +506,12 @@ jobs:
         env:
           SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
           KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
-          KBUILD_BUILD_USER: ${{ (inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12') && 'kleaf' || 'build-user' }}
+          KBUILD_BUILD_USER: ${{ (inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12' || inputs.version == 'android17-6.18') && 'kleaf' || 'build-user' }}
           KBUILD_BUILD_HOST: build-host
         uses: ./.github/actions/build-kernel
         with:
           version: ${{ inputs.version }}
           page_size: ${{ inputs.page_size }}
-
-      - name: Get Cache Stats
-        uses: ./.github/actions/cache-stats
-        with:
-          clear_stats: false
-
-      - name: Prune ccache before save
-        if: always() && inputs.use_cache && (inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15')
-        shell: bash
-        run: |
-          if [ -d /home/runner/.ccache ]; then
-            ccache -c 2>/dev/null || true
-            find /home/runner/.ccache -type f -mtime +0.5 -delete 2>/dev/null || true
-            find /home/runner/.ccache -type d -empty -delete 2>/dev/null || true
-            echo "ccache pruned"; ccache -s 2>/dev/null | head -20 || true
-          fi
-
-      - name: Save ccache
-        continue-on-error: true
-        uses: ./.github/actions/cache-save
-        if: always() && inputs.use_cache && (inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15')
-        with:
-          cache_path: /home/runner/.ccache
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}
-          cache_bucket: "ccache-cache-${{ inputs.version }}-${{ inputs.variant }}"
-          compression_level: 9
-          github_token: ${{ github.token }}
-
-      - name: Save bazel-cache
-        continue-on-error: true
-        uses: ./.github/actions/cache-save
-        if: always() && inputs.use_cache && (inputs.version == 'android14-5.15' || inputs.version == 'android14-6.1' || inputs.version == 'android15-6.6' || inputs.version == 'android16-6.12')
-        with:
-          cache_path: /home/runner/.cache/bazel
-          cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}
-          cache_bucket: "bazel-cache-${{ inputs.version }}-${{ inputs.variant }}${{ inputs.page_size == '16k' && '-16k' || '' }}"
-          compression_level: 9
-          github_token: ${{ github.token }}
 
       - name: Consolidated Build Summary
         id: build-summary

@@ -27,6 +27,8 @@ inputs:
     default: ''
   bakasu_commit:
     description: 'BakaSU commit to match (empty = resolve the main tip)'
+  root_matrix:
+    description: 'JSON array of the resolved build matrix (root_flavor/root_commit). When set, each flavor is matched to the exact commit the kernel embeds instead of a live tip.'
     required: false
     default: ''
   sukisu_ultra_commit:
@@ -127,20 +129,53 @@ runs:
         # Emits into REC (never stdout): a function called as $(resolve_one) runs
         # in a subshell, where `exit 1` would only kill the substitution and the
         # strict-mode/validation failures below would silently pass.
+        # Per-flavor commit from the resolved build matrix. main.yml passes the
+        # matrix so each flavor is matched to the commit its kernel actually
+        # embeds; managers.yml keeps using the individual *_commit inputs
+        # (matrix empty -> these lookups return nothing and the inputs win).
+        matrix_commit() { # flavor [matrix_flavor]
+          local want="${2:-$1}" out
+          [[ -z "${INPUT_ROOT_MATRIX:-}" ]] && return 0
+          out="$(jq -r --arg f "$want" \
+                 'map(select(.root_flavor == $f))[0].root_commit // empty' \
+                 <<< "$INPUT_ROOT_MATRIX" 2>/dev/null)"
+          [[ "$out" =~ ^[0-9a-f]{40}$ ]] && printf '%s' "$out"
+          return 0
+        }
+
         REC=""
         resolve_one() { # flavor
           local flavor="$1"
-          local owner repo wf branch want stock pinned run_id
+          local owner repo wf branch want stock pinned run_id mc note=""
+          # Exact commit this flavor's kernel embeds (empty when called from
+          # managers.yml, which pins through the individual *_commit inputs).
+          mc="$(matrix_commit "$flavor")"
+          [[ "$flavor" == "next-susfs" ]] && mc="$(matrix_commit next)"
           case "$flavor" in
             next)
               owner="KernelSU-Next"; repo="KernelSU-Next"; wf="build-manager-ci.yml"
               branch="dev"; want="manager,manager-spoofed"
-              resolve_stock "${INPUT_NEXT_COMMIT:-}" kernelsu_next_commit https://github.com/KernelSU-Next/KernelSU-Next.git dev
+              resolve_stock "${mc:-${INPUT_NEXT_COMMIT:-}}" kernelsu_next_commit https://github.com/KernelSU-Next/KernelSU-Next.git dev
+              # With SUSFS on, the matrix carries a pershoot dev-susfs commit --
+              # a fork-only SHA. The kernel reports the version of its merge base
+              # with upstream dev, so pair the manager with that same upstream
+              # commit instead of falling back to an unrelated tip.
+              if [[ "$PINNED" == "1" && -n "$STOCK" ]] \
+                 && [[ -z "$(find_run "$owner" "$repo" "$wf" "$STOCK")" ]]; then
+                if [[ -n "$(find_run pershoot KernelSU-Next "$wf" "$STOCK")" ]]; then
+                  echo "using pershoot fork manager CI for ${STOCK:0:12}" >&2
+                  owner="pershoot"
+                elif [[ "${INPUT_NEXT_COMMIT:-}" =~ ^[0-9a-f]{40}$ && "${INPUT_NEXT_COMMIT}" != "$STOCK" ]] \
+                     && [[ -n "$(find_run "$owner" "$repo" "$wf" "$INPUT_NEXT_COMMIT")" ]]; then
+                  echo "no manager build for ${STOCK:0:12}; using the upstream base ${INPUT_NEXT_COMMIT:0:12} the kernel reports its version from" >&2
+                  STOCK="$INPUT_NEXT_COMMIT"
+                fi
+              fi
               ;;
             next-susfs)
               owner="pershoot"; repo="KernelSU-Next"; wf="build-manager-ci.yml"
               branch="dev-susfs"; want="manager,manager-spoofed"
-              resolve_stock "${INPUT_NEXT_SUSFS_COMMIT:-}" kernelsu_next_susfs_commit https://github.com/pershoot/KernelSU-Next.git dev-susfs
+              resolve_stock "${mc:-${INPUT_NEXT_SUSFS_COMMIT:-}}" kernelsu_next_susfs_commit https://github.com/pershoot/KernelSU-Next.git dev-susfs
               if [[ -z "$STOCK" && -z "${INPUT_NEXT_SUSFS_COMMIT:-}" ]]; then
                 # pershoot fork unreachable: fall back to upstream dev-susfs tip.
                 echo "pershoot dev-susfs tip not found; trying upstream KernelSU-Next dev-susfs" >&2
@@ -150,22 +185,22 @@ runs:
             kernelsu)
               owner="tiann"; repo="KernelSU"; wf="build-manager.yml"
               branch="main"; want="manager"
-              resolve_stock "${INPUT_KSU_COMMIT:-}" kernelsu_commit https://github.com/tiann/KernelSU.git main
+              resolve_stock "${mc:-${INPUT_KSU_COMMIT:-}}" kernelsu_commit https://github.com/tiann/KernelSU.git main
               ;;
             bakasu)
               owner="Baka-SU"; repo="BakaSU"; wf="build-manager.yml"
               branch="main"; want="Manager-release,Spoofed-Manager-release"
-              resolve_stock "${INPUT_BAKASU_COMMIT:-}" bakasu_commit https://github.com/Baka-SU/BakaSU.git main
+              resolve_stock "${mc:-${INPUT_BAKASU_COMMIT:-}}" bakasu_commit https://github.com/Baka-SU/BakaSU.git main
               ;;
             sukisu-ultra)
               owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
               branch="main"; want="Manager,Spoofed-Manager"
-              resolve_stock "${INPUT_SUKISU_ULTRA_COMMIT:-}" sukisu_ultra_commit https://github.com/SukiSU-Ultra/SukiSU-Ultra.git main
+              resolve_stock "${mc:-${INPUT_SUKISU_ULTRA_COMMIT:-}}" sukisu_ultra_commit https://github.com/SukiSU-Ultra/SukiSU-Ultra.git main
               ;;
             finasu)
               owner="LyraVoid"; repo="FinaSU"; wf="build-manager.yml"
               branch="master"; want="manager"
-              resolve_stock "${INPUT_FINASU_COMMIT:-}" finasu_commit https://github.com/LyraVoid/FinaSU.git master
+              resolve_stock "${mc:-${INPUT_FINASU_COMMIT:-}}" finasu_commit https://github.com/LyraVoid/FinaSU.git master
               ;;
             kowsu)
               # KowSU has no SUSFS support and always tracks latest master.
@@ -183,31 +218,31 @@ runs:
 
           run_id="$(find_run "$owner" "$repo" "$wf" "$stock")"
           if [[ -z "$run_id" ]]; then
+            # The pershoot fork runs no manager CI at all, so a dev-susfs commit
+            # never has a run to match. Substituting a different commit here is
+            # exactly what made the manager report a different version than the
+            # kernel, so say so and let the source build own it.
+            if [[ "$flavor" == "next-susfs" ]]; then
+              echo "WARNING: no ${owner}/${repo} manager build for ${stock}; requires build_from_source at that exact commit" >&2
+              printf -v REC '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":null,"stock":"%s","want":"%s","note":"no-ci-run"}' \
+                "$flavor" "$owner" "$repo" "$stock" "$want"
+              return 0
+            fi
             if [[ "$pinned" == "1" && "${INPUT_ALLOW_FALLBACK:-true}" != "true" ]]; then
               echo "ERROR: no ${owner}/${repo} manager build exists for pinned commit ${stock}" >&2
               exit 1
             fi
             echo "No manager build for ${stock:-unknown tip}, falling back to latest successful run" >&2
+            note="fallback"
             read -r run_id stock <<< "$(fallback_run "$owner" "$repo" "$wf" "$branch")"
-            if [[ "$flavor" == "next-susfs" && -z "$run_id" ]]; then
-              # dev-susfs has no CI on this fork - try the dev branch.
-              echo "No dev-susfs CI run, trying dev branch fallback" >&2
-              read -r run_id stock <<< "$(fallback_run "$owner" "$repo" "$wf" dev)"
-            fi
             if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
             if [[ -z "$run_id" ]]; then
-              if [[ "$flavor" == "next-susfs" ]]; then
-                echo "WARNING: no ${owner}/${repo} manager build for dev-susfs commit ${stock} - will need build_from_source" >&2
-                printf -v REC '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":null,"stock":"%s","want":"%s","note":"no-ci-run"}' \
-                  "$flavor" "$owner" "$repo" "$stock" "$want"
-                return 0
-              fi
               echo "ERROR: no ${repo} manager build exists for commit ${stock}" >&2
               exit 1
             fi
           fi
-          printf -v REC '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"%s"}' \
-            "$flavor" "$owner" "$repo" "$run_id" "$stock" "$want"
+          printf -v REC '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"%s","note":"%s"}' \
+            "$flavor" "$owner" "$repo" "$run_id" "$stock" "$want" "$note"
           return 0
         }
 

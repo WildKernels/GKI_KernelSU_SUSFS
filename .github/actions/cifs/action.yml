@@ -19,9 +19,23 @@ runs:
           CONFIG_CIFS_XATTR=y
           CONFIG_CIFS_POSIX=y
 
-    - name: Fix CIFS on android16-6.12
+    - name: Drop now-built-in modules from the GKI module list
+      # These configs are =y above, so the modules are not produced, but Kleaf
+      # verifies every module in its GKI list exists and fails otherwise:
+      #   ERROR: Unable to find fs/netfs/netfs.ko in any of the following directories:
+      # 6.12's list lives in modules.bzl; 6.18 moved it to bazel/modules_private.bzl,
+      # which is why the old 6.12-only sed stopped matching there.
+      if: inputs.version == 'android16-6.12' || inputs.version == 'android17-6.18'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      if: inputs.version == 'android16-6.12'
       run: |
-        sed -i '/"fs\/netfs\/netfs\.ko",/d' modules.bzl
+        # netfs.ko is never produced (CONFIG_NETFS_SUPPORT=y above), so its entry
+        # always goes. libarc4.ko differs per family: 6.12 still builds it as a
+        # module (arc4 is used by other subsystems) and Kleaf then fails with
+        # "The following kernel modules are built but not copied ... libarc4.ko"
+        # if we prune it; 6.18 builds it in, so its entry must go there.
+        MODULES="fs/netfs/netfs.ko"
+        if [ "${{ inputs.version }}" = "android17-6.18" ]; then
+          MODULES="$MODULES lib/crypto/libarc4.ko"
+        fi
+        python3 "${{ github.workspace }}/.github/scripts/cifs_modules_fix.py" "$PWD" $MODULES

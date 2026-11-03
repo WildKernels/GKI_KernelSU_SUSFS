@@ -24,7 +24,7 @@ jobs:
     # variable). Forks inherit the workflow but not the variable, so their
     # daily matrix-sync cron skips instead of opening PRs on the fork.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_BUILDS == 'true')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout main
         uses: actions/checkout@v7
@@ -50,6 +50,7 @@ jobs:
           COMMON_URL = "https://android.googlesource.com/kernel/common"
           MONTH = re.compile(r"^(\d{4}-\d{2})$")
           added = []
+          replaced = []
 
           def ls_heads(pattern):
               r = subprocess.run(
@@ -115,6 +116,24 @@ jobs:
                       if sub is None:
                           print(f"WARNING: no SUBLEVEL in {head}; skipping")
                           continue
+                      # One ACTIVE row per sublevel: a re-published sublevel keeps
+                      # the old row in the file but switches it off ("disabled":
+                      # true), so a numeric sublevel still resolves to exactly one
+                      # month and the older snapshot can be restored by deleting
+                      # one word. Nothing is ever deleted here.
+                      superseded = [e for e in cfg["include"] if e.get("sublevel") == sub]
+                      for old in superseded:
+                          was_disabled = bool(old.get("disabled"))
+                          old["disabled"] = True
+                          replaced.append(
+                              f"{version} {month} (sublevel {sub}) disables "
+                              f"{old['date']} (sublevel {sub})"
+                              + (" [was already disabled]" if was_disabled else "")
+                          )
+                          print(
+                              f"DISABLE: {version} sublevel {sub} "
+                              f"{old['date']} (superseded by {month})"
+                          )
                       cfg["include"].append({"sublevel": sub, "date": month})
                       added.append(f"{version} {month} (sublevel {sub})")
                       version_added = True
@@ -134,6 +153,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"changed={'true' if added else 'false'}\n")
               f.write(f"added={'; '.join(added)}\n")
+              f.write(f"replaced={'; '.join(replaced)}\n")
           EOF
 
       - name: Open or update sync PR
@@ -148,9 +168,29 @@ jobs:
           git push --force-with-lease origin "$BRANCH" || git push origin "$BRANCH"
           if [ "$(gh pr list --head "$BRANCH" --base main --json number --jq 'length')" = "0" ]; then
             BODY=$(printf '%s' "${{ steps.sync.outputs.added }}" | sed 's/; /\n- /g; s/^/- /')
+            REPLACED="${{ steps.sync.outputs.replaced }}"
+            if [ -n "$REPLACED" ]; then
+              REPLACED_BODY=$(printf '%s' "$REPLACED" | sed 's/; /\n- /g; s/^/- /')
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\n### Replaced rows\n\nOne row per sublevel: the new month supersedes these older rows, which were removed. If you need one of them back, say so here and it can be re-enabled as `"disabled": true` instead of being deleted.\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY" "$REPLACED_BODY")
+            else
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nNo rows were replaced: every new sublevel was unique.\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")
+            fi
             gh pr create --head "$BRANCH" --base main \
               --title "Sync kernel matrix: add new upstream months" \
-              --body "$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")"
+              --body "$PR_BODY"
           else
-            echo "Sync PR already open; updated in place."
+            # A PR already open must get the same replaced-rows note, otherwise a
+            # re-sync that supersedes rows would silently change the matrix with
+            # nothing in the PR to review. Rebuild the body and edit it in place.
+            BODY=$(printf '%s' "${{ steps.sync.outputs.added }}" | sed 's/; /\n- /g; s/^/- /')
+            REPLACED="${{ steps.sync.outputs.replaced }}"
+            if [ -n "$REPLACED" ]; then
+              REPLACED_BODY=$(printf '%s' "$REPLACED" | sed 's/; /\n- /g; s/^/- /')
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\n### Replaced rows\n\nOne row per sublevel: the new month supersedes these older rows, which were removed. If you need one of them back, say so here and it can be re-enabled as `"disabled": true` instead of being deleted.\n\n%s\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY" "$REPLACED_BODY")
+            else
+              PR_BODY=$(printf 'New monthly branches detected upstream, sublevels resolved from source:\n\n%s\n\nNo rows were replaced: every new sublevel was unique.\n\nDead/retired branches need no action (tag fallback covers them).' "$BODY")
+            fi
+            PR_NUM=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number')
+            gh pr edit "$PR_NUM" --body "$PR_BODY"
+            echo "Sync PR #${PR_NUM} updated in place (body refreshed with the replaced rows)."
           fi
