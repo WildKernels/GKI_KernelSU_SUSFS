@@ -31,9 +31,11 @@ runs:
         exit 1
       fi
 
-      # Invoked through sh: the script is plain POSIX shell and some trees ship
-      # it without the executable bit.
-      kc() { sh scripts/config "$@"; }
+      # bash, not sh: scripts/config is `#!/usr/bin/env bash` and uses [[ ]] and
+      # arrays, so dash (Ubuntu's /bin/sh) dies with
+      #   scripts/config: 129: Syntax error: "(" unexpected
+      # Running it through bash also covers trees that ship it non-executable.
+      kc() { bash scripts/config "$@"; }
 
       # scripts/config knows the three shapes the kernel actually emits
       # (CONFIG_X=y, CONFIG_X=m, "# CONFIG_X is not set") and writes the right
