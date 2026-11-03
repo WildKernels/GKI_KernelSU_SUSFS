@@ -226,6 +226,14 @@ runs:
           python3 "${{ github.workspace }}/.github/scripts/susfs_618_prototypes.py" "$PWD"
         fi
 
+        # The 5.10/5.15/6.1 SUSFS patches widen show_fdinfo() to a 3-argument
+        # callback but leave fanotify_fdinfo() at two, which only compiles while
+        # CONFIG_FANOTIFY=n. With fanotify on (PR #349) it is a hard error:
+        #   incompatible function pointer types passing
+        #   'void (struct seq_file *, struct fsnotify_mark *)' to parameter of
+        #   type 'void (*)(struct seq_file *, struct fsnotify_mark *, struct file *)'
+        python3 "${{ github.workspace }}/.github/scripts/susfs_fdinfo_fanotify_arity.py" "$PWD"
+
         # SUSFS's OPEN_REDIRECT code unconditionally calls VMA_PAD_START(), which
         # only exists on GKI branches that carry Google's page-size-migration
         # feature (added to each android version's kernel/common branch at a
