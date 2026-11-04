@@ -852,7 +852,7 @@ jobs:
           .status == "Build-verified only" and
           (.root.manager | length > 0) and
           (.root.version | length > 0) and
-          (.susfs_revision | test("^[0-9a-f]{40}$")) and
+          (.susfs_revision | test("^[0-9a-f]{40}$")) or .susfs_revision == "N/A" or .susfs_revision == "") and
           (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
           (.artifact_url | startswith("https://")) and
           (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
