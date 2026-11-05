@@ -1532,12 +1532,25 @@ jobs:
         shopt -s nullglob
 
         for dir in release-assets/*NoMount-Metamodule; do
-          zip_name="${dir}.zip"
-          rm -f "$zip_name"
-          cd "$dir"
-          zip -r -q -9 "../$(basename "$zip_name")" .
-          cd - >/dev/null
+          if [ -d "$dir" ]; then
+            zip_name="${dir}.zip"
+            rm -f "$zip_name"
+            (cd "$dir" && zip -r -q -9 "../$(basename "$zip_name")" .)
+          fi
         done
+
+        if [ -f "release-assets/module.prop" ] && [ ! -f "release-assets/NoMount-Metamodule.zip" ]; then
+          mkdir -p release-assets/NoMount-Metamodule
+          mv release-assets/module.prop release-assets/NoMount-Metamodule/ 2>/dev/null || true
+          mv release-assets/metamount.sh release-assets/NoMount-Metamodule/ 2>/dev/null || true
+          mv release-assets/webroot release-assets/NoMount-Metamodule/ 2>/dev/null || true
+          mv release-assets/common.sh release-assets/NoMount-Metamodule/ 2>/dev/null || true
+          mv release-assets/customize.sh release-assets/NoMount-Metamodule/ 2>/dev/null || true
+          mv release-assets/post-fs-data.sh release-assets/NoMount-Metamodule/ 2>/dev/null || true
+          mv release-assets/service.sh release-assets/NoMount-Metamodule/ 2>/dev/null || true
+          mv release-assets/uninstall.sh release-assets/NoMount-Metamodule/ 2>/dev/null || true
+          (cd release-assets/NoMount-Metamodule && zip -r -q -9 "../NoMount-Metamodule.zip" .)
+        fi
 
     - name: Verify NoMount metamodule zip
       if: inputs.use_nomount
