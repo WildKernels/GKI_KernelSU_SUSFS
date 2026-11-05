@@ -1767,7 +1767,7 @@ jobs:
                   # KowSU never ships SUSFS: render n/a rather than shared pins.
                   _sm={} if _fl=="kowsu" else (sus_map_sukisu_ultra if _fl=="sukisu-ultra" else (sus_map_resukisu if _fl=="resukisu" else sus_map))
                   sha=_sm.get(v,"")
-                  sha_s=f"[`{sha[:7]}`]({_susfs_url}/-/commit/{sha})" if sha else "_n/a_"
+                  sha_s=f"[`{sha[:7]}`]({_susfs_url}/-/commit/{sha})" if sha else ("Disabled" if _fl == "kowsu" else "_n/a_")
                   _row+=f" {sha_s} |"
               lines.append(_row)
           lines.append("")
