@@ -1654,7 +1654,7 @@ jobs:
           SUSFS_ANDROID16_6_12: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12 }}
           SUSFS_ANDROID12_5_10_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android12_5_10_resukisu }}
           SUSFS_ANDROID13_5_10_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_10_resukisu }}
-          SUSFS_ANDROID13_5_15_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_15_resukisu }}
+          SUSFS_ANDROID13_5_15_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_15_resukisu || needs.resolve-sources.outputs.susfs_commit_android13_5_15 }}
           SUSFS_ANDROID14_5_15_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android14_5_15_resukisu }}
           SUSFS_ANDROID14_6_1_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android14_6_1_resukisu }}
           SUSFS_ANDROID15_6_6_RESUKISU: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6_resukisu }}
