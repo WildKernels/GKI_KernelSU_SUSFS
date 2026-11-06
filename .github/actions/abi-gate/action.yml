@@ -43,32 +43,58 @@ runs:
 
         OURS=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
                  -name 'Module.symvers' -type f -size +0 2>/dev/null | head -n1)
+        # 6.1/6.6 keep it at android/abi_gki_aarch64.stg; 6.12 and 6.18 moved it
+        # to gki/aarch64/abi.stg, same format.
         STG=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
-                -name 'abi_gki_aarch64.stg' -type f -size +0 2>/dev/null | head -n1)
+                \( -name 'abi_gki_aarch64.stg' -o -name 'abi.stg' \) \
+                -type f -size +0 2>/dev/null | head -n1)
+        # 5.10 and 5.15 predate the .stg; they carry the same CRCs as attributes
+        # of <elf-symbol> in the libabigail XML.
+        XML=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
+                -name 'abi_gki_aarch64.xml' -type f -size +0 2>/dev/null | head -n1)
 
         if [ -z "${OURS:-}" ] || [ ! -f "$OURS" ]; then
           echo "::error title=ABI gate::no Module.symvers in this build - cannot verify the ABI"
           exit 1
         fi
-        if [ -z "${STG:-}" ] || [ ! -f "$STG" ]; then
-          echo "::error title=ABI gate::no android/abi_gki_aarch64.stg in the tree - cannot verify the ABI"
-          exit 1
-        fi
         echo "ABI gate: family=$FAMILY mode=$MODE"
         echo "ABI gate: ours=$OURS"
-        echo "ABI gate: stock=$STG"
 
         # Module.symvers: <crc> <symbol> <module> <export>
         awk -F'\t' 'NF>=2 && $1 ~ /^0x/ {print $2"\t"$1}' "$OURS" | LC_ALL=C sort -u > /tmp/ours.tsv
 
-        # .stg records are elf_symbol { id: 0x…  name: "sym" … crc: 0x…  }.
-        # `crc:` is the modversions CRC; `id:` is the type id.
-        awk '
-          /^elf_symbol \{/ {insym=1; nm=""; crc=""; next}
-          insym && /^[[:space:]]*name:[[:space:]]*"/ {nm=$0; sub(/.*name:[[:space:]]*"/, "", nm); sub(/".*/, "", nm); next}
-          insym && /^[[:space:]]*crc:[[:space:]]*0x/ {crc=$2; next}
-          insym && /^\}/ {if (nm != "" && crc != "") print nm"\t"crc; insym=0; next}
-        ' "$STG" | LC_ALL=C sort -u > /tmp/stock.tsv
+        if [ -n "${STG:-}" ] && [ -f "$STG" ]; then
+          echo "ABI gate: stock=$STG (.stg)"
+          # .stg records are elf_symbol { id: 0x…  name: "sym" … crc: 0x…  }.
+          # `crc:` is the modversions CRC; `id:` is the type id.
+          awk '
+            /^elf_symbol \{/ {insym=1; nm=""; crc=""; next}
+            insym && /^[[:space:]]*name:[[:space:]]*"/ {nm=$0; sub(/.*name:[[:space:]]*"/, "", nm); sub(/".*/, "", nm); next}
+            insym && /^[[:space:]]*crc:[[:space:]]*0x/ {crc=$2; next}
+            insym && /^\}/ {if (nm != "" && crc != "") print nm"\t"crc; insym=0; next}
+          ' "$STG" | LC_ALL=C sort -u > /tmp/stock.tsv
+        elif [ -n "${XML:-}" ] && [ -f "$XML" ]; then
+          echo "ABI gate: stock=$XML (.xml)"
+          # 5.10/5.15 predate the .stg: same CRCs, carried as attributes of
+          # <elf-symbol name='X' … crc='0x…'/> in the libabigail XML.
+          perl -ne 'if (/<elf-symbol\b([^>]*)>/) { $a = $1;
+              ($n) = $a =~ /name=.([^\x27]+)./;
+              ($c) = $a =~ /crc=.([^\x27]+)./;
+              print "$n\t$c\n" if defined $n && defined $c }' "$XML" \
+            | LC_ALL=C sort -u > /tmp/stock.tsv
+        else
+          # Nothing found at all: no .stg and no XML anywhere in this tree. Warn
+          # loudly rather than pretend the ABI was checked.
+          echo "::warning title=ABI gate::no in-tree ABI definition (.stg or .xml) for $FAMILY - ABI unverified"
+          {
+            echo ""
+            echo "### ABI gate - $FAMILY"
+            echo ""
+            echo "**UNVERIFIED** - this tree ships no \`android/abi_gki_aarch64.stg\` or \`.xml\`, so there is no stock CRC to compare against."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          exit 0
+        fi
 
         # join wants byte order; the default locale collation silently drops rows
         LC_ALL=C join -t $'\t' -1 1 -2 1 /tmp/ours.tsv /tmp/stock.tsv > /tmp/joined.tsv
