@@ -246,9 +246,9 @@ jobs:
           # NoMount is deliberately NOT pinned: it is a module-side component
           # with no kernel contract, so it always tracks the dev tip even in
           # verified mode (see the nomount_commit emit below).
-          # KernelSU: official main tip (28db74f6, 2026-11-01, "kernel: Fix
-          # SELinux generation tracking for policy updates (#3964)").
-          PIN_KERNELSU="28db74f6f4692e97006ce9ebd8b19b9cc614b5b7"
+          # KernelSU: official main tip (019a3c01, 2026-11-06, "refactor(kernel):
+          # Mark original type datum to save symtab search (#3969)").
+          PIN_KERNELSU="019a3c0103a8f8d56675546016c4073d0fd18352"
           # BakaSU: official main tip (516d3e87, 2026-10-31, "ksuinit: make lint
           # check happy"). Still tracks latest despite the fa12ffd fake_state
           # removal - the 5 older branches (12-5.10/13-5.10/13-5.15/14-5.15/
@@ -262,46 +262,49 @@ jobs:
           PIN_SUKISU_ULTRA="1cfa57340590971cba7521ed536da8ebbedc5f0a"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
-          # master tip 2d5786b9 (2026-11-01, "susfs: Separate provider and
-          # operation state").
-          PIN_FINASU="2d5786b9129a254a87ac358c8bec0203ccd53351"
+          # master tip a839ce2d (2026-11-06); the 12 commits since 2d5786b9 are
+          # manager/ksud userspace only, no kernel change.
+          PIN_FINASU="a839ce2d742f0f1450a3aad20bdc14bc060da840"
           # SUSFS (gitlab simonpunk/susfs4ksu): every gki-<family> branch moved
-          # one commit, "KernelSU: Fix compiler error" (2026-10-30) - a compile
-          # fix for newer KernelSU headers, no new config symbol, no ABI change.
+          # two commits (2026-11-06): "KernelSU: Sync with upstream" (the
+          # 10_enable_susfs_for_ksu patch, +9 lines) and "kernel: ratelimit on
+          # logging sus selinux type and rule" (SUSFS_LOGI_RL/SUSFS_LOGE_RL macros,
+          # 6 lines of fs/susfs.c). No new config symbol, no ABI change, and
+          # neither touches the fdinfo/cifs/binder surfaces our fix scripts cover.
           # The previous refresh (2026-10-27) added the priority uid filter
           # ("susfs: Add priority uid filter" + its "Fix UAF bugs and worker not
           # able to run" follow-up), guarded by CONFIG_KSU_SUSFS only;
           # susfs_is_priority_uid_filtered() lives in fs/susfs.c, so the config
           # list still needs no change.
           declare -A PIN_SUSFS=(
-            [susfs_commit_android12_5_10]="b0e474642cf77ee797004a454fa441362723d0ba"
-            [susfs_commit_android13_5_10]="8a120081f2739bc0e4b1f6a389d8236f22944acc"
-            [susfs_commit_android13_5_15]="d5df1d937361530787fafa920dea3a9b6dc8ebef"
-            [susfs_commit_android14_5_15]="e22ceec7cbc459dcf560cf4a0ac34a8235c8df84"
-            [susfs_commit_android14_6_1]="a0ac906915c8a8d50d474dfb3cae478ef32edc1a"
-            [susfs_commit_android15_6_6]="c7f670f57b7d43d75066b6657f8aee9cdf580d96"
-            [susfs_commit_android16_6_12]="68f62fae75ada3959f816841a3c64299383521ed"
+            [susfs_commit_android12_5_10]="64855680c7b0dbc3ade66068dfb2acd08acaffe4"
+            [susfs_commit_android13_5_10]="0ee665081f639a41c21f1ee5c3b208cf063edb2d"
+            [susfs_commit_android13_5_15]="41da83f3b1721c1a44d05212093d0934441f975c"
+            [susfs_commit_android14_5_15]="2babc11f865b77c1fb867674a58d11b9387917ee"
+            [susfs_commit_android14_6_1]="5f85e6e7838a54ad363de5749d33361a5da2316b"
+            [susfs_commit_android15_6_6]="6f21c8c9a9ea02a9281a2a019dc4802cde5698bc"
+            [susfs_commit_android16_6_12]="c6788e2a21dc717beb7dd3a36b729b58bc909927"
           )
           # BakaSU keeps its own SUSFS pin set (kept separate so it can diverge
           # again). Values = the same verified branch tips as PIN_SUSFS.
           declare -A PIN_SUSFS_BAKASU=(
-            [susfs_commit_android12_5_10]="b0e474642cf77ee797004a454fa441362723d0ba"
-            [susfs_commit_android13_5_10]="8a120081f2739bc0e4b1f6a389d8236f22944acc"
-            [susfs_commit_android13_5_15]="d5df1d937361530787fafa920dea3a9b6dc8ebef"
-            [susfs_commit_android14_5_15]="e22ceec7cbc459dcf560cf4a0ac34a8235c8df84"
-            [susfs_commit_android14_6_1]="a0ac906915c8a8d50d474dfb3cae478ef32edc1a"
-            [susfs_commit_android15_6_6]="c7f670f57b7d43d75066b6657f8aee9cdf580d96"
-            [susfs_commit_android16_6_12]="68f62fae75ada3959f816841a3c64299383521ed"
+            [susfs_commit_android12_5_10]="64855680c7b0dbc3ade66068dfb2acd08acaffe4"
+            [susfs_commit_android13_5_10]="0ee665081f639a41c21f1ee5c3b208cf063edb2d"
+            [susfs_commit_android13_5_15]="41da83f3b1721c1a44d05212093d0934441f975c"
+            [susfs_commit_android14_5_15]="2babc11f865b77c1fb867674a58d11b9387917ee"
+            [susfs_commit_android14_6_1]="5f85e6e7838a54ad363de5749d33361a5da2316b"
+            [susfs_commit_android15_6_6]="6f21c8c9a9ea02a9281a2a019dc4802cde5698bc"
+            [susfs_commit_android16_6_12]="c6788e2a21dc717beb7dd3a36b729b58bc909927"
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
-            [susfs_commit_android12_5_10]="b0e474642cf77ee797004a454fa441362723d0ba"
-            [susfs_commit_android13_5_10]="8a120081f2739bc0e4b1f6a389d8236f22944acc"
-            [susfs_commit_android13_5_15]="d5df1d937361530787fafa920dea3a9b6dc8ebef"
-            [susfs_commit_android14_5_15]="e22ceec7cbc459dcf560cf4a0ac34a8235c8df84"
-            [susfs_commit_android14_6_1]="a0ac906915c8a8d50d474dfb3cae478ef32edc1a"
-            [susfs_commit_android15_6_6]="c7f670f57b7d43d75066b6657f8aee9cdf580d96"
-            [susfs_commit_android16_6_12]="68f62fae75ada3959f816841a3c64299383521ed"
+            [susfs_commit_android12_5_10]="64855680c7b0dbc3ade66068dfb2acd08acaffe4"
+            [susfs_commit_android13_5_10]="0ee665081f639a41c21f1ee5c3b208cf063edb2d"
+            [susfs_commit_android13_5_15]="41da83f3b1721c1a44d05212093d0934441f975c"
+            [susfs_commit_android14_5_15]="2babc11f865b77c1fb867674a58d11b9387917ee"
+            [susfs_commit_android14_6_1]="5f85e6e7838a54ad363de5749d33361a5da2316b"
+            [susfs_commit_android15_6_6]="6f21c8c9a9ea02a9281a2a019dc4802cde5698bc"
+            [susfs_commit_android16_6_12]="c6788e2a21dc717beb7dd3a36b729b58bc909927"
           )
 
           pick() { # pinned repo ref  -> pinned when verified, else latest
