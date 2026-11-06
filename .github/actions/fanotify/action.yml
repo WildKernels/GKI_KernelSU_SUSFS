@@ -1,0 +1,37 @@
+name: 'fanotify (zero ABI drift)'
+description: 'Enable fanotify without moving struct user_namespace or struct fsnotify_group'
+
+inputs:
+  version:
+    description: 'Kernel config family (e.g. android14-6.1)'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Port fanotify off the ABI-visible layouts
+      # CONFIG_FANOTIFY normally does two things that move GKI symbol CRCs:
+      #   * enum ucount_type gains UCOUNT_FANOTIFY_*, which grows both
+      #     struct ucounts and struct user_namespace.ucount_max[] - and
+      #     struct user_namespace is in make_kuid/from_kuid/make_kgid/from_kgid/
+      #     make_kprojid/from_kprojid/current_in_userns/__put_user_ns prototypes.
+      #   * struct fsnotify_group grows, because its private-data union gains the
+      #     larger fanotify struct - eight exported fsnotify_* symbols take it.
+      # The script moves fanotify's private state into a kzalloc'd block hung off
+      # group->private and re-implements the per-namespace group/mark limits in
+      # fanotify's own table, so both structs keep their stock layout while the
+      # limits (128 groups, RAM-derived marks) still apply.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/fanotify_zero_drift.py" "$PWD"
+
+    - name: Enable fanotify
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          # FAN_OPEN_PERM / FAN_ACCESS_PERM / FAN_OPEN_EXEC_PERM need both:
+          # FANOTIFY for the subsystem, ACCESS_PERMISSIONS for the permission
+          # event classes.
+          CONFIG_FANOTIFY=y
+          CONFIG_FANOTIFY_ACCESS_PERMISSIONS=y

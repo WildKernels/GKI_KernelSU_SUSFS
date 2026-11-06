@@ -98,6 +98,8 @@ on:
         description: "USB Arsenal (USB gadget patches + configs)"
         type: boolean
         default: true
+      use_fanotify:
+        description: "fanotify + FAN_OPEN_PERM (ported to keep stock CRCs; gated by the ABI check)"
       use_sysvipc:
         description: "CONFIG_SYSVIPC/POSIX_MQUEUE for DS containers - grows task_struct, so the ABI gate fails"
         type: boolean
@@ -540,6 +542,7 @@ jobs:
             F_SUSFS=true;  F_NOMOUNT=true; F_BBG=true;  F_NET=true
             F_DS=true;     F_USBA=true;    F_NTSYNC=true; F_PTRACE=true; F_UNICODE=true
             F_BPF=true;    F_PERF=false
+            F_FANOTIFY=false
           else
             F_SUSFS="${{ inputs.use_susfs }}";   F_NOMOUNT="${{ inputs.use_nomount }}"
             F_BBG="${{ inputs.use_bbg }}";        F_NET="${{ inputs.use_net }}"
@@ -547,6 +550,7 @@ jobs:
             F_NTSYNC="${{ inputs.use_ntsync }}"
             F_PTRACE="${{ inputs.use_ptrace }}";  F_UNICODE="${{ inputs.use_unicode }}"
             F_BPF="${{ inputs.use_bpf }}";        F_PERF="${{ inputs.use_perf }}"
+            F_FANOTIFY="${{ inputs.use_fanotify }}"
           fi
 
           FEATURES=""
@@ -560,6 +564,7 @@ jobs:
           [ "$F_PTRACE" = "true" ] && FEATURES="${FEATURES}Ptrace+"
           [ "$F_UNICODE" = "true" ] && FEATURES="${FEATURES}Unicode+"
           [ "$F_BPF" = "true" ] && FEATURES="${FEATURES}BPF+"
+          [ "$F_FANOTIFY" = "true" ] && FEATURES="${FEATURES}FANOTIFY+"
           [ "$F_PERF" = "true" ] && FEATURES="${FEATURES}Perf+"
           echo "feature_set=${FEATURES%+}" >> "$GITHUB_OUTPUT"
 
