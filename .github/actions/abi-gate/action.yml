@@ -96,6 +96,14 @@ runs:
           exit 0
         fi
 
+        # Compare numerically, not as text: Module.symvers zero-pads its CRCs to
+        # 8 digits and the libabigail XML does not (0x0b30d744 vs 0xb30d744), which
+        # otherwise shows up as hundreds of phantom mismatches on 5.10/5.15.
+        for f in /tmp/ours.tsv /tmp/stock.tsv; do
+          perl -F'\t' -lane 'printf "%s\t0x%08x\n", $F[0], hex($F[1]) if @F >= 2' "$f" \
+            | LC_ALL=C sort -u > "$f.norm" && mv "$f.norm" "$f"
+        done
+
         # join wants byte order; the default locale collation silently drops rows
         LC_ALL=C join -t $'\t' -1 1 -2 1 /tmp/ours.tsv /tmp/stock.tsv > /tmp/joined.tsv
         compared=$(wc -l < /tmp/joined.tsv)
