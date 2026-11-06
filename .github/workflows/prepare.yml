@@ -66,6 +66,11 @@ on:
         required: false
         type: boolean
         default: false
+      abi_mode:
+        description: "check = fail on unrecorded CRC drift, update = print allowlist lines"
+        required: false
+        type: string
+        default: check
       allow_version_mismatch:
         description: "Force-load modules with mismatched symbol versions ( force check_version() to pass )"
         required: false
@@ -337,6 +342,7 @@ jobs:
       droidspaces_commit: ${{ inputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       page_size: ${{ inputs.page_size }}
       stock_config_artifact: stock-configs-${{ needs.generate-matrix.outputs.version_slug }}
