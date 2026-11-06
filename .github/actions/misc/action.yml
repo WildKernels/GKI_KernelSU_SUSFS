@@ -29,6 +29,44 @@ runs:
           CONFIG_TMPFS_POSIX_ACL=y
           CONFIG_KALLSYMS=y
           CONFIG_KALLSYMS_ALL=y
-          CONFIG_FANOTIFY=y
-          CONFIG_FANOTIFY_ACCESS_PERMISSIONS=y
+          # Container CPU limits (cpu.max / cgroup v2 CPU bandwidth).
+          #
+          # Unlike fanotify this needs no port: CONFIG_CFS_BANDWIDTH touches
+          # nothing in include/, so no ABI-visible struct moves and no exported
+          # symbol appears or disappears - verified on android12-5.10,
+          # android13-5.15, android14-6.1 (include/linux/sched.h: 0 references)
+          # and android16-6.12 (whole include/: 0 references). FAIR_GROUP_SCHED,
+          # which it depends on, is already =y in every stock GKI defconfig, so
+          # struct sched_entity is unchanged.
+          # On android17-6.18 it does add three task_struct fields
+          # (sched_throttle_work/throttle_node/throttled), but stock 6.18 already
+          # sets CFS_BANDWIDTH=y, so those fields are part of the stock ABI there.
+          # FANOTIFY IS DISABLED ON PURPOSE - do not re-add these two lines here.
+          #
+          # CONFIG_FANOTIFY moves two type layouts that are part of the GKI module
+          # contract, so every kernel built with it changes symbol CRCs and
+          # prebuilt vendor modules that import either family refuse to load:
+          #
+          #   * enum ucount_type gains UCOUNT_FANOTIFY_GROUPS/MARKS, which grows
+          #     struct ucounts.ucount[UCOUNT_COUNTS] and, more importantly,
+          #     struct user_namespace.ucount_max[]. struct user_namespace is in
+          #     the prototypes of make_kuid/from_kuid/make_kgid/from_kgid/
+          #     make_kprojid/from_kprojid/current_in_userns/__put_user_ns.
+          #   * struct fsnotify_group grows, because its private-data union gains
+          #     the larger fanotify_group_private_data; eight exported fsnotify_*
+          #     symbols take that pointer.
+          #
+          # It is also not needed for anything we ship today: a fanotify listener
+          # can only allow/deny an open (FAN_OPEN_PERM); it cannot rewrite the
+          # content a process reads. FAN_PRE_ACCESS, the hook that sits in front
+          # of the data, only exists from 6.18 and needs a listener that does the
+          # rewriting itself.
+          #
+          # A zero-drift port lives in .github/actions/fanotify +
+          # .github/scripts/fanotify_zero_drift.py (it moves the private struct
+          # out of the union and re-implements the per-namespace limits in
+          # fanotify's own table). It is opt-in via the use_fanotify dispatch
+          # input, which defaults to false.
+          #CONFIG_FANOTIFY=y
+          #CONFIG_FANOTIFY_ACCESS_PERMISSIONS=y
           
