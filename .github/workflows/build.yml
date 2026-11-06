@@ -71,6 +71,11 @@ on:
         required: false
         type: boolean
         default: false
+      abi_mode:
+        description: "check = fail on unrecorded CRC drift, update = print allowlist lines"
+        required: false
+        type: string
+        default: check
       page_size:
         description: "ARM64 page size: 4k (default) or 16k (Kleaf --page_size)"
         required: false
@@ -405,6 +410,16 @@ jobs:
           os_patch_level: ${{ inputs.os_patch_level }}
           droidspaces_commit: ${{ inputs.droidspaces_commit }}
 
+      - name: USB Arsenal Patches
+        # USB gadget functions (mass storage, HID, NCM) plus the kernel-patches
+        # folder that makes a second gadget instance and CD-ROM/DVD emulation work.
+        # 6.1 has no patch set of its own upstream, so it takes the 5.15 one.
+        if: contains(inputs.feature_set, 'USBA') || inputs.feature_set == 'All'
+        uses: ./.github/actions/usb-arsenal
+        with:
+          version: ${{ inputs.version }}
+          kernel_version: ${{ inputs.kernel_version }}
+
       - name: Apply NTSync Patches
         if: contains(inputs.feature_set, 'NTSync')
         uses: ./.github/actions/ntsync
@@ -512,6 +527,16 @@ jobs:
         with:
           version: ${{ inputs.version }}
           page_size: ${{ inputs.page_size }}
+
+      - name: ABI gate
+        # Fails the leg when a symbol CRC moved and no allowlist entry covers it.
+        # Runs even after a failed build: if Module.symvers exists, the CRCs are
+        # real and worth reporting.
+        if: always()
+        uses: ./.github/actions/abi-gate
+        with:
+          family: ${{ inputs.version }}
+          mode: ${{ inputs.abi_mode }}
 
       - name: Consolidated Build Summary
         id: build-summary

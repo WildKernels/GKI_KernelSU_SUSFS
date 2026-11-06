@@ -94,6 +94,15 @@ on:
         description: "DroidSpaces"
         type: boolean
         default: true
+      use_usba:
+        description: "USB Arsenal (USB gadget patches + configs)"
+        type: boolean
+        default: true
+      abi_mode:
+        description: "check = fail on ANY CRC drift from stock, update = only report what moved"
+        type: choice
+        options: [check, update]
+        default: check
       use_ntsync:
         description: "NTSync"
         type: boolean
@@ -522,12 +531,13 @@ jobs:
           # which is opt-in on dispatch and stays off for nightlies.
           if [ "${{ github.event_name }}" = "schedule" ]; then
             F_SUSFS=true;  F_NOMOUNT=true; F_BBG=true;  F_NET=true
-            F_DS=true;     F_NTSYNC=true;  F_PTRACE=true; F_UNICODE=true
+            F_DS=true;     F_USBA=true;    F_NTSYNC=true; F_PTRACE=true; F_UNICODE=true
             F_BPF=true;    F_PERF=false
           else
             F_SUSFS="${{ inputs.use_susfs }}";   F_NOMOUNT="${{ inputs.use_nomount }}"
             F_BBG="${{ inputs.use_bbg }}";        F_NET="${{ inputs.use_net }}"
-            F_DS="${{ inputs.use_ds }}";          F_NTSYNC="${{ inputs.use_ntsync }}"
+            F_DS="${{ inputs.use_ds }}";          F_USBA="${{ inputs.use_usba }}"
+            F_NTSYNC="${{ inputs.use_ntsync }}"
             F_PTRACE="${{ inputs.use_ptrace }}";  F_UNICODE="${{ inputs.use_unicode }}"
             F_BPF="${{ inputs.use_bpf }}";        F_PERF="${{ inputs.use_perf }}"
           fi
@@ -538,6 +548,7 @@ jobs:
           [ "$F_BBG" = "true" ] && FEATURES="${FEATURES}BBG+"
           [ "$F_NET" = "true" ] && FEATURES="${FEATURES}NET+"
           [ "$F_DS" = "true" ] && FEATURES="${FEATURES}DS+"
+          [ "$F_USBA" = "true" ] && FEATURES="${FEATURES}USBA+"
           [ "$F_NTSYNC" = "true" ] && FEATURES="${FEATURES}NTSync+"
           [ "$F_PTRACE" = "true" ] && FEATURES="${FEATURES}Ptrace+"
           [ "$F_UNICODE" = "true" ] && FEATURES="${FEATURES}Unicode+"
@@ -677,6 +688,7 @@ jobs:
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
@@ -707,6 +719,7 @@ jobs:
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
@@ -737,6 +750,7 @@ jobs:
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
@@ -767,6 +781,7 @@ jobs:
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
@@ -797,6 +812,7 @@ jobs:
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
@@ -827,6 +843,7 @@ jobs:
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
@@ -857,6 +874,7 @@ jobs:
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
@@ -892,6 +910,7 @@ jobs:
       brand_name: ${{ inputs.brand_name || 'Wild' }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
+      abi_mode: ${{ inputs.abi_mode || 'check' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
     secrets: inherit
