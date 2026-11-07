@@ -4,6 +4,43 @@ description: 'Enable SUSFS-related kernel configuration options'
 runs:
   using: "composite"
   steps:
+    - name: Make sure the SUSFS Kconfig menu has the priority-uid-filter symbol
+      # The symbol is `default y` in SUSFS's own Kconfig hunk, so if it were in the
+      # tree we would not need to enable it at all. SukiSU-Ultra's tip calls
+      # susfs_set_priority_uid_filter()/susfs_parse_priority_app_strings() from
+      # drivers/kernelsu/, and SUSFS declares them only under this symbol:
+      #   supercall/dispatch.c:478: error: call to undeclared function
+      #   'susfs_set_priority_uid_filter'
+      # The hunk lands on KernelSU's Kconfig but not always on SukiSU's, and a
+      # CONFIG_ the Kconfig does not declare is dropped by olddefconfig - so it
+      # has to be added before the config is written.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set +e
+        K=drivers/kernelsu/Kconfig
+        if [ ! -f "$K" ]; then
+          echo "no drivers/kernelsu/Kconfig - SUSFS is not in this tree"
+          exit 0
+        fi
+        if grep -q 'KSU_SUSFS_PRIORITY_UID_FILTER' "$K"; then
+          echo "priority-uid-filter symbol already declared"
+          exit 0
+        fi
+        grep -q 'KSU_SUSFS' "$K" || echo "::warning::no KSU_SUSFS menu in $K - the SUSFS Kconfig hunk did not apply"
+        echo "adding the missing KSU_SUSFS_PRIORITY_UID_FILTER symbol to $K"
+        cat >> "$K" <<'KCONFIG'
+
+        config KSU_SUSFS_PRIORITY_UID_FILTER
+        	bool "Enable to allow adding user-defined uids that will be hidden from getpriority/setpriority/ioprio_get/ioprio_set syscall"
+        	depends on KSU_SUSFS
+        	default y
+        	help
+        	  - Allow hiding user-defined uids from syscalls like getpriority/setpriority/ioprio_get/ioprio_set.
+        	  - Effective on all processes with uid >= 10000.
+        KCONFIG
+        grep -c 'KSU_SUSFS_PRIORITY_UID_FILTER' "$K"
+
     - name: Enable SUSFS Kernel Configs
       uses: ./.github/actions/set-kernel-config
       with:
@@ -18,11 +55,6 @@ runs:
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          # SukiSU-Ultra's tip calls susfs_set_priority_uid_filter() and
-          # susfs_parse_priority_app_strings() from drivers/kernelsu/, and SUSFS
-          # only declares them under this symbol:
-          #   dispatch.c:478: error: call to undeclared function
-          #   'susfs_set_priority_uid_filter'
-          # Unknown symbols are dropped by the later olddefconfig, so trees whose
-          # SUSFS predates the feature are unaffected.
+          # SukiSU-Ultra's tip needs this one; the step above guarantees the symbol
+          # exists so olddefconfig cannot drop it.
           CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER=y
