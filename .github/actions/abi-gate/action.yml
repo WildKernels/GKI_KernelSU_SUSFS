@@ -141,6 +141,9 @@ runs:
         if [ "$drifted" -gt 0 ]; then
           echo "ABI gate: $drifted symbol(s) differ from stock:"
           awk -F'\t' '{printf "  %s  ours=%s stock=%s\n", $1,$2,$3}' /tmp/drift.tsv | head -40
+          # full list for analysis, not just the head
+          cp /tmp/drift.tsv "$RUNNER_TEMP/abi-drift.tsv" 2>/dev/null || true
+          echo "::notice title=ABI drift::full list: ${RUNNER_TEMP}/abi-drift.tsv ($drifted rows, symbol\\tours\\tstock)"
           [ "$drifted" -gt 40 ] && echo "  ... $((drifted - 40)) more - full list: re-dispatch with abi_mode=update"
           printf '%s' "$(awk -F'\t' '{print $1}' /tmp/drift.tsv | head -6 | tr '\n' ' ')" > /tmp/names
           echo "::error title=ABI drift::$(cat /tmp/names)$([ "$drifted" -gt 6 ] && echo "...") - $drifted symbol(s) no longer match the stock ABI. Disable the config that caused it (CFSBW / pids / fanotify) or fix the port; this repo keeps the stock ABI."

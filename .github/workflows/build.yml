@@ -575,6 +575,14 @@ jobs:
           family: ${{ inputs.version }}
           mode: ${{ inputs.abi_mode }}
 
+      - name: Upload ABI drift list
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: abi-drift-${{ inputs.version }}-${{ strategy.job-index || 0 }}
+          path: ${{ runner.temp }}/abi-drift.tsv
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Consolidated Build Summary
         id: build-summary
         if: always()
