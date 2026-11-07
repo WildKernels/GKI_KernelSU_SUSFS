@@ -420,6 +420,19 @@ jobs:
           version: ${{ inputs.version }}
           kernel_version: ${{ inputs.kernel_version }}
 
+      # OFF BY DEFAULT: CONFIG_SYSVIPC adds struct sysv_sem/sysv_shm to
+      # struct task_struct and CONFIG_POSIX_MQUEUE grows struct ipc_namespace.
+      # Both are ABI-visible and stock GKI has both off, so enabling them moves
+      # 6,329 of 9,741 symbols on 6.18 (measured). Opt in only if a container
+      # needs SysV IPC and you accept the drift.
+      - name: SysV IPC for containers (ABI drift, opt-in)
+        if: contains(inputs.feature_set, 'SYSVIPC')
+        uses: ./.github/actions/set-kernel-config
+        with:
+          config_list: |
+            CONFIG_SYSVIPC=y
+            CONFIG_POSIX_MQUEUE=y
+
       - name: Apply NTSync Patches
         if: contains(inputs.feature_set, 'NTSync')
         uses: ./.github/actions/ntsync

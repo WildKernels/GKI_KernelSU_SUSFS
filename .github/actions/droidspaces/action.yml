@@ -95,9 +95,19 @@ runs:
         # than relying on the NET/misc actions, so a DS build is self-contained
         # even when those features are switched off for a dispatch.
         config_list: |
-          # IPC
-          CONFIG_SYSVIPC=y
-          CONFIG_POSIX_MQUEUE=y
+          # IPC: SYSVIPC and POSIX_MQUEUE are NOT set here on purpose.
+          #
+          # CONFIG_SYSVIPC adds struct sysv_sem/sysv_shm to struct task_struct
+          # (include/linux/sched.h), and CONFIG_POSIX_MQUEUE adds fields to
+          # struct ipc_namespace. Both are ABI-visible, stock GKI has both off on
+          # every family, and enabling them on 6.18 moved 6,329 of 9,741 symbols
+          # (measured: DS-only run 42330772916, BBG-only 0, KSU-only 0,
+          # KSU+SUSFS 0). Every exported symbol taking a task pointer shifts,
+          # which is why the drift looks nothing like the configs that caused it.
+          #
+          # Opt in with the use_sysvipc dispatch input if you need SysV IPC for
+          # containers and accept the ABI cost; the gate will refuse the build
+          # otherwise.
 
           # Namespaces
           CONFIG_IPC_NS=y

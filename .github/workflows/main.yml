@@ -98,6 +98,10 @@ on:
         description: "USB Arsenal (USB gadget patches + configs)"
         type: boolean
         default: true
+      use_sysvipc:
+        description: "CONFIG_SYSVIPC/POSIX_MQUEUE for DS containers - grows task_struct, so the ABI gate fails"
+        type: boolean
+        default: false
       abi_mode:
         description: "check = fail on ANY CRC drift from stock, update = only report what moved"
         type: choice
