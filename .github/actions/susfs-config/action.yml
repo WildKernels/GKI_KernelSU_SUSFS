@@ -18,3 +18,11 @@ runs:
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          # SukiSU-Ultra's tip calls susfs_set_priority_uid_filter() and
+          # susfs_parse_priority_app_strings() from drivers/kernelsu/, and SUSFS
+          # only declares them under this symbol:
+          #   dispatch.c:478: error: call to undeclared function
+          #   'susfs_set_priority_uid_filter'
+          # Unknown symbols are dropped by the later olddefconfig, so trees whose
+          # SUSFS predates the feature are unaffected.
+          CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER=y
