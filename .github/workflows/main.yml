@@ -98,6 +98,12 @@ on:
         description: "USB Arsenal (USB gadget patches + configs)"
         type: boolean
         default: true
+      use_pids:
+        description: "cgroup pids controller - moves 3,202 CRCs, so the ABI gate fails the build"
+        type: boolean
+        default: false
+      use_cfs_bw:
+        description: "CONFIG_CFS_BANDWIDTH (cpu.max) - moves 142 CRCs, so the ABI gate fails"
       abi_mode:
         description: "check = fail on ANY CRC drift from stock, update = only report what moved"
         type: choice
@@ -536,6 +542,8 @@ jobs:
             F_SUSFS=true;  F_NOMOUNT=true; F_BBG=true;  F_NET=true
             F_DS=true;     F_USBA=true;    F_NTSYNC=true; F_PTRACE=true; F_UNICODE=true
             F_BPF=true;    F_PERF=false
+            F_PIDS=false
+            F_CFSBW=false
           else
             F_SUSFS="${{ inputs.use_susfs }}";   F_NOMOUNT="${{ inputs.use_nomount }}"
             F_BBG="${{ inputs.use_bbg }}";        F_NET="${{ inputs.use_net }}"
@@ -543,6 +551,8 @@ jobs:
             F_NTSYNC="${{ inputs.use_ntsync }}"
             F_PTRACE="${{ inputs.use_ptrace }}";  F_UNICODE="${{ inputs.use_unicode }}"
             F_BPF="${{ inputs.use_bpf }}";        F_PERF="${{ inputs.use_perf }}"
+            F_PIDS="${{ inputs.use_pids }}"
+            F_CFSBW="${{ inputs.use_cfs_bw }}"
           fi
 
           FEATURES=""
@@ -556,6 +566,8 @@ jobs:
           [ "$F_PTRACE" = "true" ] && FEATURES="${FEATURES}Ptrace+"
           [ "$F_UNICODE" = "true" ] && FEATURES="${FEATURES}Unicode+"
           [ "$F_BPF" = "true" ] && FEATURES="${FEATURES}BPF+"
+          [ "$F_PIDS" = "true" ] && FEATURES="${FEATURES}PIDS+"
+          [ "$F_CFSBW" = "true" ] && FEATURES="${FEATURES}CFSBW+"
           [ "$F_PERF" = "true" ] && FEATURES="${FEATURES}Perf+"
           echo "feature_set=${FEATURES%+}" >> "$GITHUB_OUTPUT"
 

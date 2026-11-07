@@ -51,7 +51,12 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        if [ "${{ inputs.version }}" == "android16-6.12" ]; then
+        if [ "${{ inputs.version }}" == "android16-6.12" ] || [ "${{ inputs.version }}" == "android17-6.18" ]; then
+          # The patch name is literal: "GKI-6.12 or above". 6.18 was missing from
+          # this chain, so CONFIG_SYSVIPC grew struct task_struct there and moved
+          # 6,329 of 9,741 symbols (measured, DS-only run 42330772916). It applies
+          # clean on android17-6.18 and adds zero bytes: both fields become packed
+          # unions with a single char.
           cp ${{ github.workspace }}/Droidspaces-OSS/Documentation/resources/kernel-patches/GKI/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kabi.patch ./
           patch -p1 < 001.GKI-6.12-or-above-fix_sysvipc_kabi.patch
         elif [ "${{ inputs.version }}" == "android15-6.6" ]; then
@@ -87,6 +92,24 @@ runs:
         echo >> "${{ github.workspace }}/kernel/common/ipc/msgutil.c"
         echo 'EXPORT_SYMBOL_GPL(init_ipc_ns);' >> "${{ github.workspace }}/kernel/common/ipc/msgutil.c"
 
+    - name: Keep the SYSVIPC task_struct members out of the ABI
+      # DroidSpaces' 6.12+ kABI patch, adapted to 6.18: the two members CONFIG_SYSVIPC
+      # adds are moved into the padding that already exists after rt_priority (struct
+      # sched_entity is 64-byte aligned), each wrapped in a packed union so it adds no
+      # alignment of its own. sizeof(struct task_struct) is unchanged, so the stock
+      # modversion CRCs hold. Applied by us because their tree stops at 6.12.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        P="${{ github.workspace }}/.github/patches/sysvipc-kabi/001.sysvipc-task-struct-padding.patch"
+        if grep -q '__kabi_ignored_0' include/linux/sched.h; then
+          echo "already applied"
+        else
+          git apply -v "$P" || { echo "ERROR: the sysvipc kABI patch did not apply" >&2; exit 1; }
+          echo "applied $(basename "$P")"
+        fi
+
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config
       with:
@@ -95,7 +118,14 @@ runs:
         # than relying on the NET/misc actions, so a DS build is self-contained
         # even when those features are switched off for a dispatch.
         config_list: |
-          # IPC
+          # IPC - ABI-neutral because of the KABI-reserve port above, which moves
+          # both task_struct members into reserve slots the stock build also has.
+          # IPC: left off. CONFIG_SYSVIPC / CONFIG_POSIX_MQUEUE force CONFIG_IPC_NS
+          # on (hidden, default y), which materialises struct ipc_namespace - an
+          # empty stub in stock GKI - and moves 6,329 of 9,741 symbols. DroidSpaces'
+          # kABI patches stop at 6.12 and only cover task_struct.
+          # .github/scripts/ipcns_zero_drift.py is the port that fixes it; it is
+          # unfinished, so the options stay off until it lands.
           CONFIG_SYSVIPC=y
           CONFIG_POSIX_MQUEUE=y
 

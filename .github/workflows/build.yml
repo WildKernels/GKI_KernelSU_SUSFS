@@ -420,6 +420,43 @@ jobs:
           version: ${{ inputs.version }}
           kernel_version: ${{ inputs.kernel_version }}
 
+      # ON BY DEFAULT, and it is NOT free - measured, not assumed. Enabling it
+      # changes struct cfs_rq (cfs_bandwidth, throttled lists, throttled_count),
+      # and struct rq embeds struct cfs_rq. struct rq * appears in the prototypes
+      # of exported symbols - the android vendor-hook tracepoints
+      # (__traceiter_android_rvh_*), __task_rq_lock, __migrate_task,
+      # __balance_callbacks - so genksyms expands it and their CRCs move. That
+      # is what the "breaks the ABI" note was about; include/ has no
+      # CONFIG_CFS_BANDWIDTH reference at all, which is why grepping headers
+      # misses it.
+      # Dispatch with use_cfs_bw=false to build without it.
+      - name: CPU bandwidth control (cgroup cpu.max)
+        # The config alone moves 142 CRCs (struct cfs_rq -> struct rq -> the
+        # android_rvh vendor-hook tracepoints), so it always goes together with
+        # the zero-drift port. Still opt-in: dispatch with use_cfs_bw=true.
+        if: contains(inputs.feature_set, 'CFSBW')
+        uses: ./.github/actions/cfs-bw
+        with:
+          version: ${{ inputs.version }}
+
+      # OFF BY DEFAULT: CONFIG_CGROUP_PIDS is the one cgroup config that cannot
+      # be relocated the way fanotify was. It does not add private state to a
+      # struct - it adds a SLOT to enum cgroup_subsys_id, so CGROUP_SUBSYS_COUNT
+      # grows and every array sized by it grows with it:
+      #   struct css_set  subsys[]        + e_cset_node[]
+      #   struct cgroup   subsys[]        + nr_dying_subsys[]
+      # Both structs are in the prototypes of exported symbols (cgroup_path_ns,
+      # cgroup_get_from_path, cgroup_get_from_fd, cgroup_get_from_id,
+      # css_task_iter_start, ...), so their CRCs move and prebuilt modules that
+      # import them fail to load. Stock GKI has pids on for 6.12/6.18 and off for
+      # 5.10/5.15/6.1/6.6, which is exactly where this drift would bite.
+      # Dispatch with use_pids=true to get the controller and accept the drift.
+      - name: cgroup pids controller (ABI drift, opt-in)
+        if: contains(inputs.feature_set, 'PIDS')
+        uses: ./.github/actions/set-kernel-config
+        with:
+          config_list: |
+            CONFIG_CGROUP_PIDS=y
       - name: Apply NTSync Patches
         if: contains(inputs.feature_set, 'NTSync')
         uses: ./.github/actions/ntsync
