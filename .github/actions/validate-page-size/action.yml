@@ -1,0 +1,33 @@
+name: 'Validate Page Size'
+description: 'Validate Page Size (composite, keeps the workflow to one entry)'
+inputs:
+  page_size:
+    description: 'page_size'
+    required: false
+  version:
+    description: 'version'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate Page Size
+      shell: bash
+      run: |
+        set -euo pipefail
+        PAGE_SIZE="${{ inputs.page_size }}"
+        case "$PAGE_SIZE" in
+          4k) exit 0 ;;
+          16k) ;;
+          *) echo "ERROR: unsupported page_size '$PAGE_SIZE' (expected 4k or 16k)." >&2; exit 1 ;;
+        esac
+        # Kleaf exposes --page_size only on the build branches used by these
+        # GKI families (main-kernel-build-2023/2024, main-kernel-2025).
+        case "${{ inputs.version }}" in
+          android14-6.1|android15-6.6|android16-6.12|android17-6.18) ;;
+          *)
+            echo "ERROR: page_size=16k is not supported for ${{ inputs.version }}." >&2
+            echo "Supported families: android14-6.1, android15-6.6, android16-6.12, android17-6.18." >&2
+            exit 1
+            ;;
+        esac

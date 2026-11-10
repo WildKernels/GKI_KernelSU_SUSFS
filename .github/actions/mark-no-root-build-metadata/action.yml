@@ -1,0 +1,19 @@
+name: 'Mark No Root build metadata'
+description: 'Mark No Root build metadata (composite, keeps the workflow to one entry)'
+inputs:
+  root_flavor:
+    description: 'root_flavor'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Mark No Root build metadata
+      shell: bash
+      run: |
+        {
+          echo "ROOT_IMPLEMENTATION=none"
+          echo "ROOT_MANAGER=N/A"
+          echo "ROOT_VERSION=N/A"
+          echo "ROOT_COMMIT=N/A"
+        } >> "$GITHUB_ENV"

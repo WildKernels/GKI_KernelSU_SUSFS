@@ -100,36 +100,10 @@ jobs:
           path: stock-configs
 
       - name: Validate Page Size
-        shell: bash
-        run: |
-          set -euo pipefail
-          PAGE_SIZE="${{ inputs.page_size }}"
-          case "$PAGE_SIZE" in
-            4k) exit 0 ;;
-            16k) ;;
-            *) echo "ERROR: unsupported page_size '$PAGE_SIZE' (expected 4k or 16k)." >&2; exit 1 ;;
-          esac
-          # Kleaf exposes --page_size only on the build branches used by these
-          # GKI families (main-kernel-build-2023/2024, main-kernel-2025).
-          case "${{ inputs.version }}" in
-            android14-6.1|android15-6.6|android16-6.12|android17-6.18) ;;
-            *)
-              echo "ERROR: page_size=16k is not supported for ${{ inputs.version }}." >&2
-              echo "Supported families: android14-6.1, android15-6.6, android16-6.12, android17-6.18." >&2
-              exit 1
-              ;;
-          esac
-
-      # Runs on every leg, trimmed to the parts that pay for themselves.
-      # Measured from a leg's own log: the full option set took 106 s to recover
-      # 39.8 GB, of which the package globs (postgresql*/mysql*/*llvm*/
-      # temurin-*/dotnet-sdk-*) were 46 s for 6.4 GB -- the slowest and least
-      # space-efficient part. Dropping them leaves ~54 s for ~32 GB, and the
-      # explicit package names still remove the browsers and cloud CLIs.
-      # Runner budget for reference: 145 GB disk, ~55 GB used by the image, so
-      # ~90 GB free before this step and ~114 GB after it (the 16 GiB LTO
-      # swapfile takes 16 GB back). The kleaf families are the reason to keep it
-      # on all 621 legs even though the legacy ones have room to spare.
+        uses: ./.github/actions/validate-page-size
+        with:
+          page_size: ${{ inputs.page_size }}
+          version: ${{ inputs.version }}
       - name: Free Disk Space
         if: true
         uses: endersonmenezes/free-disk-space@v4 # Use @main for latest, @v3 for stable
@@ -167,6 +141,8 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
           os_patch_level: ${{ inputs.os_patch_level }}
 
+      - name: Initialize Config Fragment
+        uses: ./.github/actions/initialize-config-fragment
       - name: Spoof /proc/config.gz With Stock Config
         uses: ./.github/actions/stock-config
         with:
@@ -175,32 +151,9 @@ jobs:
           stock_config_dir: stock-configs
 
       - name: Set Build Timestamp from Kernel Commit
-        shell: bash
-        run: |
-          set -x
-          # Hardcode the build timestamp to the 5th day of the patch level
-          # at 04:20 UTC, using the existing timestamp formats expected by the build.
-          OS_PATCH_LEVEL_INPUT="${{ inputs.os_patch_level }}"
-          if [[ "$OS_PATCH_LEVEL_INPUT" == lts* ]]; then
-            if [[ "$OS_PATCH_LEVEL_INPUT" =~ ^lts-([0-9]{2})$ ]]; then
-              OS_PATCH_LEVEL_YM="$(date -u +%Y)-${BASH_REMATCH[1]}"
-            else
-              OS_PATCH_LEVEL_YM="$(date -u +%Y-%m)"
-            fi
-          else
-            OS_PATCH_LEVEL_YM="$OS_PATCH_LEVEL_INPUT"
-          fi
-          FIXED_BUILD_DATE="${OS_PATCH_LEVEL_YM}-05 04:20:00 UTC"
-          SOURCE_DATE_EPOCH=$(date -u -d "$FIXED_BUILD_DATE" +%s)
-          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >> $GITHUB_ENV
-          KBUILD_TS=$(date -u -d @${SOURCE_DATE_EPOCH} '+%a %b %d %H:%M:%S UTC %Y')
-          echo "KBUILD_BUILD_TIMESTAMP=${KBUILD_TS}" >> $GITHUB_ENV
-          # Keep git metadata aligned with the same fixed timestamp.
-          GIT_DATE=$(date -u -d @${SOURCE_DATE_EPOCH} '+%Y-%m-%dT%H:%M:%SZ')
-          echo "GIT_COMMITTER_DATE=${GIT_DATE}" >> $GITHUB_ENV
-          echo "GIT_AUTHOR_DATE=${GIT_DATE}" >> $GITHUB_ENV
-          echo "Build timestamp set to: $(date -u -d @${SOURCE_DATE_EPOCH} '+%Y-%m-%d %H:%M:%S UTC') (epoch: $SOURCE_DATE_EPOCH)"
-
+        uses: ./.github/actions/set-build-timestamp-from-kernel-commit
+        with:
+          os_patch_level: ${{ inputs.os_patch_level }}
       - name: Extract Sublevel and Set File Name
         id: extract
         uses: ./.github/actions/extract-sublevel-file-name
@@ -223,21 +176,16 @@ jobs:
 
       - name: Reject KowSU with SUSFS
         if: inputs.root_flavor == 'kowsu' && (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'All')
-        shell: bash
-        run: |
-          echo "ERROR: KowSU does not work together with SUSFS — re-run with SUSFS off." >&2
-          exit 1
-
+        uses: ./.github/actions/reject-kowsu-with-susfs
+        with:
+          feature_set: ${{ inputs.feature_set }}
+          root_flavor: ${{ inputs.root_flavor }}
       - name: Reject FinaSU without SUSFS
-        # FinaSU's kernel hard-depends on the susfs headers and its supercall
-        # dispatch references susfs symbols unguarded, so a susfs-less build
-        # cannot link. Unlike KernelSU/BakaSU there is no susfs-free shape.
         if: inputs.root_flavor == 'finasu' && !contains(inputs.feature_set, 'SUSFS')
-        shell: bash
-        run: |
-          echo "ERROR: FinaSU requires SUSFS — re-run with SUSFS on." >&2
-          exit 1
-
+        uses: ./.github/actions/reject-finasu-without-susfs
+        with:
+          feature_set: ${{ inputs.feature_set }}
+          root_flavor: ${{ inputs.root_flavor }}
       - name: Setup Selected Root Implementation
         if: inputs.root_flavor != '' && inputs.root_flavor != 'none'
         uses: ./.github/actions/root-setup
@@ -247,18 +195,12 @@ jobs:
 
       - name: Mark No Root build metadata
         if: inputs.root_flavor == 'none'
-        shell: bash
-        run: |
-          {
-            echo "ROOT_IMPLEMENTATION=none"
-            echo "ROOT_MANAGER=N/A"
-            echo "ROOT_VERSION=N/A"
-            echo "ROOT_COMMIT=N/A"
-          } >> "$GITHUB_ENV"
-
+        uses: ./.github/actions/mark-no-root-build-metadata
+        with:
+          root_flavor: ${{ inputs.root_flavor }}
       - name: Disable SUSFS for BakaSU without SUSFS feature
         if: inputs.root_flavor == 'bakasu' && !contains(inputs.feature_set, 'SUSFS')
-        uses: ./.github/actions/set-kernel-config
+        uses: ./.github/actions/add-configs
         with:
           config_list: |
             CONFIG_KSU_SUSFS=n
@@ -274,7 +216,7 @@ jobs:
 
       - name: Disable SUSFS for SukiSU-Ultra without SUSFS feature
         if: inputs.root_flavor == 'sukisu-ultra' && !contains(inputs.feature_set, 'SUSFS')
-        uses: ./.github/actions/set-kernel-config
+        uses: ./.github/actions/add-configs
         with:
           config_list: |
             CONFIG_KSU_SUSFS=n
@@ -288,21 +230,6 @@ jobs:
             CONFIG_KSU_SUSFS_OPEN_REDIRECT=n
             CONFIG_KSU_SUSFS_SUS_MAP=n
 
-      - name: 6.18 exports the ipc_ns symbols rust_binder needs
-        # android17-6.18's gki_defconfig builds CONFIG_ANDROID_BINDER_IPC_RUST=m
-        # and the Rust driver references init_ipc_ns / put_ipc_ns, which this
-        # tree does not export, so modpost fails:
-        #   ERROR: modpost: "put_ipc_ns" [drivers/android/binder/rust_binder.ko] undefined!
-        # Turning the module off is NOT an option - Kleaf's GKI target expects
-        # drivers/android/binder/rust_binder.ko in its outputs and the build dies
-        # with "Unable to find drivers/android/binder/rust_binder.ko in any of
-        # the following directories". Export both symbols instead (GPL-only).
-        if: inputs.version == 'android17-6.18'
-        shell: bash
-        working-directory: ${{ github.workspace }}/kernel/common
-        run: |
-          python3 "${{ github.workspace }}/.github/scripts/binder_ipc_ns_exports.py" "$PWD"
-
       - name: Single manager for BakaSU (multi-manager off)
         # BakaSU's Kconfig ships CONFIG_KSU_MULTI_MANAGER_SUPPORT=y, which
         # compiles three rows into apk_sign_keys[]: its own key plus
@@ -312,7 +239,7 @@ jobs:
         # is the key their main-branch manager APK is signed with (checked
         # against run 41207077584), so the manager we ship stays trusted.
         if: inputs.root_flavor == 'bakasu'
-        uses: ./.github/actions/set-kernel-config
+        uses: ./.github/actions/add-configs
         with:
           config_list: |
             CONFIG_KSU_MULTI_MANAGER_SUPPORT=n
@@ -326,27 +253,16 @@ jobs:
         # root process (ksu_register_manager, index 253) - so the single-manager
         # guarantee from the step above is unaffected.
         if: inputs.root_flavor == 'bakasu'
-        uses: ./.github/actions/set-kernel-config
+        uses: ./.github/actions/add-configs
         with:
           config_list: |
             CONFIG_KSU_TOOLKIT_SUPPORT=y
 
       - name: Single manager for SukiSU-Ultra (trim cert table)
-        # SukiSU hardcodes seven trusted manager certificates in
-        # kernel/manager/apk_sign.c (SukiSU, RKSU, KSU, WKSU, KowSU, KSUN, MKSU)
-        # and is_manager_apk() accepts the first match - no flags, no Kconfig,
-        # no Kbuild knob. The signature-fallback crowner in
-        # kernel/extension/dynamic_sig_fallback.c reuses is_manager_apk(), so
-        # trimming to one row narrows that path too. We keep SukiSU's own cert
-        # (0x35c / 947ae944…), the key the manager APK we ship is signed with.
-        # The script self-verifies and exits 1 if the table shape changes.
         if: inputs.root_flavor == 'sukisu-ultra'
-        shell: bash
-        working-directory: ${{ github.workspace }}/kernel
-        run: |
-          set -euo pipefail
-          python3 "${GITHUB_WORKSPACE}/.github/scripts/trim_sukisu_managers.py" SukiSU-Ultra
-
+        uses: ./.github/actions/single-manager-for-sukisu-ultra-trim-cert-table
+        with:
+          root_flavor: ${{ inputs.root_flavor }}
       - name: Single manager for FinaSU (dynamic manager off)
         # Upstream ships CONFIG_KSU_DYNAMIC_MANAGER=y, which compiles a
         # nine-row signature table: FINASU_TRUSTED_* as the only trusted row
@@ -358,7 +274,7 @@ jobs:
         # entry. dynamic_manager.o still builds - FinaSU guards that file with
         # no CONFIG symbol - it is simply no longer reachable from apk_sign.c.
         if: inputs.root_flavor == 'finasu'
-        uses: ./.github/actions/set-kernel-config
+        uses: ./.github/actions/add-configs
         with:
           config_list: |
             CONFIG_KSU_DYNAMIC_MANAGER=n
@@ -405,6 +321,25 @@ jobs:
           os_patch_level: ${{ inputs.os_patch_level }}
           droidspaces_commit: ${{ inputs.droidspaces_commit }}
 
+      - name: USB Arsenal Patches
+        # USB gadget functions (mass storage, HID, NCM) plus the kernel-patches
+        # folder that makes a second gadget instance and CD-ROM/DVD emulation work.
+        # 6.1 has no patch set of its own upstream, so it takes the 5.15 one.
+        if: contains(inputs.feature_set, 'USBA') || inputs.feature_set == 'All'
+        uses: ./.github/actions/usb-arsenal
+        with:
+          version: ${{ inputs.version }}
+          kernel_version: ${{ inputs.kernel_version }}
+
+      # ON BY DEFAULT, and it is NOT free - measured, not assumed. Enabling it
+      # changes struct cfs_rq (cfs_bandwidth, throttled lists, throttled_count),
+      # and struct rq embeds struct cfs_rq. struct rq * appears in the prototypes
+      # of exported symbols - the android vendor-hook tracepoints
+      # (__traceiter_android_rvh_*), __task_rq_lock, __migrate_task,
+      # __balance_callbacks - so genksyms expands it and their CRCs move. That
+      # is what the "breaks the ABI" note was about; include/ has no
+      # CONFIG_CFS_BANDWIDTH reference at all, which is why grepping headers
+      # misses it.
       - name: Apply NTSync Patches
         if: contains(inputs.feature_set, 'NTSync')
         uses: ./.github/actions/ntsync
@@ -440,13 +375,19 @@ jobs:
           sublevel: ${{ steps.extract.outputs.sublevel }}
           variant: ${{ inputs.variant }}
 
-      - name: Enable BPF Stack (BTF + eBPF + FUSE-BPF)
-        if: contains(inputs.feature_set, 'BPF')
-        uses: ./.github/actions/btf
-        with:
-          version: ${{ inputs.version }}
-          kernel_version: ${{ inputs.kernel_version }}
-          sublevel: ${{ steps.extract.outputs.sublevel }}
+      # DISABLED: the BPF stack (BTF + eBPF + FUSE-BPF) is off until there is a
+      # concrete need for it. Most of it is already in stock GKI (BPF_SYSCALL,
+      # DEBUG_INFO_BTF, FUSE_FS are =y on 5.15+), so the action was mainly adding
+      # BPF_EVENTS/kprobe/uprobe events and FUSE_BPF - tracing plumbing and an
+      # experimental FUSE-over-eBPF path that nothing here uses - at the cost of build
+      # time and extra config surface. If you require it, open an issue.
+      # - name: Enable BPF Stack (BTF + eBPF + FUSE-BPF)
+      #   if: contains(inputs.feature_set, 'BPF')
+      #   uses: ./.github/actions/btf
+      #   with:
+      #     version: ${{ inputs.version }}
+      #     kernel_version: ${{ inputs.kernel_version }}
+      #     sublevel: ${{ steps.extract.outputs.sublevel }}
 
       - name: Apply Device-Specific Patches
         uses: ./.github/actions/apply-device-patches
@@ -492,9 +433,6 @@ jobs:
           if-no-files-found: ignore
           compression-level: 9
 
-      - name: Initialize Config Fragment
-        run: touch "${{ github.workspace }}/wild_gki.fragment"
-
       - name: Apply Kernel Bypass Hack
         if: ${{ inputs.allow_version_mismatch == 'true' }}
         uses: ./.github/actions/bypass-kernel
@@ -512,6 +450,21 @@ jobs:
         with:
           version: ${{ inputs.version }}
           page_size: ${{ inputs.page_size }}
+
+      - name: ABI gate
+        # Compares Module.symvers CRCs against the stock ABI of the tree that was
+        # built and fails on any symbol whose CRC moved.
+        if: always()
+        uses: ./.github/actions/abi-gate
+        with:
+          version: ${{ inputs.version }}
+
+      - name: Extract the built .config
+        if: always()
+        uses: ./.github/actions/extract-the-built-config
+      - name: Verify the fragment landed in .config
+        if: always()
+        uses: ./.github/actions/verify-fragment
 
       - name: Consolidated Build Summary
         id: build-summary
@@ -556,6 +509,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.extract.outputs.file_name }}-BuildInfo
-          path: /tmp/build-summary-${{ steps.build-summary.outputs.summary_base }}.md
+          path: |
+            /tmp/build-summary-${{ steps.build-summary.outputs.summary_base }}.md
+            ${{ github.workspace }}/built.config
           if-no-files-found: warn
           compression-level: 9

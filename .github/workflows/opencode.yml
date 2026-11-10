@@ -58,7 +58,8 @@ jobs:
     if: |
       needs.preflight.outputs.key == 'true' &&
       github.event_name == 'issues' &&
-      !endsWith(github.actor, '[bot]')
+      !endsWith(github.actor, '[bot]') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

@@ -1,0 +1,40 @@
+name: 'Extract the built .config'
+description: 'Extract the built .config (composite, keeps the workflow to one entry)'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Extract the built .config
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        # Kleaf writes it under the kernel_config rule output; build.sh writes it
+        # into OUT_DIR. Locate it rather than hardcoding one path.
+        CONFIG_FILE=""
+        for candidate in \
+          bazel-bin/common/kernel_aarch64_config/out_dir/.config \
+          /home/runner/out/.config; do
+          if [ -f "$candidate" ]; then CONFIG_FILE="$candidate"; break; fi
+        done
+        if [ -z "$CONFIG_FILE" ]; then
+          CONFIG_FILE="$(find bazel-bin/common /home/runner/out -maxdepth 4 -name .config -type f 2>/dev/null | head -n1 || true)"
+        fi
+        if [ -z "${CONFIG_FILE:-}" ]; then
+          echo "::warning title=.config::no .config in the build output - nothing to report"
+          exit 0
+        fi
+        cp "$CONFIG_FILE" "${{ github.workspace }}/built.config"
+        echo "built.config <- $CONFIG_FILE ($(grep -c '^CONFIG_' "$CONFIG_FILE") entries)"
+        {
+          echo ""
+          echo "### Built .config"
+          echo ""
+          echo "| | |"
+          echo "|---|---|"
+          echo "| source | \`$CONFIG_FILE\` |"
+          echo "| CONFIG_ entries | $(grep -c '^CONFIG_' "$CONFIG_FILE") |"
+          echo ""
+        } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        echo "=== built .config (all $(grep -c '^CONFIG_' "$CONFIG_FILE") entries) ==="
+        cat "$CONFIG_FILE"
