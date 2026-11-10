@@ -1,0 +1,139 @@
+name: 'ABI gate'
+description: 'Fail the build if any symbol CRC differs from the stock GKI ABI of the tree being built'
+
+inputs:
+  version:
+    description: 'Kernel version (android14-6.1) - reported in the log'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Compare Module.symvers CRCs against the stock GKI ABI
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        # GitHub runs `shell: bash` as bash -e -o pipefail; -e turns an expected
+        # non-zero (grep with no match, a guard test) into a step failure, so this
+        # step does its own error handling.
+        set +e
+
+        OURS=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
+                 -name 'Module.symvers' -type f -size +0 2>/dev/null | head -n1)
+        # 6.1/6.6 keep it at android/abi_gki_aarch64.stg; 6.12 and 6.18 moved it to
+        # gki/aarch64/abi.stg. Trec the GKI one by path - a bare 'abi.stg' search
+        # also matches microdroid/aarch64/abi.stg, which is a different ABI (it
+        # produced 3 phantom diffs on 6.12).
+        STG=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
+                -path '*/gki/aarch64/abi.stg' -type f -size +0 2>/dev/null | head -n1)
+        if [ -z "${STG:-}" ]; then
+          STG=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
+                  -name 'abi_gki_aarch64.stg' -type f -size +0 2>/dev/null | head -n1)
+        fi
+        if [ -z "${STG:-}" ]; then
+          STG=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
+                  -name 'abi.stg' ! -path '*microdroid*' -type f -size +0 2>/dev/null | head -n1)
+        fi
+        # 5.10 and 5.15 predate the .stg; they carry the same CRCs as attributes
+        # of <elf-symbol> in the libabigail XML.
+        XML=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
+                -name 'abi_gki_aarch64.xml' -type f -size +0 2>/dev/null | head -n1)
+
+        if [ -z "${OURS:-}" ] || [ ! -f "$OURS" ]; then
+          echo "::error title=ABI gate::no Module.symvers in this build - cannot verify the ABI"
+          exit 1
+        fi
+        echo "ABI gate: version=$VERSION"
+        echo "ABI gate: ours=$OURS"
+
+        # Module.symvers: <crc> <symbol> <module> <export>
+        awk -F'\t' 'NF>=2 && $1 ~ /^0x/ {print $2"\t"$1}' "$OURS" | LC_ALL=C sort -u > /tmp/ours.tsv
+
+        if [ -n "${STG:-}" ] && [ -f "$STG" ]; then
+          echo "ABI gate: stock=$STG (.stg)"
+          # .stg records are elf_symbol { id: 0x…  name: "sym" … crc: 0x…  }.
+          # `crc:` is the modversions CRC; `id:` is the type id.
+          awk '
+            /^elf_symbol \{/ {insym=1; nm=""; crc=""; next}
+            insym && /^[[:space:]]*name:[[:space:]]*"/ {nm=$0; sub(/.*name:[[:space:]]*"/, "", nm); sub(/".*/, "", nm); next}
+            insym && /^[[:space:]]*crc:[[:space:]]*0x/ {crc=$2; next}
+            insym && /^\}/ {if (nm != "" && crc != "") print nm"\t"crc; insym=0; next}
+          ' "$STG" | LC_ALL=C sort -u > /tmp/stock.tsv
+        elif [ -n "${XML:-}" ] && [ -f "$XML" ]; then
+          echo "ABI gate: stock=$XML (.xml)"
+          # 5.10/5.15 predate the .stg: same CRCs, carried as attributes of
+          # <elf-symbol name='X' … crc='0x…'/> in the libabigail XML.
+          perl -ne 'if (/<elf-symbol\b([^>]*)>/) { $a = $1;
+              ($n) = $a =~ /name=.([^\x27]+)./;
+              ($c) = $a =~ /crc=.([^\x27]+)./;
+              print "$n\t$c\n" if defined $n && defined $c }' "$XML" \
+            | LC_ALL=C sort -u > /tmp/stock.tsv
+        else
+          # Nothing found at all: no .stg and no XML anywhere in this tree. Warn
+          # loudly rather than pretend the ABI was checked.
+          echo "::warning title=ABI gate::no in-tree ABI definition (.stg or .xml) for $VERSION - ABI unverified"
+          {
+            echo ""
+            echo "### ABI gate - $VERSION"
+            echo ""
+            echo "**UNVERIFIED** - this tree ships no \`android/abi_gki_aarch64.stg\` or \`.xml\`, so there is no stock CRC to compare against."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          exit 0
+        fi
+
+        # Compare numerically, not as text: Module.symvers zero-pads its CRCs to
+        # 8 digits and the libabigail XML does not (0x0b30d744 vs 0xb30d744), which
+        # otherwise shows up as hundreds of phantom mismatches on 5.10/5.15.
+        for f in /tmp/ours.tsv /tmp/stock.tsv; do
+          perl -F'\t' -lane 'printf "%s\t0x%08x\n", $F[0], hex($F[1]) if @F >= 2' "$f" \
+            | LC_ALL=C sort -u > "$f.norm" && mv "$f.norm" "$f"
+        done
+
+        # join wants byte order; the default locale collation silently drops rows
+        LC_ALL=C join -t $'\t' -1 1 -2 1 /tmp/ours.tsv /tmp/stock.tsv > /tmp/joined.tsv
+        compared=$(wc -l < /tmp/joined.tsv)
+        awk -F'\t' '$2!=$3' /tmp/joined.tsv > /tmp/drift.tsv
+        drifted=$(wc -l < /tmp/drift.tsv)
+
+        {
+          echo ""
+          echo "### ABI gate - stock ABI of $VERSION"
+          echo ""
+          echo "| | |"
+          echo "|---|---|"
+          echo "| symbols compared against stock | $compared |"
+          echo "| **differ from stock** | **$drifted** |"
+          echo ""
+        } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+        if [ "$drifted" -gt 0 ]; then
+          echo "ABI gate: $drifted symbol(s) differ from stock:"
+          awk -F'\t' '{printf "  %s  ours=%s stock=%s\n", $1,$2,$3}' /tmp/drift.tsv | head -40
+          printf '%s' "$(awk -F'\t' '{print $1}' /tmp/drift.tsv | head -6 | tr '\n' ' ')" > /tmp/names
+          echo "::error title=ABI drift::$(cat /tmp/names)$([ "$drifted" -gt 6 ] && echo "...") - $drifted symbol(s) no longer match the stock ABI of this tree."
+          exit 1
+        fi
+
+        echo "ABI gate: OK - $compared symbols compared against stock, 0 differ"
+
+    - name: Assert the KMI symbol list is unchanged
+      # Kleaf already computes this inside the build (kernel_aarch64_kmi_symbol_list_
+      # violations); this step only makes the verdict visible and names it. It is a
+      # report on that check, not a second implementation of it.
+      shell: bash
+      run: |
+        set +e
+        V=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
+              -name 'kernel_aarch64_kmi_symbol_list_violations_checked' -type f 2>/dev/null | head -n1)
+        if [ -z "${V:-}" ]; then
+          echo "::warning title=KMI::no violation-check output in this build - skipped"
+          exit 0
+        fi
+        if [ -s "$V" ]; then
+          echo "::error title=KMI::the exported symbol list moved away from stock:"
+          cat "$V"
+          exit 1
+        fi
+        echo "KMI: symbol list unchanged (violations file empty)"
