@@ -50,7 +50,16 @@ runs:
             echo "$dir/${monthly}.patch"
           fi
         }
-        if [[ ${{ inputs.version }} == "android16-6.12" ]]; then
+        if [[ ${{ inputs.version }} == "android17-6.18" ]]; then
+          # No upstream backport exists for 6.18, and the 6.12 set fails 8 of 46 hunks
+          # there. This applies our own port instead: Google's BBRv3 (google/bbr v3,
+          # Linux 6.13.7) as net/ipv4/tcp_bbr3.c, registered as congestion control
+          # "bbr3" beside the in-tree BBR v1. No header is touched - the per-socket
+          # state lives behind a pointer in icsk_ca_priv and the four extra rate-sample
+          # values stay file-local, because extending struct rate_sample moved 6,326
+          # CRCs when measured.
+          patch -p1 --forward < "${{ github.workspace }}/.github/patches/bbrv3/bbrv3_6.18.patch"
+        elif [[ ${{ inputs.version }} == "android16-6.12" ]]; then
           #patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"
           #patch -p1 < ${{ github.action_path }}/patches/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch
           echo "skipped"
