@@ -1,0 +1,58 @@
+From 77558cff4989f06a27242a9d39077c5d19fde752 Mon Sep 17 00:00:00 2001
+From: ravindu644 <droidcasts@protonmail.com>
+Date: Mon, 19 Oct 2026 19:16:01 +0530
+Subject: [PATCH 1/2] usb: gadget: configfs: unregister the gadget's own
+ android device
+
+Every gadget gets an androidN device in the android_usb class, all
+created with devt MKDEV(0, 0). android_device_destroy() and the create
+error path then call device_destroy(class, devt), which looks the
+device up by devt and finds the oldest one: android0, which belongs to
+Android's own gadget g1. Dropping any second gadget therefore destroys
+Android's device while the dropped gadget's own stays behind without its
+attributes, and UsbDeviceManager, which listens for android0's uevents,
+hears nothing more until a reboot: no USB notification, USB tethering
+greyed out.
+
+Unregister gi->dev itself, and forget android_device when it is the
+one going away.
+
+Signed-off-by: ravindu644 <droidcasts@protonmail.com>
+---
+ drivers/usb/gadget/configfs.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/gadget/configfs.c b/drivers/usb/gadget/configfs.c
+index a19a394af..41c8098c9 100755
+--- a/drivers/usb/gadget/configfs.c
++++ b/drivers/usb/gadget/configfs.c
+@@ -1802,8 +1802,9 @@ static int android_device_create(struct gadget_info *gi)
+ 
+ 		err = device_create_file(gi->dev, attr);
+ 		if (err) {
+-			device_destroy(gi->dev->class,
+-				       gi->dev->devt);
++			if (android_device == gi->dev)
++				android_device = NULL;
++			device_unregister(gi->dev);
+ 			return err;
+ 		}
+ 	}
+@@ -1819,7 +1820,13 @@ static void android_device_destroy(struct gadget_info *gi)
+ 	attrs = android_usb_attributes;
+ 	while ((attr = *attrs++))
+ 		device_remove_file(gi->dev, attr);
+-	device_destroy(gi->dev->class, gi->dev->devt);
++	if (android_device == gi->dev)
++		android_device = NULL;
++	/*
++	 * Not device_destroy(): every gadget's device has devt 0, so a lookup
++	 * by devt finds the oldest one, android0, whichever gadget is dropped.
++	 */
++	device_unregister(gi->dev);
+ }
+ #else
+ static inline int android_device_create(struct gadget_info *gi)
+-- 
+2.56.0
+

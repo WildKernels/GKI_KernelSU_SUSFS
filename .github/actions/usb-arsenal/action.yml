@@ -1,0 +1,130 @@
+name: 'USB Arsenal kernel patches'
+description: 'Apply ravindu644/USB-Arsenal kernel-patches and the gadget/NAT configs it needs'
+
+inputs:
+  version:
+    description: 'Kernel config family (e.g. android14-6.1)'
+    required: true
+  kernel_version:
+    description: 'Kernel version (5.10, 5.15, 6.1, 6.6, 6.12, 6.18)'
+    required: true
+  usb_arsenal_commit:
+    description: 'Pinned USB-Arsenal commit (empty = main tip)'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Clone USB-Arsenal
+      uses: ./.github/actions/retry
+      with:
+        command: git clone --depth=1 https://github.com/ravindu644/USB-Arsenal.git
+        attempts: 5
+        delay: 5
+        workdir: ${{ github.workspace }}
+        # A clone that dies mid-transfer leaves the directory behind and every
+        # later attempt then fails with "destination path already exists".
+        cleanup: rm -rf USB-Arsenal
+
+    - name: Apply USB-Arsenal kernel patches
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        # Upstream ships kernel-patches/{4.9,4.10,4.14,4.19,5.10,5.15,6.6,6.12}.
+        # There is no 6.1 directory: the 5.15 set is the one that applies to 6.1
+        # (owner decision), and 6.18 takes the 6.12 set for the same reason.
+        # Variant subdirectories (e.g. 5.15/sm8550) are rebases for a different
+        # mass-storage tree - we take the top level only, as upstream instructs.
+        case "${{ inputs.kernel_version }}" in
+          5.10) PATCH_DIR=5.10 ;;
+          5.15) PATCH_DIR=5.15 ;;
+          6.1)  PATCH_DIR=5.15 ;;
+          6.6)  PATCH_DIR=6.6 ;;
+          6.12) PATCH_DIR=6.12 ;;
+          6.18) PATCH_DIR=6.12 ;;
+          *)
+            echo "ERROR: no USB-Arsenal patch set mapped for kernel ${{ inputs.kernel_version }}" >&2
+            exit 1
+            ;;
+        esac
+
+        SRC="${{ github.workspace }}/USB-Arsenal/kernel-patches/${PATCH_DIR}"
+        [ -d "$SRC" ] || { echo "ERROR: $SRC missing from the USB-Arsenal checkout" >&2; exit 1; }
+
+        # android13-5.10 rewrote do_read_toc (no case 0/1/2 switch), so three of
+        # upstream's 5.10 hunks have no target there and 0002 does not apply. Our
+        # ported set lives in the repo and is preferred when a family has one;
+        # everything still comes from upstream otherwise.
+        OVERRIDE="${{ github.workspace }}/.github/patches/usb-arsenal/${{ inputs.version }}"
+        if [ -d "$OVERRIDE" ]; then
+          SRC="$OVERRIDE"
+          echo "USB-Arsenal: kernel ${{ inputs.kernel_version }} -> repo port for ${{ inputs.version }} (upstream ${PATCH_DIR})"
+        else
+          echo "USB-Arsenal: kernel ${{ inputs.kernel_version }} -> kernel-patches/${PATCH_DIR}"
+        fi
+
+        mapfile -t PATCHES < <(find "$SRC" -maxdepth 1 -name '*.patch' | sort)
+        [ "${#PATCHES[@]}" -gt 0 ] || { echo "ERROR: no patches under $SRC" >&2; exit 1; }
+
+        # A newer kernel can already contain a fix an older patch set carries.
+        # 6.1 + the 5.15 set is that case: 0005 (f_hid inits) is present but with
+        # different context, so it is neither appliable nor cleanly reversible -
+        # and applying it with fuzz would duplicate the inits. The helper compares
+        # the patch's added lines against the tree and reports "already present".
+        CHECK="${{ github.workspace }}/.github/scripts/usb_arsenal_already_present.py"
+
+        APPLIED=0
+        SKIPPED=0
+        FAILED=()
+
+        # Always patch -p1. git apply is stricter about whitespace than the trees these
+        # patches were cut against, so trying it first made the outcome depend on which
+        # tool happened to accept the hunk - and the "applied" label on which path won.
+        # One tool, one behaviour, same report every run.
+        for p in "${PATCHES[@]}"; do
+          name="$(basename "$p")"
+          if patch -p1 --forward --dry-run -f < "$p" >/dev/null 2>&1; then
+            patch -p1 --forward -f < "$p" >/dev/null
+            APPLIED=$((APPLIED + 1))
+            echo "  applied: $name"
+          elif python3 "$CHECK" "$p"; then
+            SKIPPED=$((SKIPPED + 1))
+            echo "  skipped (already in this tree): $name"
+          else
+            FAILED+=("$name")
+            echo "  NOT APPLIED: $name"
+            # --forward dry-run again, capturing why: FAILED hunks, line numbers,
+            # or "Reversed (or previously applied)" for a patch already in the tree.
+            patch -p1 --forward --dry-run -f < "$p" 2>&1 \
+              | grep -E 'FAILED|Hunk|Reversed|Skipping' | head -6 | sed 's/^/    /' || true
+          fi
+        done
+
+        echo "USB-Arsenal: ${APPLIED} applied, ${SKIPPED} already present, ${#FAILED[@]} not applied"
+
+        # These patches are hardening and feature add-ons (upstream's own table:
+        # DVD images over 2.36G, HID cdev lifetime, bInterval attribute). None of
+        # them is required to create a gadget - the configs below are. A patch cut
+        # against a vendor tree therefore should not fail the whole build, but it
+        # must not pass silently either, and a set that applies *nothing* means
+        # the mapping is wrong.
+        if [ "${#FAILED[@]}" -gt 0 ]; then
+          echo "::warning title=USB-Arsenal patches::${#FAILED[@]} patch(es) did not apply to ${{ inputs.version }}: ${FAILED[*]}. Gadget configs are still enabled; the affected optional support is absent."
+        fi
+        if [ "$APPLIED" -eq 0 ] && [ "$SKIPPED" -eq 0 ]; then
+          echo "ERROR: no USB-Arsenal patch applied to ${{ inputs.version }} - the ${PATCH_DIR} mapping is wrong" >&2
+          exit 1
+        fi
+
+    - name: Append the USB Arsenal fragment
+      # One fragment for every family. The 5.10-only entries carry '# nocheck' so
+      # a tree without those symbols warns instead of failing the config step.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.action_path }}/usb-arsenal.fragment" \
+          --dest wild_defconfig.fragment --label usba

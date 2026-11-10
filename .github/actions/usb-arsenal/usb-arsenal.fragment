@@ -1,0 +1,11 @@
+# USB Arsenal gadget functions (kernel-patches/README.md fragment).
+CONFIG_USB_CONFIGFS=y
+CONFIG_USB_CONFIGFS_MASS_STORAGE=y
+CONFIG_USB_CONFIGFS_F_HID=y
+CONFIG_USB_CONFIGFS_NCM=y
+# RNDIS left GKI after 5.10 - `tether` uses NCM from 5.15 up - so this entry only
+# lands there; on every other family the symbol does not exist.
+CONFIG_USB_CONFIGFS_RNDIS=y # nocheck: 5.10-only symbol, absent from 5.15+
+# NAT for `tether`.
+CONFIG_IP_NF_NAT=y
+CONFIG_IP_NF_TARGET_MASQUERADE=y # nocheck: needs nf_nat + iptable_nat, which the gadget trees do not always enable
