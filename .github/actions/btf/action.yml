@@ -184,13 +184,13 @@ runs:
         fi
 
     - name: Enable BTF Config
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_DEBUG_INFO_BTF=y
 
     - name: Enable eBPF Kernel Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           # eBPF support (Issue #176) - tiny safe programs that run in the kernel
@@ -200,14 +200,29 @@ runs:
           CONFIG_UPROBES=y
           CONFIG_UPROBE_EVENTS=y
 
-    - name: Enable FUSE-BPF Kernel Config
-      uses: ./.github/actions/set-kernel-config
+    - name: Enable FUSE Kernel Config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
-          # FUSE-BPF support (Issue #211) - FUSE filesystems backed by eBPF
-          # programs. Sits on eBPF (Issue #176) above. Explicitly set the
-          # kconfig dependencies (FUSE_FS, BPF via BPF_SYSCALL) so kconfig can't
-          # silently drop FUSE_BPF on any branch whose gki_defconfig differs.
+          # FUSE-BPF support (Issue #211) sits on eBPF (Issue #176) above, so the
+          # dependencies are explicit: FUSE_FS and BPF_SYSCALL exist on every family,
+          # FUSE_BPF itself does not (see the step below).
           CONFIG_FUSE_FS=y
           CONFIG_BPF_SYSCALL=y
-          CONFIG_FUSE_BPF=y
+
+    - name: Enable FUSE-BPF Kernel Config
+      # CONFIG_FUSE_BPF arrived after 5.10 - android12-5.10's fs/fuse/Kconfig has no
+      # such symbol, so requesting it fails the fragment check with
+      #   CONFIG_FUSE_BPF: actual '', expected 'CONFIG_FUSE_BPF=y'
+      # Only ask for it where the tree declares it.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        if ! grep -qs '^config FUSE_BPF' fs/fuse/Kconfig; then
+          echo "::warning title=fuse-bpf::CONFIG_FUSE_BPF is not declared in this tree - skipped"
+          exit 0
+        fi
+        printf 'CONFIG_FUSE_BPF=y\n' \
+          | python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" - \
+              --dest wild_defconfig.fragment --label fuse-bpf
