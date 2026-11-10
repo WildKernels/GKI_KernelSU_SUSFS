@@ -1,0 +1,50 @@
+# DroidSpaces GKI config set - one fragment.
+#
+# Previously split in two (IPC separately) because android17-6.18 could not take the IPC
+# configs without 6,329 exported symbols changing CRC. That is solved: the 6.18 SysV
+# task-table port runs before this fragment is appended, measured at 0 of 9,741 symbols
+# against stock, so the IPC block is safe on every family now.
+#
+# Order matters only in that it is readable: the 6.18 port must be applied before the
+# fragment, which the action already does.
+
+# IPC
+CONFIG_SYSVIPC=y
+CONFIG_POSIX_MQUEUE=y
+
+# Namespaces
+CONFIG_IPC_NS=y
+CONFIG_PID_NS=y
+
+# optional but recommended: docker's unsafe procfs check
+CONFIG_USER_NS=y
+# HW access
+CONFIG_DEVTMPFS=y
+# binfmt: running distro binaries out of the container
+CONFIG_BINFMT_MISC=y
+CONFIG_BINFMT_SCRIPT=y
+CONFIG_BINFMT_ELF=y
+# xattr / posix acl on tmpfs (NixOS)
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_TMPFS_XATTR=y
+# Networking: enhanced NAT support
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+CONFIG_IP6_NF_NAT=y
+CONFIG_IP6_NF_TARGET_MASQUERADE=y
+# macvlan mode (--net=macvlan); self-contained driver
+CONFIG_MACVLAN=y
+# UFW - reject target. Upstream's list says NETFILTER_XT_TARGET_REJECT,
+# which no 5.10/5.15/6.1/6.6/6.12/6.18 tree declares: the iptables
+# REJECT target is built by ipt_REJECT.o under IP_NF_TARGET_REJECT
+# (net/ipv4/netfilter/Kconfig) and ip6t_REJECT.o under
+# IP6_NF_TARGET_REJECT. The old name was a silent no-op - the defconfig
+# gained a line Kconfig then dropped.
+CONFIG_IP_NF_TARGET_REJECT=y
+CONFIG_IP6_NF_TARGET_REJECT=y
+CONFIG_NETFILTER_XT_TARGET_LOG=y
+CONFIG_NETFILTER_XT_MATCH_RECENT=y
+# fail2ban
+CONFIG_IP_SET=y
+CONFIG_IP_SET_HASH_IP=y
+CONFIG_IP_SET_HASH_NET=y
+CONFIG_NETFILTER_XT_SET=y
