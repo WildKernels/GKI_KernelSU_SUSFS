@@ -14,7 +14,7 @@ if env("USE_NET","true")=="true": feats.append("Networking")
 if env("USE_NTSYNC","true")=="true": feats.append("NTSync")
 if env("USE_PTRACE","true")=="true": feats.append("Ptrace Leak Fix")
 if env("USE_UNICODE","true")=="true": feats.append("Unicode Fix")
-if env("USE_BPF","true")=="true": feats.append("BTF / eBPF / FUSE-BPF")
+if env("USE_BPF","true")=="true": feats.append("BTF / eBPF / FUSE-BPF - **disabled**, open an issue if you require it")
 if env("USE_PERF","false")=="true": feats.append("Performance Tuning")
 if env("PAGE_SIZE","4k")=="16k": feats.append("16 KB page size (ARM64)")
 lines=[]
