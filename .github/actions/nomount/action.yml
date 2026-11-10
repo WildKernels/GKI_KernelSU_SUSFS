@@ -91,3 +91,5 @@ runs:
       with:
         config_list: |
           CONFIG_NOMOUNT=y
+          # needed by the mount itself, independent of the Misc baseline
+          CONFIG_OVERLAY_FS=y

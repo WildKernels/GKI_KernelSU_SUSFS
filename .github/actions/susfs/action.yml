@@ -196,6 +196,10 @@ runs:
     # the gated sources no longer contain it either, so the step was a no-op.)
 
     - name: Fix selinux_hide pointer-bool-conversion on 6.6+ (ALL branches)
+      # Not a SUSFS fix: selinux_hide.c ships in the root flavour's own tree, so this is
+      # needed whenever a root flavour is built, SUSFS or not. With no root there is no
+      # such file and the list below is empty - gated so that case is explicit.
+      if: inputs.root_flavor != '' && inputs.root_flavor != 'none'
       # Runs whether or not SUSFS patches were applied: every root flavor
       # compiles its own selinux_hide.c, and 6.6+ clang turns the bare
       # `if (fn)` forms into -Werror. The file list used to be fed from
