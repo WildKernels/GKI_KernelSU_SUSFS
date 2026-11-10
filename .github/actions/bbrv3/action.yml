@@ -60,9 +60,11 @@ runs:
           # CRCs when measured.
           patch -p1 --forward < "${{ github.workspace }}/.github/patches/bbrv3/bbrv3_6.18.patch"
         elif [[ ${{ inputs.version }} == "android16-6.12" ]]; then
-          #patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"
-          #patch -p1 < ${{ github.action_path }}/patches/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch
-          echo "skipped"
+          # Same port as 6.18. 6.12 still has TCP_ECN_OK/TCP_ECN_LOW; it has no
+          # TCP_ECN_LOW (v3's low-latency marking mode came with ACCECN), so BBR3's ECN
+          # path is compiled out there - the algorithm otherwise runs unmodified.
+          patch -p1 --forward < "${{ github.workspace }}/.github/patches/bbrv3/bbrv3_6.12.patch"
+          exit 0
         elif [[ ${{ inputs.version }} == "android15-6.6" ]]; then
           patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android15-6.6)"
           APPLIED=1
