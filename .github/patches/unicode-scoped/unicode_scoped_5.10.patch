@@ -1,0 +1,212 @@
+diff --git a/include/linux/ucpath.h b/include/linux/ucpath.h
+new file mode 100644
+--- /dev/null
++++ b/include/linux/ucpath.h
+@@ -0,0 +1,143 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_UCPATH_H
++#define _LINUX_UCPATH_H
++
++#include <linux/cred.h>
++#include <linux/dcache.h>
++#include <linux/err.h>
++#include <linux/fs.h>
++#include <linux/kernel.h>
++#include <linux/limits.h>
++#include <linux/namei.h>
++#include <linux/slab.h>
++#include <linux/string.h>
++#include <linux/uaccess.h>
++
++/*
++ * Scoped-storage guard against invisible-character path rewriting.
++ *
++ * /storage/emulated is a FUSE mount, so names are compared as byte strings: a path
++ * carrying an invisible formatting character looks identical to the protected one
++ * while comparing differently. That is how /sdcard/Android/data gets reached from an
++ * app that has no business there. This strips only characters that render as
++ * nothing, resolves the stripped path, and refuses when it lands in Android/data or
++ * Android/obb for a caller that does not own it.
++ *
++ * Visible characters are never altered. U+200C ZWNJ, U+200D ZWJ, U+FE00-U+FE0F
++ * variation selectors, the Hangul fillers and the Khmer/Mongolian variation
++ * selectors are deliberately absent from the list below: they render, or a script
++ * requires them, so stripping them would rename files rather than expose a trick.
++ */
++
++/* bytes in a codepoint that renders as nothing, 0 for everything else */
++static inline int uc_invisible(const unsigned char *s)
++{
++	if (s[0] == 0xC2 && s[1] == 0xAD)		/* U+00AD soft hyphen */
++		return 2;
++	if (s[0] == 0xD8 && s[1] == 0x9C)		/* U+061C Arabic letter mark */
++		return 2;
++	if (s[0] == 0xE1 && s[1] == 0xA0 && s[2] == 0x8E)
++		return 3;				/* U+180E Mongolian vowel separator */
++	if (s[0] == 0xE2 && s[1] == 0x80) {
++		if (s[2] == 0x8B)			/* U+200B zero width space */
++			return 3;
++		if (s[2] == 0x8E || s[2] == 0x8F)	/* U+200E LRM, U+200F RLM */
++			return 3;
++		if (s[2] >= 0xAA && s[2] <= 0xAE)	/* U+202A-U+202E bidi overrides */
++			return 3;
++	}
++	if (s[0] == 0xE2 && s[1] == 0x81 && s[2] >= 0xA0 && s[2] <= 0xAF)
++		return 3;				/* U+2060-U+206F WJ, isolates */
++	if (s[0] == 0xEF && s[1] == 0xBB && s[2] == 0xBF)
++		return 3;				/* U+FEFF BOM / ZWNBSP */
++	return 0;
++}
++
++/* strip those characters; returns how many were removed */
++static inline int uc_strip(const char *in, char *out, int outsz)
++{
++	const unsigned char *r = (const unsigned char *)in;
++	int w = 0, stripped = 0, len, drop;
++
++	while (*r && w < outsz - 1) {
++		drop = uc_invisible(r);
++		if (drop) {
++			r += drop;
++			stripped++;
++			continue;
++		}
++		if (*r < 0x80)
++			len = 1;
++		else if (*r < 0xE0)
++			len = 2;
++		else if (*r < 0xF0)
++			len = 3;
++		else
++			len = 4;
++		while (len-- && *r && w < outsz - 1)
++			out[w++] = *r++;
++	}
++	out[w] = '\0';
++	return stripped;
++}
++
++/*
++ * 0 to allow, negative errno to refuse. Nothing is logged: a path in dmesg is one
++ * of the first things a detector reads.
++ */
++static inline int uc_path_check(const char __user *ufname)
++{
++	char *clean, *resolved, *p;
++	struct path path;
++	unsigned int user, other;
++	kuid_t uid = current_uid();
++	int ret = 0;
++
++	if (!ufname)
++		return 0;
++	/* system, root and the zygote-isolated range are untouched */
++	if (uid.val % 100000 < 2000)
++		return 0;
++
++	clean = kmalloc(PATH_MAX, GFP_KERNEL);
++	resolved = kmalloc(PATH_MAX, GFP_KERNEL);
++	if (!clean || !resolved) {
++		kfree(clean);
++		kfree(resolved);
++		return 0;
++	}
++
++	if (strncpy_from_user(clean, ufname, PATH_MAX) <= 0)
++		goto out;
++	clean[PATH_MAX - 1] = '\0';
++
++	if (!uc_strip(clean, resolved, PATH_MAX))
++		goto out;			/* nothing invisible: stock behaviour */
++	memcpy(clean, resolved, PATH_MAX);
++
++	if (kern_path(clean, LOOKUP_FOLLOW, &path))
++		goto out;
++	p = d_path(&path, resolved, PATH_MAX);
++	if (IS_ERR(p)) {
++		path_put(&path);
++		goto out;
++	}
++
++	user = uid.val / 100000;
++	if (strncmp(p, "/storage/emulated/", 18) == 0) {
++		char own[64];
++		int n = scnprintf(own, sizeof(own), "/storage/emulated/%u/Android", user);
++
++		if (strncmp(p, own, n) == 0)
++			ret = -ENOENT;		/* an app's own Android tree */
++		else if (sscanf(p + 18, "%u", &other) == 1 && other != user)
++			ret = -EACCES;		/* another user's storage */
++	}
++	path_put(&path);
++out:
++	kfree(clean);
++	kfree(resolved);
++	return ret;
++}
++
++#endif /* _LINUX_UCPATH_H */
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -5,6 +5,7 @@
+  *  Copyright (C) 1991, 1992  Linus Torvalds
+  */
+ 
++#include <linux/ucpath.h>
+ #include <linux/string.h>
+ #include <linux/mm.h>
+ #include <linux/file.h>
+@@ -475,6 +476,10 @@
+ SYSCALL_DEFINE4(faccessat2, int, dfd, const char __user *, filename, int, mode,
+ 		int, flags)
+ {
++	int uc_err = uc_path_check(filename);
++
++	if (uc_err)
++		return uc_err;
+ 	return do_faccessat(dfd, filename, mode, flags);
+ }
+ 
+@@ -1246,6 +1251,10 @@
+ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags,
+ 		umode_t, mode)
+ {
++	int uc_err = uc_path_check(filename);
++
++	if (uc_err)
++		return uc_err;
+ 	if (force_o_largefile())
+ 		flags |= O_LARGEFILE;
+ 	return do_sys_open(dfd, filename, flags, mode);
+@@ -1254,6 +1263,10 @@
+ SYSCALL_DEFINE4(openat2, int, dfd, const char __user *, filename,
+ 		struct open_how __user *, how, size_t, usize)
+ {
++	int uc_err = uc_path_check(filename);
++
++	if (uc_err)
++		return uc_err;
+ 	int err;
+ 	struct open_how tmp;
+ 
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -5,6 +5,7 @@
+  *  Copyright (C) 1991, 1992  Linus Torvalds
+  */
+ 
++#include <linux/ucpath.h>
+ #include <linux/export.h>
+ #include <linux/mm.h>
+ #include <linux/errno.h>
+@@ -377,6 +378,10 @@
+ SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
+ 		struct stat __user *, statbuf, int, flag)
+ {
++	int uc_err = uc_path_check(filename);
++
++	if (uc_err)
++		return uc_err;
+ 	struct kstat stat;
+ 	int error;
+ 

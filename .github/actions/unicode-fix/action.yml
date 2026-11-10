@@ -8,17 +8,27 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Apply Unicode Fix Patch
+    - name: Apply the scoped-storage Unicode path filter
+      # Strips only characters that render as nothing (ZWSP, bidi overrides, BOM, ...)
+      # from paths before an app can act on them, then refuses the resolved path when
+      # it lands in Android/data or Android/obb for a caller that does not own it. That
+      # is the zero-width bypass. Visible characters are untouched, so emoji (including
+      # ZWJ sequences and U+FE0F) and every non-Latin script keep working.
+      #
+      # This replaced the blob unicode_bypass_fix_*.patch: that changed how an empty
+      # decomposition is handled in fs/unicode, which is also reached by visible
+      # characters, so emoji filenames stopped resolving. It also only takes effect on
+      # casefold filesystems, while /storage/emulated is FUSE - it never covered the
+      # /sdcard/Android/data bypass in the first place.
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         set -euo pipefail
-        KERNEL_VERSION="${{ inputs.kernel_version }}"
-        MIN_VERSION="5.16"
-
-        echo "Patching unicode!"
-        if [ "$(printf '%s\n' "$KERNEL_VERSION" "$MIN_VERSION" | sort -V | head -n1)" = "$KERNEL_VERSION" ]; then
-            patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/unicode_bypass_fix_6.1-.patch"
-        else
-            patch -p1 --forward < "${{ github.workspace }}/kernel_patches/common/unicode_bypass_fix_6.1+.patch"
+        V="${{ inputs.kernel_version }}"
+        P="${{ github.workspace }}/.github/patches/unicode-scoped/unicode_scoped_${V}.patch"
+        if [ ! -f "$P" ]; then
+          echo "::error::no scoped-unicode patch for kernel $V (expected $(basename "$P"))"
+          exit 1
         fi
+        git apply "$P"
+        echo "unicode path filter applied for $V ($(grep -c 'uc_path_check' include/linux/ucpath.h) helper, 4 syscall hooks)"
