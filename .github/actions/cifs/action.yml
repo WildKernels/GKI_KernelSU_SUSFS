@@ -9,12 +9,17 @@ runs:
   using: "composite"
   steps:
     - name: Enable CIFS Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_CIFS=y
           CONFIG_NETWORK_FILESYSTEMS=y
-          CONFIG_NETFS_SUPPORT=y
+          # NETFS_SUPPORT has no prompt: CIFS selects it on 6.x trees, and 5.15 has no
+          # such symbol at all (netfs landed later). Kleaf's fragment check rejects an
+          # entry the tree cannot satisfy -
+          #   CONFIG_NETFS_SUPPORT: actual '', expected 'CONFIG_NETFS_SUPPORT=y'
+          # - so it is marked nocheck; CIFS=y is what actually pulls netfs in.
+          CONFIG_NETFS_SUPPORT=y # nocheck: CIFS selects NETFS_SUPPORT only on trees that use netfs; 5.15 and 6.1 do not
           CONFIG_KEYS=y
           CONFIG_CIFS_XATTR=y
           CONFIG_CIFS_POSIX=y
