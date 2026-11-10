@@ -78,66 +78,38 @@ runs:
         fi
 
     - name: Export IPC symbols for module linkage
+      if: inputs.version == 'android16-6.12' || inputs.version == 'android17-6.18'
       shell: bash
-      if: inputs.version == 'android16-6.12'
-      working-directory: ${{ github.workspace }}/kernel
+      working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        echo >> "${{ github.workspace }}/kernel/common/ipc/namespace.c"
-        echo 'EXPORT_SYMBOL_GPL(put_ipc_ns);' >> "${{ github.workspace }}/kernel/common/ipc/namespace.c"
-        echo >> "${{ github.workspace }}/kernel/common/ipc/msgutil.c"
-        echo 'EXPORT_SYMBOL_GPL(init_ipc_ns);' >> "${{ github.workspace }}/kernel/common/ipc/msgutil.c"
+        python3 "${{ github.workspace }}/.github/scripts/binder_ipc_ns_exports.py" "$PWD"
 
-    - name: Enable Kernel Configs
-      uses: ./.github/actions/set-kernel-config
-      with:
-        # Full DroidSpaces support set, mirroring upstream's
-        # Documentation/resources/.../gki config list. Kept complete here rather
-        # than relying on the NET/misc actions, so a DS build is self-contained
-        # even when those features are switched off for a dispatch.
-        config_list: |
-          # IPC
-          CONFIG_SYSVIPC=y
-          CONFIG_POSIX_MQUEUE=y
+    - name: Apply the 6.18 SysV task-table port
+      # CONFIG_SYSVIPC adds two members to task_struct, and any change to that member
+      # list moves 6,329 of 9,741 modver CRCs - even when the bytes land at identical
+      # offsets. DroidSpaces relocate the members instead (reserve slots below 6.12, a
+      # 28-byte hole from 6.12 up); 6.18 has neither, so this port deletes the members
+      # outright and keeps the state in an xarray keyed by task pointer.
+      # Measured on android17-6.18: 0 of 9,741 symbols differ from stock.
+      if: inputs.version == 'android17-6.18'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        P="${{ github.workspace }}/.github/patches/sysvipc-618/001-task-table.patch"
+        if grep -q 'sysv_task_state_get' ipc/sem.c; then
+          echo "task-table port already applied"
+          exit 0
+        fi
+        git apply -v "$P" || { echo "ERROR: the 6.18 SysV port did not apply" >&2; exit 1; }
+        grep -q 'sysv_task_state_get' ipc/sem.c || { echo "ERROR: port applied but sem.c unchanged" >&2; exit 1; }
+        echo "task-table port applied"
 
-          # Namespaces
-          CONFIG_IPC_NS=y
-          CONFIG_PID_NS=y
-          # optional but recommended: docker's unsafe procfs check
-          CONFIG_USER_NS=y
-
-          # HW access
-          CONFIG_DEVTMPFS=y
-
-          # binfmt: running distro binaries out of the container
-          CONFIG_BINFMT_MISC=y
-          CONFIG_BINFMT_SCRIPT=y
-          CONFIG_BINFMT_ELF=y
-
-          # xattr / posix acl on tmpfs (NixOS)
-          CONFIG_TMPFS_POSIX_ACL=y
-          CONFIG_TMPFS_XATTR=y
-
-          # Networking: enhanced NAT support
-          CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
-          CONFIG_IP6_NF_NAT=y
-          CONFIG_IP6_NF_TARGET_MASQUERADE=y
-          # macvlan mode (--net=macvlan); self-contained driver
-          CONFIG_MACVLAN=y
-
-          # UFW - reject target. Upstream's list says NETFILTER_XT_TARGET_REJECT,
-          # which no 5.10/5.15/6.1/6.6/6.12/6.18 tree declares: the iptables
-          # REJECT target is built by ipt_REJECT.o under IP_NF_TARGET_REJECT
-          # (net/ipv4/netfilter/Kconfig) and ip6t_REJECT.o under
-          # IP6_NF_TARGET_REJECT. The old name was a silent no-op - the defconfig
-          # gained a line Kconfig then dropped.
-          CONFIG_IP_NF_TARGET_REJECT=y
-          CONFIG_IP6_NF_TARGET_REJECT=y
-          CONFIG_NETFILTER_XT_TARGET_LOG=y
-          CONFIG_NETFILTER_XT_MATCH_RECENT=y
-
-          # fail2ban
-          CONFIG_IP_SET=y
-          CONFIG_IP_SET_HASH_IP=y
-          CONFIG_IP_SET_HASH_NET=y
-          CONFIG_NETFILTER_XT_SET=y
-
+    - name: Append the DS configs to the wild fragment
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        A="${{ github.workspace }}/.github/actions/droidspaces"
+        S="${{ github.workspace }}/.github/scripts/append_fragment.py"
+        python3 "$S" "$A/droidspaces_defconfig.fragment" --dest wild_defconfig.fragment --label droidspaces
