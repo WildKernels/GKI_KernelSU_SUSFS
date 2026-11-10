@@ -5,7 +5,7 @@ runs:
   using: "composite"
   steps:
     - name: Enable SUSFS Kernel Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_KSU_SUSFS=y
@@ -18,3 +18,4 @@ runs:
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER=y

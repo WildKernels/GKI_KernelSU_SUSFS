@@ -56,7 +56,7 @@ runs:
         echo "BBG_COMMIT=$BBG_COMMIT" >> $GITHUB_ENV
 
     - name: Enable Kernel Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_BBG=y

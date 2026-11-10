@@ -34,6 +34,7 @@ runs:
         PATCH_LEVEL: ${{ inputs.os_patch_level }}
       run: |
         set -euo pipefail
+        APPLIED=0
         # The *-lts branches drift from the monthly ones (e.g. 5.10-lts carries
         # tcp_min_rcvbuf between one_day_secs and the /* obsolete */ block, so
         # the monthly patch's sysctl_net_ipv4.c hunk no longer matches). When a
@@ -55,20 +56,26 @@ runs:
           echo "skipped"
         elif [[ ${{ inputs.version }} == "android15-6.6" ]]; then
           patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android15-6.6)"
+          APPLIED=1
         elif [[ ${{ inputs.version }} == "android14-6.1" ]]; then
           patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android14-6.1)"
+          APPLIED=1
         elif [[ ${{ inputs.version }} == "android14-5.15" ]]; then
           #patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android13-5.15.patch"
           patch -p1 < "$(pick "$APATCHES" 0001-net-tcp-backport-BBRv3-to-android14-5.15)"
+          APPLIED=1
         elif [[ ${{ inputs.version }} == "android13-5.15" ]]; then
           patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android13-5.15)"
+          APPLIED=1
           if [[ ${{ inputs.sublevel }} -le "43" ]]; then
             patch -p1 < ${{ github.action_path }}/patches/0002-net-tcp-add-tcp_snd_cwnd-and-tcp_snd_cwnd_set-helper-functions.patch
           fi
         elif [[ ${{ inputs.version }} == "android13-5.10" ]]; then
           patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android12-5.10 0001-net-tcp-backport-BBRv3-to-android13-5.10)"
+          APPLIED=1
         elif [[ ${{ inputs.version }} == "android12-5.10" ]]; then
           patch -p1 < "$(pick "$KP" 0001-net-tcp-backport-BBRv3-to-android12-5.10)"
+          APPLIED=1
         fi
 
         if [[ ${{ inputs.version }} == "android12-5.10" || ${{ inputs.version }} == "android13-5.10" ]]; then
@@ -78,10 +85,26 @@ runs:
           fi
         fi
 
-        echo "[+] BBRv3 patches applied"
+        if [ "$APPLIED" = "1" ]; then
+          echo "[+] BBRv3 patches applied for ${{ inputs.version }}"
+        else
+          echo "[*] BBRv3: no patch for ${{ inputs.version }} - nothing applied, config will be skipped"
+        fi
 
     - name: Enable BBRv3 Kernel Config
-      uses: ./.github/actions/set-kernel-config
-      with:
-        config_list: |
-          CONFIG_TCP_CONG_BBR3=y
+      # Only when the patch actually declared the symbol. Kleaf's fragment check
+      # rejects a symbol the tree does not have -
+      #   ERROR: CONFIG_TCP_CONG_BBR3: actual '', expected 'y' from wild_defconfig.fragment
+      # - so adding it unconditionally turns a patch that did not apply into a
+      # build failure in a place that says nothing about the patch.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        if ! grep -rqs 'config TCP_CONG_BBR3' net/ipv4/Kconfig; then
+          echo "::warning title=bbrv3::CONFIG_TCP_CONG_BBR3 is not declared in this tree - the patch did not land, config skipped"
+          exit 0
+        fi
+        printf 'CONFIG_TCP_CONG_BBR3=y\n' \
+          | python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" - \
+              --dest wild_defconfig.fragment --label bbrv3

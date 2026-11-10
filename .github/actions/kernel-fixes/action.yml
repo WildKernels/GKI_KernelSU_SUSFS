@@ -58,6 +58,30 @@ runs:
           echo "[-] GLIBC version < 2.38, skipping Makefile fix."
         fi
 
+    - name: 'Drop static from the selinux helpers the kernel declares extern'
+      # The kernel declares these helpers in its own headers, so a `static`
+      # definition in drivers/kernelsu/feature/selinux_hide.c is a conflicting
+      # redeclaration:
+      #   error: static declaration of 'security_context_to_sid_with_policy'
+      #          follows non-static declaration
+      # The SUSFS action has the same fix, but it only runs with SUSFS enabled -
+      # BakaSU hits this with SUSFS off, so it belongs here where it always runs.
+      # The qualifiers differ per flavour (__nocfi, __maybe_unused, __init), hence
+      # matching the line rather than a fixed prefix.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -uo pipefail
+        f=drivers/kernelsu/feature/selinux_hide.c
+        if [ ! -f "$f" ]; then
+          echo "no $f in this tree - nothing to do"
+          exit 0
+        fi
+        before=$(grep -cE '^static [A-Za-z_ ]*(security_context_to_sid_with_policy|security_sid_to_context_with_policy|security_compute_av_user_with_policy)\(' "$f" || true)
+        sed -i -E '/^static [A-Za-z_ ]*\b(security_context_to_sid_with_policy|security_sid_to_context_with_policy|security_compute_av_user_with_policy)\(/s/^static //' "$f"
+        after=$(grep -cE '^static [A-Za-z_ ]*(security_context_to_sid_with_policy|security_sid_to_context_with_policy|security_compute_av_user_with_policy)\(' "$f" || true)
+        echo "selinux_hide.c: $before static declaration(s) before, $after after"
+
     - name: 'Apply mmap.c fix for specific versions'
       shell: bash
       if: inputs.version == 'android15-6.6' && inputs.sublevel <= '58'

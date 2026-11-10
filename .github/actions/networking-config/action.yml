@@ -5,7 +5,7 @@ runs:
   using: "composite"
   steps:
     - name: Enable IP Set & Firewall Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_IP_SET=y
@@ -40,7 +40,7 @@ runs:
           CONFIG_IP6_NF_TARGET_MASQUERADE=y
 
     - name: Enable TCP Congestion Control Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_TCP_CONG_ADVANCED=y
@@ -53,7 +53,7 @@ runs:
           CONFIG_DEFAULT_TCP_CONG="bbr"
 
     - name: Enable Traffic Shaping (Qdisc) Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_NET_SCH_FQ=y
@@ -61,13 +61,13 @@ runs:
           CONFIG_NET_SCH_CAKE=y
 
     - name: Enable Connection Marking Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_NET_ACT_CONNMARK=y
 
     - name: Enable TTL/Hop Limit Target Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_IP_NF_TARGET_TTL=y
@@ -75,7 +75,7 @@ runs:
           CONFIG_IP6_NF_MATCH_HL=y
 
     - name: Enable Wireguard VPN Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_WIREGUARD=y
