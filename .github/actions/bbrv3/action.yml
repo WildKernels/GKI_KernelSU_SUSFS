@@ -58,7 +58,7 @@ runs:
           # state lives behind a pointer in icsk_ca_priv and the four extra rate-sample
           # values stay file-local, because extending struct rate_sample moved 6,326
           # CRCs when measured.
-          patch -p1 --forward < "${{ github.workspace }}/.github/patches/bbrv3/bbrv3_6.18.patch"
+          patch -p1 --forward < "${{ github.workspace }}/.github/patches/bbrv3/bbrv3_6.18-upstream.patch"
         elif [[ ${{ inputs.version }} == "android16-6.12" ]]; then
           # Same port as 6.18. 6.12 still has TCP_ECN_OK/TCP_ECN_LOW; it has no
           # TCP_ECN_LOW (v3's low-latency marking mode came with ACCECN), so BBR3's ECN
