@@ -347,6 +347,21 @@ jobs:
           set -euo pipefail
           python3 "${GITHUB_WORKSPACE}/.github/scripts/trim_sukisu_managers.py" SukiSU-Ultra
 
+      - name: Fix SukiSU-Ultra rules.c latest_granting typo
+        # SukiSU commits that merged tiann/KernelSU#3964 (generation tracking
+        # for policy updates) ship `policydb->latest_granting = ...` in
+        # apply_kernelsu_rules(); no such variable exists there, so clang fails
+        # with "must use 'struct' tag to refer to type 'policydb'" at
+        # rules.c:194 (run 43218073908, 6.1 SukiSU leg, pinned 6076949f).
+        # The script rewrites it to pol->latest_granting, self-verifies, and is
+        # a no-op once the pinned commit already carries the upstream fix.
+        if: inputs.root_flavor == 'sukisu-ultra'
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel
+        run: |
+          set -euo pipefail
+          python3 "${GITHUB_WORKSPACE}/.github/scripts/fix_sukisu_rules_pol.py" SukiSU-Ultra
+
       - name: Single manager for FinaSU (dynamic manager off)
         # Upstream ships CONFIG_KSU_DYNAMIC_MANAGER=y, which compiles a
         # nine-row signature table: FINASU_TRUSTED_* as the only trusted row
