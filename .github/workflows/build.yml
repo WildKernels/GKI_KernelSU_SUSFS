@@ -422,8 +422,6 @@ jobs:
       - name: ABI gate
         # Compares Module.symvers CRCs against the stock ABI of the tree that was
         # built and fails on any symbol whose CRC moved.
-        # Default condition (success) on purpose: it needs a kernel to compare,
-        # and 'always()' made a failed build report a second, misleading error.
         uses: ./.github/actions/abi-gate
         with:
           version: ${{ inputs.version }}
@@ -432,8 +430,6 @@ jobs:
         if: always()
         uses: ./.github/actions/extract-the-built-config
       - name: Verify the fragment landed in .config
-        # Same as the ABI gate: default (success) condition, because a leg that
-        # never produced a .config has nothing to verify.
         uses: ./.github/actions/verify-fragment
 
       - name: Consolidated Build Summary
