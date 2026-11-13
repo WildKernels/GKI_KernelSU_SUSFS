@@ -87,7 +87,7 @@ runs:
         echo "NoMount integrated (kernel $KERNEL_VERSION, commit $actual_commit)"
 
     - name: Enable NoMount in kernel defconfig
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_NOMOUNT=y

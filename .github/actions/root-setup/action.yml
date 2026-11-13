@@ -158,7 +158,7 @@ runs:
         echo "ROOT_COMMIT=$actual_commit" >> "$GITHUB_ENV"
 
     - name: Enable root configuration
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_KSU=y
@@ -183,7 +183,7 @@ runs:
 
     - name: Disable multi-manager for BakaSU
       if: inputs.flavor == 'bakasu'
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_KSU_MULTI_MANAGER_SUPPORT=n
