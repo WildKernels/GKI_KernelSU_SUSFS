@@ -56,7 +56,7 @@ runs:
             echo "ERROR: page_size=${PAGE_SIZE} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
             exit 1
           fi
-          cp wild_defconfig.fragment wild_build.config
+          cp common/wild_defconfig.fragment wild_build.config
           export BUILD_CONFIG_FRAGMENTS="wild_build.config"
           BUILD_GKI_ARTIFACTS="" \
           BUILD_GKI_CERTIFICATION_TOOLS=0 \
