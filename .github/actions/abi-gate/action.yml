@@ -19,9 +19,9 @@ runs:
         # step does its own error handling.
         set +e
 
-        OURS=$(find ./kernel/bazel-bin/common/kernel_aarch64 "${OUT_DIR:-/home/runner/out}/dist" \
-                 -maxdepth 1 -name 'Module.symvers' -type f -size +0 2>/dev/null | head -n1)
-        [ -n "$OURS" ] && echo "ABI gate: symvers=$OURS"
+        OURS="./kernel/bazel-bin/common/kernel_aarch64/Module.symvers"
+        [ -s "$OURS" ] || OURS="${OUT_DIR:-/home/runner/out}/dist/Module.symvers"
+        echo "ABI gate: symvers=$OURS"
         STG=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
                 -path '*/gki/aarch64/abi.stg' -type f -size +0 2>/dev/null | head -n1)
         if [ -z "${STG:-}" ]; then
