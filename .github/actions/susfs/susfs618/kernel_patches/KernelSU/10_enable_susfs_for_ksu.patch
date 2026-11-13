@@ -1,5 +1,5 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index 66aa2ba9..9b88d179 100644
+index 19fa2989..4ee557a2 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
 @@ -5,21 +5,7 @@ kernelsu-objs += feature/module_blacklist.o
@@ -599,7 +599,7 @@ index 7e337abf..8b6e0b3c 100644
      pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
  
 diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
-index 2a41b805..ede875e5 100644
+index 67c866d6..12e56b4c 100644
 --- a/kernel/feature/selinux_hide.c
 +++ b/kernel/feature/selinux_hide.c
 @@ -1,9 +1,5 @@
@@ -650,7 +650,7 @@ index 2a41b805..ede875e5 100644
  static int security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext, u32 scontext_len,
                                                 u32 *sid, u32 def_sid, gfp_t gfp_flags, u32 *orig_sid_p, int *orig_rc_p);
  static int security_sid_to_context_with_policy(struct selinux_policy *policy, u32 sid, char **scontext,
-@@ -75,9 +65,6 @@ static void (*context_struct_compute_av_fn)(struct policydb *policydb, struct co
+@@ -76,9 +66,6 @@ static void (*context_struct_compute_av_fn)(struct policydb *policydb, struct co
                                              struct context *tcontext, u16 tclass, struct av_decision *avd,
                                              struct extended_perms *xperms) = NULL;
  
@@ -660,7 +660,7 @@ index 2a41b805..ede875e5 100644
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
  #define ksu_avc_has_perm_compat(...) avc_has_perm(__VA_ARGS__)
  #define ksu_security_bounded_transition_compat(...) security_bounded_transition(__VA_ARGS__)
-@@ -92,12 +79,8 @@ static write_op_fn orig_context_write, orig_access_write;
+@@ -93,12 +80,8 @@ static write_op_fn orig_context_write, orig_access_write;
  #define ksu_task_security_struct cred_security_struct
  #endif
  
@@ -674,7 +674,7 @@ index 2a41b805..ede875e5 100644
      char *canon = NULL;
      u32 sid, len;
      ssize_t length;
-@@ -130,12 +113,8 @@ out:
+@@ -131,12 +114,8 @@ out:
      return length;
  }
  
@@ -688,7 +688,7 @@ index 2a41b805..ede875e5 100644
      char *scon = NULL, *tcon = NULL;
      u32 ssid, tsid, sconlen, tconlen;
      u16 tclass;
-@@ -187,9 +166,6 @@ out:
+@@ -188,9 +167,6 @@ out:
      return length;
  }
  
@@ -698,7 +698,7 @@ index 2a41b805..ede875e5 100644
  /*
   * get the security ID of a set of credentials
   */
-@@ -228,17 +204,8 @@ static u32 ptrace_parent_sid(void)
+@@ -229,17 +205,8 @@ static u32 ptrace_parent_sid(void)
      return sid;
  }
  
@@ -717,7 +717,7 @@ index 2a41b805..ede875e5 100644
      struct ksu_task_security_struct *tsec;
      struct cred *new;
      u32 mysid = current_sid(), sid = 0, tmp_sid, ptsid;
-@@ -304,15 +271,12 @@ static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
+@@ -311,15 +278,12 @@ static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
  abort_change:
      abort_creds(new);
      return error;
@@ -736,7 +736,7 @@ index 2a41b805..ede875e5 100644
  {
      mutex_lock(&selinux_state.status_lock);
      if (fake_status)
-@@ -323,7 +287,7 @@ static void initialize_fake_status()
+@@ -330,7 +294,7 @@ static void initialize_fake_status()
      }
  
      struct selinux_kernel_status *status = page_address(selinux_state.status_page);
@@ -745,7 +745,7 @@ index 2a41b805..ede875e5 100644
          pr_warn("initialize_fake_status: skip not enforcing\n");
          goto out;
      }
-@@ -336,22 +300,6 @@ static void initialize_fake_status()
+@@ -343,22 +307,6 @@ static void initialize_fake_status()
  
      struct selinux_kernel_status *new_status = page_address(new_page);
      memcpy(new_status, status, sizeof(*status));
@@ -768,7 +768,7 @@ index 2a41b805..ede875e5 100644
  
      fake_status = new_page;
      pr_info("initialize_fake_status initialized: sequence=%d, policyload=%d, enforcing=%d\n", new_status->sequence,
-@@ -361,117 +309,32 @@ out:
+@@ -368,117 +316,32 @@ out:
      mutex_unlock(&selinux_state.status_lock);
  }
  
@@ -899,7 +899,7 @@ index 2a41b805..ede875e5 100644
  }
  
  static int selinux_hide_feature_get(u64 *value)
-@@ -496,10 +359,11 @@ static int selinux_hide_feature_set(u64 value)
+@@ -503,10 +366,11 @@ static int selinux_hide_feature_set(u64 value)
          }
      } else {
          if (ksu_selinux_hide_running) {
@@ -912,7 +912,7 @@ index 2a41b805..ede875e5 100644
      mutex_unlock(&selinux_hide_mutex);
      return ret;
  }
-@@ -511,65 +375,18 @@ static const struct ksu_feature_handler selinux_hide_handler = {
+@@ -518,65 +382,18 @@ static const struct ksu_feature_handler selinux_hide_handler = {
      .set_handler = selinux_hide_feature_set,
  };
  
@@ -979,7 +979,7 @@ index 2a41b805..ede875e5 100644
          ksu_selinux_hide_running = false;
      }
      mutex_unlock(&selinux_hide_mutex);
-@@ -1265,4 +1082,4 @@ out:
+@@ -1419,4 +1236,4 @@ out:
  allow:
      avd->allowed = 0xffffffff;
      goto out;
@@ -2480,7 +2480,7 @@ index a4fb4138..1a2fb61c 100644
          free_module_rc();
      }
 diff --git a/kernel/selinux/rules.c b/kernel/selinux/rules.c
-index 241eeeb0..2595940b 100644
+index 587f9306..2595940b 100644
 --- a/kernel/selinux/rules.c
 +++ b/kernel/selinux/rules.c
 @@ -27,17 +27,17 @@ extern int avc_ss_reset(u32 seqno);
@@ -2508,12 +2508,18 @@ index 241eeeb0..2595940b 100644
  #endif
      selinux_xfrm_notify_policyload();
  }
-@@ -156,12 +156,13 @@ void apply_kernelsu_rules()
-     ksu_allow(db, "system_server", KERNEL_SU_DOMAIN, "process", "getpgid");
-     ksu_allow(db, "system_server", KERNEL_SU_DOMAIN, "process", "sigkill");
+@@ -84,10 +84,6 @@ void apply_kernelsu_rules()
+ 
+     db = &pol->policydb;
  
 -    pol->latest_granting = old_pol->latest_granting + 1;
-     rcu_assign_pointer(selinux_state.policy, pol);
+-    if (!ksu_set_original_types(db, &old_pol->policydb, pol->latest_granting))
+-        pr_warn("failed to save original type metadata, use backup lookups\n");
+-
+     ksu_type(db, KERNEL_SU_DOMAIN, "domain");
+     ksu_permissive(db, KERNEL_SU_DOMAIN);
+     ksu_typeattribute(db, KERNEL_SU_DOMAIN, "mlstrustedsubject");
+@@ -164,7 +160,9 @@ void apply_kernelsu_rules()
      synchronize_rcu();
      ksu_destroy_sepolicy(old_pol);
  
@@ -2524,11 +2530,14 @@ index 241eeeb0..2595940b 100644
  out_unlock:
      mutex_unlock(&selinux_state.policy_mutex);
  }
-@@ -516,12 +517,11 @@ int handle_sepolicy(void __user *user_data, u64 data_len)
+@@ -519,15 +517,11 @@ int handle_sepolicy(void __user *user_data, u64 data_len)
          cmd_index++;
      }
  
 -    pol->latest_granting = old_pol->latest_granting + 1;
+-    if (!ksu_advance_original_types(db, &old_pol->policydb, old_pol->latest_granting, pol->latest_granting))
+-        pr_warn("failed to carry original type metadata, use backup lookups\n");
+-
      rcu_assign_pointer(selinux_state.policy, pol);
      synchronize_rcu();
      ksu_destroy_sepolicy(old_pol);
@@ -2654,7 +2663,7 @@ index b1918a42..5873f03e 100644
 +bool susfs_is_current_init_domain(void);
  #endif
 diff --git a/kernel/selinux/sepolicy.c b/kernel/selinux/sepolicy.c
-index b00e5175..e2e59d1a 100644
+index 54bc1b9b..15745877 100644
 --- a/kernel/selinux/sepolicy.c
 +++ b/kernel/selinux/sepolicy.c
 @@ -14,6 +14,11 @@
@@ -2669,7 +2678,7 @@ index b00e5175..e2e59d1a 100644
  #define KSU_SUPPORT_ADD_TYPE
  
  //////////////////////////////////////////////////////
-@@ -307,6 +312,10 @@ static bool add_rule_raw(struct policydb *db, struct type_datum *src, struct typ
+@@ -311,6 +316,10 @@ static bool add_rule_raw(struct policydb *db, struct type_datum *src, struct typ
                  return false;
          }
  
@@ -2680,7 +2689,7 @@ index b00e5175..e2e59d1a 100644
          if (invert) {
              if (perm)
                  node->datum.u.data &= ~(1U << (perm->value - 1));
-@@ -724,6 +733,9 @@ static bool add_type(struct policydb *db, const char *type_name, bool attr)
+@@ -728,6 +737,9 @@ static bool add_type(struct policydb *db, const char *type_name, bool attr)
          ebitmap_set_bit(&db->role_val_to_struct[i]->types, value - 1, 1);
      }
  
