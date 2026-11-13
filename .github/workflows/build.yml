@@ -174,18 +174,19 @@ jobs:
           sublevel: ${{ steps.extract.outputs.sublevel }}
           os_patch_level: ${{ inputs.os_patch_level }}
 
-      - name: Reject KowSU with SUSFS
-        if: inputs.root_flavor == 'kowsu' && (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'All')
-        uses: ./.github/actions/reject-kowsu-with-susfs
-        with:
-          feature_set: ${{ inputs.feature_set }}
-          root_flavor: ${{ inputs.root_flavor }}
-      - name: Reject FinaSU without SUSFS
-        if: inputs.root_flavor == 'finasu' && !contains(inputs.feature_set, 'SUSFS')
-        uses: ./.github/actions/reject-finasu-without-susfs
-        with:
-          feature_set: ${{ inputs.feature_set }}
-          root_flavor: ${{ inputs.root_flavor }}
+      - name: Reject incompatible root/SUSFS combinations
+        # One step for both: these are a single guard, and splitting them only
+        # added two composite actions whose whole body was one echo.
+        if: (inputs.root_flavor == 'kowsu' && (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'All')) || (inputs.root_flavor == 'finasu' && !contains(inputs.feature_set, 'SUSFS'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.root_flavor }}" = "kowsu" ]; then
+            echo "ERROR: KowSU does not work together with SUSFS - re-run with SUSFS off." >&2
+          else
+            echo "ERROR: FinaSU requires SUSFS - re-run with SUSFS on." >&2
+          fi
+          exit 1
       - name: Setup Selected Root Implementation
         if: inputs.root_flavor != '' && inputs.root_flavor != 'none'
         uses: ./.github/actions/root-setup
@@ -200,85 +201,49 @@ jobs:
           root_flavor: ${{ inputs.root_flavor }}
       - name: Disable SUSFS for BakaSU without SUSFS feature
         if: inputs.root_flavor == 'bakasu' && !contains(inputs.feature_set, 'SUSFS')
-        uses: ./.github/actions/add-configs
-        with:
-          config_list: |
-            CONFIG_KSU_SUSFS=n
-            CONFIG_KSU_SUSFS_SUS_PATH=n
-            CONFIG_KSU_SUSFS_SUS_MOUNT=n
-            CONFIG_KSU_SUSFS_SUS_KSTAT=n
-            CONFIG_KSU_SUSFS_SPOOF_UNAME=n
-            CONFIG_KSU_SUSFS_ENABLE_LOG=n
-            CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=n
-            CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=n
-            CONFIG_KSU_SUSFS_OPEN_REDIRECT=n
-            CONFIG_KSU_SUSFS_SUS_MAP=n
-
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel/common
+        run: |
+          python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+            "${{ github.workspace }}/.github/fragments/disable-susfs-for-bakasu-without-susfs-feature.fragment" \
+            --dest wild_defconfig.fragment --label disable-susfs-for-bakasu-without-susfs-feature
       - name: Disable SUSFS for SukiSU-Ultra without SUSFS feature
         if: inputs.root_flavor == 'sukisu-ultra' && !contains(inputs.feature_set, 'SUSFS')
-        uses: ./.github/actions/add-configs
-        with:
-          config_list: |
-            CONFIG_KSU_SUSFS=n
-            CONFIG_KSU_SUSFS_SUS_PATH=n
-            CONFIG_KSU_SUSFS_SUS_MOUNT=n
-            CONFIG_KSU_SUSFS_SUS_KSTAT=n
-            CONFIG_KSU_SUSFS_SPOOF_UNAME=n
-            CONFIG_KSU_SUSFS_ENABLE_LOG=n
-            CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=n
-            CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=n
-            CONFIG_KSU_SUSFS_OPEN_REDIRECT=n
-            CONFIG_KSU_SUSFS_SUS_MAP=n
-
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel/common
+        run: |
+          python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+            "${{ github.workspace }}/.github/fragments/disable-susfs-for-sukisu-ultra-without-susfs-feature.fragment" \
+            --dest wild_defconfig.fragment --label disable-susfs-for-sukisu-ultra-without-susfs-feature
       - name: Single manager for BakaSU (multi-manager off)
-        # BakaSU's Kconfig ships CONFIG_KSU_MULTI_MANAGER_SUPPORT=y, which
-        # compiles three rows into apk_sign_keys[]: its own key plus
-        # tiann/KernelSU's and KOWX712/KernelSU's, with an optional custom row
-        # under EXPECTED_SIZE. Turning it off leaves exactly one row -
-        # EXPECTED_SIZE_BAKASU / EXPECTED_HASH_BAKASU (0x377 / d3469712…), which
-        # is the key their main-branch manager APK is signed with (checked
-        # against run 41207077584), so the manager we ship stays trusted.
         if: inputs.root_flavor == 'bakasu'
-        uses: ./.github/actions/add-configs
-        with:
-          config_list: |
-            CONFIG_KSU_MULTI_MANAGER_SUPPORT=n
-
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel/common
+        run: |
+          python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+            "${{ github.workspace }}/.github/fragments/single-manager-for-bakasu-multi-manager-off.fragment" \
+            --dest wild_defconfig.fragment --label single-manager-for-bakasu-multi-manager-off
       - name: Enable KernelSU toolkit support for BakaSU
-        # BakaSU's ksu_toolkit interface (backslashxx/ksu_toolkit), off upstream.
-        # Adds sys_reboot extensions behind a uid-0 check in
-        # kernel/supercall/supercall.c:114-118: CHANGE_MANAGER_UID,
-        # CHANGE_KSUVER, CHANGE_SPOOF_UNAME, CHANGE_KSUFLAGS. It does not add a
-        # trusted signature - the toolkit slot is registered at runtime by a
-        # root process (ksu_register_manager, index 253) - so the single-manager
-        # guarantee from the step above is unaffected.
         if: inputs.root_flavor == 'bakasu'
-        uses: ./.github/actions/add-configs
-        with:
-          config_list: |
-            CONFIG_KSU_TOOLKIT_SUPPORT=y
-
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel/common
+        run: |
+          python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+            "${{ github.workspace }}/.github/fragments/enable-kernelsu-toolkit-support-for-bakasu.fragment" \
+            --dest wild_defconfig.fragment --label enable-kernelsu-toolkit-support-for-bakasu
       - name: Single manager for SukiSU-Ultra (trim cert table)
         if: inputs.root_flavor == 'sukisu-ultra'
         uses: ./.github/actions/single-manager-for-sukisu-ultra-trim-cert-table
         with:
           root_flavor: ${{ inputs.root_flavor }}
       - name: Single manager for FinaSU (dynamic manager off)
-        # Upstream ships CONFIG_KSU_DYNAMIC_MANAGER=y, which compiles a
-        # nine-row signature table: FINASU_TRUSTED_* as the only trusted row
-        # plus KernelSU/KowSU/KernelSU-Next/ReSukiSU/SukiSU/MKSU/RKSU/xxKSU as
-        # recognition-only presets the user can authorise at runtime. We want
-        # one manager and no runtime path to add another, so disable it: the
-        # classic two-slot table compiles instead, and with slot 1 replaced by
-        # the FinaSU cert (see the SUSFS action) that table is a single trusted
-        # entry. dynamic_manager.o still builds - FinaSU guards that file with
-        # no CONFIG symbol - it is simply no longer reachable from apk_sign.c.
         if: inputs.root_flavor == 'finasu'
-        uses: ./.github/actions/add-configs
-        with:
-          config_list: |
-            CONFIG_KSU_DYNAMIC_MANAGER=n
-
+        shell: bash
+        working-directory: ${{ github.workspace }}/kernel/common
+        run: |
+          python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+            "${{ github.workspace }}/.github/fragments/single-manager-for-finasu-dynamic-manager-off.fragment" \
+            --dest wild_defconfig.fragment --label single-manager-for-finasu-dynamic-manager-off
       - name: SUSFS
         # One step, one action: resolve the SUSFS commit, apply it for the
         # selected root, then run the post-patch fixes (ksu_close_fd restore,

@@ -17,10 +17,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Setup Kernel Configs
-      if: false
-      uses: ./.github/actions/add-configs
-
     # - name: Provide host ld from repo prebuilts
     #   shell: bash
     #   run: |
@@ -50,21 +46,6 @@ runs:
     #       exit 1
     #     fi
 
-    - name: 'Prune fragment symbols this tree does not declare'
-      # Runs last, after every patch: Kleaf rejects a fragment entry whose
-      # symbol the tree does not declare and the error names the fragment, not
-      # the step or patch that contributed it. Symbols a patch adds later are
-      # not declared when the entry is appended, so the check cannot live in
-      # append_fragment.py's append path (it dropped CONFIG_DEFAULT_BBR that
-      # way, which silently reverted CONFIG_DEFAULT_TCP_CONG to "cubic").
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        set -euo pipefail
-        [ -f wild_defconfig.fragment ] || { echo "no wild_defconfig.fragment - nothing to prune"; exit 0; }
-        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
-          --prune --dest wild_defconfig.fragment
-
     - name: 'Build Kernel'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
@@ -75,16 +56,7 @@ runs:
             echo "ERROR: page_size=${PAGE_SIZE} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
             exit 1
           fi
-          # Compiler caching was removed on purpose: the ccache save/restore keys
-          # never matched (save omitted the -g<gen> suffix), so no leg ever
-          # restored one and every build was cold anyway; the bazel cache bought
-          # a handful of actions for a multi-GB restore/save. A build that can be
-          # reproduced only when a cache happens to be warm is worse than a slow
-          # build, so the tree now compiles with plain clang every time.
-          # build.sh has no fragment mechanism, but it does source
-          # BUILD_CONFIG_FRAGMENTS after the build config (_setup_env.sh:56-58).
-          # Layering one there sets POST_DEFCONFIG_CMDS without editing upstream files.
-          cp "${{ github.workspace }}/.github/actions/build-kernel/legacy-wild.config" wild_build.config
+          cp wild_defconfig.fragment wild_build.config
           export BUILD_CONFIG_FRAGMENTS="wild_build.config"
           BUILD_GKI_ARTIFACTS="" \
           BUILD_GKI_CERTIFICATION_TOOLS=0 \
@@ -97,10 +69,6 @@ runs:
           BUILD_CONFIG=common/build.config.gki.aarch64 \
           build/build.sh -j"$(nproc)"
         else
-          # check_defconfig is left at its default (match/minimized): the fragment is a
-          # post-defconfig fragment, so it does not change the defconfig the check compares
-          # against. Verified by building //common:kernel_aarch64_config with the fragment
-          # on a pristine tree.
           PAGE_SIZE_FLAGS=()
           if [ "$PAGE_SIZE" = "16k" ]; then
             PAGE_SIZE_FLAGS+=(--page_size=16k)
@@ -108,7 +76,6 @@ runs:
           tools/bazel build \
             --config=fast \
             "${PAGE_SIZE_FLAGS[@]}" \
-            --disk_cache=/home/runner/.cache/bazel \
             --defconfig_fragment=//common:wild_defconfig.fragment \
             //common:kernel_aarch64
         fi

@@ -1,0 +1,6 @@
+  CONFIG_CIFS=y
+  CONFIG_NETWORK_FILESYSTEMS=y
+  CONFIG_NETFS_SUPPORT=y # nocheck: CIFS selects NETFS_SUPPORT only on trees that use netfs; 5.15 and 6.1 do not
+  CONFIG_KEYS=y
+  CONFIG_CIFS_XATTR=y
+  CONFIG_CIFS_POSIX=y

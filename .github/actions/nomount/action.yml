@@ -87,9 +87,9 @@ runs:
         echo "NoMount integrated (kernel $KERNEL_VERSION, commit $actual_commit)"
 
     - name: Enable NoMount in kernel defconfig
-      uses: ./.github/actions/add-configs
-      with:
-        config_list: |
-          CONFIG_NOMOUNT=y
-          # needed by the mount itself, independent of the Misc baseline
-          CONFIG_OVERLAY_FS=y
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/nomount/enable-nomount-in-kernel-defconfig.fragment" \
+          --dest wild_defconfig.fragment --label enable-nomount-in-kernel-defconfig

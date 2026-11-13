@@ -1,0 +1,14 @@
+  CONFIG_DEBUG_INFO_BTF=y
+
+  # eBPF support (Issue #176) - tiny safe programs that run in the kernel
+  # to trace/control events. Requires BTF above for CO-RE to work.
+  CONFIG_BPF_EVENTS=y
+  CONFIG_KPROBE_EVENTS=y
+  CONFIG_UPROBES=y
+  CONFIG_UPROBE_EVENTS=y
+
+  # FUSE-BPF support (Issue #211) sits on eBPF (Issue #176) above, so the
+  # dependencies are explicit: FUSE_FS and BPF_SYSCALL exist on every family,
+  # FUSE_BPF itself does not (see the step below).
+  CONFIG_FUSE_FS=y
+  CONFIG_BPF_SYSCALL=y

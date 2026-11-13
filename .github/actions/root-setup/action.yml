@@ -158,11 +158,12 @@ runs:
         echo "ROOT_COMMIT=$actual_commit" >> "$GITHUB_ENV"
 
     - name: Enable root configuration
-      uses: ./.github/actions/add-configs
-      with:
-        config_list: |
-          CONFIG_KSU=y
-
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/root-setup/enable-root-configuration.fragment" \
+          --dest wild_defconfig.fragment --label enable-root-configuration
     - name: Soften KernelSU-Next Kbuild config guard for mrproper
       if: inputs.flavor == 'next'
       shell: bash
@@ -183,12 +184,12 @@ runs:
 
     - name: Disable multi-manager for BakaSU
       if: inputs.flavor == 'bakasu'
-      uses: ./.github/actions/add-configs
-      with:
-        config_list: |
-          CONFIG_KSU_MULTI_MANAGER_SUPPORT=n
-          CONFIG_KSU_TOOLKIT_SUPPORT=y
-
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/root-setup/disable-multi-manager-for-bakasu.fragment" \
+          --dest wild_defconfig.fragment --label disable-multi-manager-for-bakasu
     - name: Soften BakaSU Kbuild submodule check for bazel builds
       if: inputs.flavor == 'bakasu'
       shell: bash

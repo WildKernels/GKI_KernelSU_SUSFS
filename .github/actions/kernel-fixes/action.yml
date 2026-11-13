@@ -29,21 +29,16 @@ runs:
         echo "[*] Detected GLIBC version: $GLIBC_VERSION"
         if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n 1)" = "2.38" ]; then
           echo "[*] GLIBC >= 2.38, attempting Makefile fix."
-          # Insert EXTRA_CFLAGS into the libsubcmd sub-make. The line changed shape:
-          #   6.12: $(Q)$(MAKE) -C $(SUBCMD_SRC) OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)
-          #   6.18: $(Q)$(MAKE) -C $(SUBCMD_SRC) OUTPUT=$(SUBCMD_OUT) \
-          # so match on the stable prefix instead of the whole line - the old exact
-          # pattern silently stopped matching on 6.18 and left a broken resolve_btfids,
-          # which surfaced three steps later as "Failed to generate BTF for vmlinux".
-          if grep -q 'EXTRA_CFLAGS' tools/bpf/resolve_btfids/Makefile; then
+          # Check if the pattern that needs fixing actually exists
+          if grep -q '\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)' tools/bpf/resolve_btfids/Makefile; then
+            echo "[*] Found pattern to fix, applying sed."
+            sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile
+            MAKEFILE_FIXED="true"
+          elif grep -q 'EXTRA_CFLAGS' tools/bpf/resolve_btfids/Makefile; then
             echo "[*] EXTRA_CFLAGS already present, no fix needed."
             MAKEFILE_FIXED="already_fixed"
-          elif grep -q '\$(Q)\$(MAKE) -C \$(SUBCMD_SRC)' tools/bpf/resolve_btfids/Makefile; then
-            echo "[*] Found SUBCMD_SRC sub-make, adding EXTRA_CFLAGS."
-            sed -i 's|\$(Q)\$(MAKE) -C \$(SUBCMD_SRC)|$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(HOSTCFLAGS)"|' tools/bpf/resolve_btfids/Makefile
-            grep -q 'EXTRA_CFLAGS="$(HOSTCFLAGS).*OUTPUT' tools/bpf/resolve_btfids/Makefile && MAKEFILE_FIXED="true" || MAKEFILE_FIXED="false"
           else
-            echo "[!] SUBCMD_SRC sub-make not found - the fix cannot be applied." >&2
+            echo "[!] Neither pattern found in Makefile."
             MAKEFILE_FIXED="false"
           fi
           echo "MAKEFILE_FIXED=$MAKEFILE_FIXED" >> $GITHUB_ENV
@@ -62,30 +57,6 @@ runs:
         else
           echo "[-] GLIBC version < 2.38, skipping Makefile fix."
         fi
-
-    - name: 'Drop static from the selinux helpers the kernel declares extern'
-      # The kernel declares these helpers in its own headers, so a `static`
-      # definition in drivers/kernelsu/feature/selinux_hide.c is a conflicting
-      # redeclaration:
-      #   error: static declaration of 'security_context_to_sid_with_policy'
-      #          follows non-static declaration
-      # The SUSFS action has the same fix, but it only runs with SUSFS enabled -
-      # BakaSU hits this with SUSFS off, so it belongs here where it always runs.
-      # The qualifiers differ per flavour (__nocfi, __maybe_unused, __init), hence
-      # matching the line rather than a fixed prefix.
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        set -uo pipefail
-        f=drivers/kernelsu/feature/selinux_hide.c
-        if [ ! -f "$f" ]; then
-          echo "no $f in this tree - nothing to do"
-          exit 0
-        fi
-        before=$(grep -cE '^static [A-Za-z_ ]*(security_context_to_sid_with_policy|security_sid_to_context_with_policy|security_compute_av_user_with_policy)\(' "$f" || true)
-        sed -i -E '/^static [A-Za-z_ ]*\b(security_context_to_sid_with_policy|security_sid_to_context_with_policy|security_compute_av_user_with_policy)\(/s/^static //' "$f"
-        after=$(grep -cE '^static [A-Za-z_ ]*(security_context_to_sid_with_policy|security_sid_to_context_with_policy|security_compute_av_user_with_policy)\(' "$f" || true)
-        echo "selinux_hide.c: $before static declaration(s) before, $after after"
 
     - name: 'Apply mmap.c fix for specific versions'
       shell: bash

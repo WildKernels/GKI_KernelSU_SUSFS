@@ -9,21 +9,12 @@ runs:
   using: "composite"
   steps:
     - name: Enable CIFS Configs
-      uses: ./.github/actions/add-configs
-      with:
-        config_list: |
-          CONFIG_CIFS=y
-          CONFIG_NETWORK_FILESYSTEMS=y
-          # NETFS_SUPPORT has no prompt: CIFS selects it on 6.x trees, and 5.15 has no
-          # such symbol at all (netfs landed later). Kleaf's fragment check rejects an
-          # entry the tree cannot satisfy -
-          #   CONFIG_NETFS_SUPPORT: actual '', expected 'CONFIG_NETFS_SUPPORT=y'
-          # - so it is marked nocheck; CIFS=y is what actually pulls netfs in.
-          CONFIG_NETFS_SUPPORT=y # nocheck: CIFS selects NETFS_SUPPORT only on trees that use netfs; 5.15 and 6.1 do not
-          CONFIG_KEYS=y
-          CONFIG_CIFS_XATTR=y
-          CONFIG_CIFS_POSIX=y
-
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/cifs/enable-cifs-configs.fragment" \
+          --dest wild_defconfig.fragment --label enable-cifs-configs
     - name: Drop now-built-in modules from the GKI module list
       # These configs are =y above, so the modules are not produced, but Kleaf
       # verifies every module in its GKI list exists and fails otherwise:

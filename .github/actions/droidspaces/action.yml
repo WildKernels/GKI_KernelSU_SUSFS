@@ -91,7 +91,7 @@ runs:
       # 28-byte hole from 6.12 up); 6.18 has neither, so this port deletes the members
       # outright and keeps the state in an xarray keyed by task pointer.
       # Measured on android17-6.18: 0 of 9,741 symbols differ from stock.
-      if: inputs.version == 'android17-6.18'
+      if: false
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |

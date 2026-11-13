@@ -56,7 +56,9 @@ runs:
         echo "BBG_COMMIT=$BBG_COMMIT" >> $GITHUB_ENV
 
     - name: Enable Kernel Configs
-      uses: ./.github/actions/add-configs
-      with:
-        config_list: |
-          CONFIG_BBG=y
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/bbg/enable-kernel-configs.fragment" \
+          --dest wild_defconfig.fragment --label enable-kernel-configs

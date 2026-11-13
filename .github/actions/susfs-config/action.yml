@@ -5,17 +5,9 @@ runs:
   using: "composite"
   steps:
     - name: Enable SUSFS Kernel Configs
-      uses: ./.github/actions/add-configs
-      with:
-        config_list: |
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_SUS_MAP=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER=y
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/susfs-config/enable-susfs-kernel-configs.fragment" \
+          --dest wild_defconfig.fragment --label enable-susfs-kernel-configs

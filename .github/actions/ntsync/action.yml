@@ -57,8 +57,9 @@ runs:
         patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_base.patch
 
     - name: Enable NTSync
-      uses: ./.github/actions/add-configs
-      with:
-        config_list: |
-          CONFIG_NTSYNC=y
-  
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/ntsync/enable-ntsync.fragment" \
+          --dest wild_defconfig.fragment --label enable-ntsync
