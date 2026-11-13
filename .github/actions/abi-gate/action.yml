@@ -19,10 +19,6 @@ runs:
         # step does its own error handling.
         set +e
 
-        # Only the two places a build writes it: Kleaf's output base (bazel-bin is
-        # a symlink into it) and build.sh's dist. Searching the whole workspace
-        # matched leftovers from other configs - that is what produced a flat
-        # 6,329-symbol drift on 6.18 bakasu while its siblings compared 0.
         OURS=$(find ./kernel/bazel-bin/common/kernel_aarch64 "${OUT_DIR:-/home/runner/out}/dist" \
                  -maxdepth 1 -name 'Module.symvers' -type f -size +0 2>/dev/null | head -n1)
         [ -n "$OURS" ] && echo "ABI gate: symvers=$OURS"
