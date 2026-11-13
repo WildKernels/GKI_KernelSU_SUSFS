@@ -19,9 +19,9 @@ runs:
         # step does its own error handling.
         set +e
 
-        OURS="./kernel/bazel-bin/common/kernel_aarch64/Module.symvers"
-        [ -s "$OURS" ] || OURS="${OUT_DIR:-/home/runner/out}/dist/Module.symvers"
-        echo "ABI gate: symvers=$OURS"
+        SYMVERS="./kernel/bazel-bin/common/kernel_aarch64/Module.symvers"
+        [ -s "$SYMVERS" ] || SYMVERS="${OUT_DIR:-/home/runner/out}/dist/Module.symvers"
+        echo "ABI gate: symvers=$SYMVERS"
         STG=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
                 -path '*/gki/aarch64/abi.stg' -type f -size +0 2>/dev/null | head -n1)
         if [ -z "${STG:-}" ]; then
@@ -37,15 +37,14 @@ runs:
         XML=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
                 -name 'abi_gki_aarch64.xml' -type f -size +0 2>/dev/null | head -n1)
 
-        if [ -z "${OURS:-}" ] || [ ! -f "$OURS" ]; then
+        if [ -z "${SYMVERS:-}" ] || [ ! -f "$SYMVERS" ]; then
           echo "::error title=ABI gate::no Module.symvers in this build - cannot verify the ABI"
           exit 1
         fi
         echo "ABI gate: version=$VERSION"
-        echo "ABI gate: ours=$OURS"
 
         # Module.symvers: <crc> <symbol> <module> <export>
-        awk -F'\t' 'NF>=2 && $1 ~ /^0x/ {print $2"\t"$1}' "$OURS" | LC_ALL=C sort -u > /tmp/ours.tsv
+        awk -F'\t' 'NF>=2 && $1 ~ /^0x/ {print $2"\t"$1}' "$SYMVERS" | LC_ALL=C sort -u > /tmp/ours.tsv
 
         if [ -n "${STG:-}" ] && [ -f "$STG" ]; then
           echo "ABI gate: stock=$STG (.stg)"
