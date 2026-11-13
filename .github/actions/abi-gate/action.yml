@@ -19,31 +19,13 @@ runs:
         # step does its own error handling.
         set +e
 
-        # Deterministic: the artifact this build produced. bazel-bin is a symlink
-        # into the output base the build populated, and build.sh writes into
-        # $OUT_DIR, so these paths are stable across runs. 'find | head -n1'
-        # was not: with Kleaf cache sandboxes and the bazel-bin symlink present,
-        # it could return a symvers from a different config, which is how the
-        # gate reported a flat 6,329 drift that never responded to source changes.
-        OURS=""
-        for cand in \
-          ./kernel/bazel-bin/common/kernel_aarch64/Module.symvers \
-          "${OUT_DIR:-/home/runner/out}/dist/Module.symvers" \
-          ./kernel/out/dist/Module.symvers \
-          ./out/dist/Module.symvers; do
-          if [ -s "$cand" ]; then OURS="$cand"; break; fi
-        done
-        if [ -n "$OURS" ]; then
-          echo "ABI gate: symvers=$(readlink -f "$OURS") built=$(date -r "$OURS" -u +%FT%TZ)"
-        else
-          OURS=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \\
-                   -name 'Module.symvers' -type f -size +0 2>/dev/null | head -n1)
-          [ -n "$OURS" ] && echo "::warning title=ABI gate::no symvers at the expected path - fell back to $OURS"
-        fi
-        # 6.1/6.6 keep it at android/abi_gki_aarch64.stg; 6.12 and 6.18 moved it to
-        # gki/aarch64/abi.stg. Trec the GKI one by path - a bare 'abi.stg' search
-        # also matches microdroid/aarch64/abi.stg, which is a different ABI (it
-        # produced 3 phantom diffs on 6.12).
+        # Only the two places a build writes it: Kleaf's output base (bazel-bin is
+        # a symlink into it) and build.sh's dist. Searching the whole workspace
+        # matched leftovers from other configs - that is what produced a flat
+        # 6,329-symbol drift on 6.18 bakasu while its siblings compared 0.
+        OURS=$(find ./kernel/bazel-bin/common/kernel_aarch64 "${OUT_DIR:-/home/runner/out}/dist" \
+                 -maxdepth 1 -name 'Module.symvers' -type f -size +0 2>/dev/null | head -n1)
+        [ -n "$OURS" ] && echo "ABI gate: symvers=$OURS"
         STG=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
                 -path '*/gki/aarch64/abi.stg' -type f -size +0 2>/dev/null | head -n1)
         if [ -z "${STG:-}" ]; then
