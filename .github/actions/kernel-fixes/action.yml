@@ -29,16 +29,21 @@ runs:
         echo "[*] Detected GLIBC version: $GLIBC_VERSION"
         if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n 1)" = "2.38" ]; then
           echo "[*] GLIBC >= 2.38, attempting Makefile fix."
-          # Check if the pattern that needs fixing actually exists
-          if grep -q '\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)' tools/bpf/resolve_btfids/Makefile; then
-            echo "[*] Found pattern to fix, applying sed."
-            sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile
-            MAKEFILE_FIXED="true"
-          elif grep -q 'EXTRA_CFLAGS' tools/bpf/resolve_btfids/Makefile; then
+          # Insert EXTRA_CFLAGS into the libsubcmd sub-make. The line changed shape:
+          #   6.12: $(Q)$(MAKE) -C $(SUBCMD_SRC) OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)
+          #   6.18: $(Q)$(MAKE) -C $(SUBCMD_SRC) OUTPUT=$(SUBCMD_OUT) \
+          # so match on the stable prefix instead of the whole line - the old exact
+          # pattern silently stopped matching on 6.18 and left a broken resolve_btfids,
+          # which surfaced three steps later as "Failed to generate BTF for vmlinux".
+          if grep -q 'EXTRA_CFLAGS' tools/bpf/resolve_btfids/Makefile; then
             echo "[*] EXTRA_CFLAGS already present, no fix needed."
             MAKEFILE_FIXED="already_fixed"
+          elif grep -q '\$(Q)\$(MAKE) -C \$(SUBCMD_SRC)' tools/bpf/resolve_btfids/Makefile; then
+            echo "[*] Found SUBCMD_SRC sub-make, adding EXTRA_CFLAGS."
+            sed -i 's|\$(Q)\$(MAKE) -C \$(SUBCMD_SRC)|$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(HOSTCFLAGS)"|' tools/bpf/resolve_btfids/Makefile
+            grep -q 'EXTRA_CFLAGS="$(HOSTCFLAGS).*OUTPUT' tools/bpf/resolve_btfids/Makefile && MAKEFILE_FIXED="true" || MAKEFILE_FIXED="false"
           else
-            echo "[!] Neither pattern found in Makefile."
+            echo "[!] SUBCMD_SRC sub-make not found - the fix cannot be applied." >&2
             MAKEFILE_FIXED="false"
           fi
           echo "MAKEFILE_FIXED=$MAKEFILE_FIXED" >> $GITHUB_ENV

@@ -367,6 +367,9 @@ jobs:
           kernel_version: ${{ inputs.kernel_version }}
 
       - name: Setup Misc Configs
+        # Gateable now: this is a baseline, not a requirement. Features that do need
+        # overlayfs or tmpfs xattr carry those configs in their own fragments.
+        if: contains(inputs.feature_set, 'Misc') || inputs.feature_set == 'All'
         uses: ./.github/actions/misc
         with:
           version: ${{ inputs.version }}
