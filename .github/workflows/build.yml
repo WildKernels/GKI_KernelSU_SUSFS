@@ -422,7 +422,10 @@ jobs:
       - name: ABI gate
         # Compares Module.symvers CRCs against the stock ABI of the tree that was
         # built and fails on any symbol whose CRC moved.
-        if: always()
+        # Only meaningful when the build produced a kernel: with always() a failed
+        # build reported a second, misleading error ("no Module.symvers in this
+        # build - cannot verify the ABI") and buried the real one.
+        if: success()
         uses: ./.github/actions/abi-gate
         with:
           version: ${{ inputs.version }}
@@ -431,7 +434,10 @@ jobs:
         if: always()
         uses: ./.github/actions/extract-the-built-config
       - name: Verify the fragment landed in .config
-        if: always()
+        # Same reason as the ABI gate: with always() a failed build printed
+        # "no .config in the build output" as a second error on a leg that never
+        # produced a .config, hiding the failure that actually mattered.
+        if: success()
         uses: ./.github/actions/verify-fragment
 
       - name: Consolidated Build Summary
