@@ -1,8 +1,8 @@
-  CONFIG_OVERLAY_FS=y
-  CONFIG_TMPFS_XATTR=y
-  CONFIG_TMPFS_POSIX_ACL=y
-  CONFIG_KALLSYMS=y
-  CONFIG_KALLSYMS_ALL=y
+CONFIG_OVERLAY_FS=y
+CONFIG_TMPFS_XATTR=y
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_KALLSYMS=y
+CONFIG_KALLSYMS_ALL=y
   # Container CPU limits (cpu.max / cgroup v2 CPU bandwidth).
   #
   # Unlike fanotify this needs no port: CONFIG_CFS_BANDWIDTH touches
