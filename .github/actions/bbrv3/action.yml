@@ -81,7 +81,17 @@ runs:
         echo "[+] BBRv3 patches applied"
 
     - name: Enable BBRv3 Kernel Config
-      uses: ./.github/actions/set-kernel-config
-      with:
-        config_list: |
-          CONFIG_TCP_CONG_BBR3=y
+      # Kleaf rejects a fragment entry the tree does not declare, and the
+      # error it prints names the fragment rather than the patch, so the
+      # symbol is only requested once net/ipv4/Kconfig actually has it.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        if ! grep -rqs 'config TCP_CONG_BBR3' net/ipv4/Kconfig; then
+          echo "::warning title=bbrv3::CONFIG_TCP_CONG_BBR3 is not declared in this tree - the patch did not land, config skipped"
+          exit 0
+        fi
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.action_path }}/bbrv3.fragment" \
+          --dest wild_defconfig.fragment --label bbrv3
