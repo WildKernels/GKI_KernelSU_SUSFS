@@ -56,22 +56,6 @@ runs:
 
         patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_base.patch
 
-    - name: Export __vfs_setxattr_noperm for the module link
-      # 5.10 and 5.15 resolve CONFIG_NTSYNC to =m and never exported this
-      # symbol, so modpost rejects the backport:
-      #   ERROR: modpost: "__vfs_setxattr_noperm" [drivers/misc/ntsync.ko] undefined!
-      # 6.x carries the same unexported symbol but builds ntsync in-tree, where
-      # the reference resolves at vmlinux link, so the export stays off those
-      # trees - it would add an exported symbol to their KMI for no gain.
-      if: inputs.kernel_version == '5.10' || inputs.kernel_version == '5.15'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        set -euo pipefail
-        python3 "${{ github.workspace }}/.github/scripts/ntsync_xattr_export.py" .
-        grep -q 'EXPORT_SYMBOL_GPL(__vfs_setxattr_noperm);' fs/xattr.c \
-          || { echo "ERROR: export not present after the script ran" >&2; exit 1; }
-
     - name: Enable NTSync
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
