@@ -46,40 +46,58 @@ runs:
     #       exit 1
     #     fi
 
-    - name: 'Build Kernel'
+    - name: Detect build system
+      id: build_system
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        PAGE_SIZE="${{ inputs.page_size }}"
-        if [ -f "build/build.sh" ]; then
-          if [ "$PAGE_SIZE" != "4k" ]; then
-            echo "ERROR: page_size=${PAGE_SIZE} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
-            exit 1
-          fi
-          cp common/wild_defconfig.fragment wild_build.config
-          export BUILD_CONFIG_FRAGMENTS="wild_build.config"
-          BUILD_GKI_ARTIFACTS="" \
-          BUILD_GKI_CERTIFICATION_TOOLS=0 \
-          BUILD_SYSTEM_DLKM=0 \
-          SKIP_VENDOR_BOOT=1 \
-          SKIP_EXT_MODULES=1 \
-          SKIP_CP_KERNEL_HDR=1 \
-          OUT_DIR="/home/runner/out" \
-          LTO=thin \
-          BUILD_CONFIG=common/build.config.gki.aarch64 \
-          build/build.sh -j"$(nproc)"
+        if [ -f build/build.sh ]; then
+          echo "mode=legacy" >> "$GITHUB_OUTPUT"
         else
-          PAGE_SIZE_FLAGS=()
-          if [ "$PAGE_SIZE" = "16k" ]; then
-            PAGE_SIZE_FLAGS+=(--page_size=16k)
-          fi
-          tools/bazel build \
-            --config=fast \
-            "${PAGE_SIZE_FLAGS[@]}" \
-            --defconfig_fragment=//common:wild_defconfig.fragment \
-            //common:kernel_aarch64
+          echo "mode=kleaf" >> "$GITHUB_OUTPUT"
         fi
+        echo "build system: $(grep -o '[a-z]*' <<< "$( [ -f build/build.sh ] && echo legacy || echo kleaf )")"
 
+    - name: 'Build Kernel (build.sh)'
+      if: steps.build_system.outputs.mode == 'legacy'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.page_size }}" != "4k" ]; then
+          echo "ERROR: page_size=${{ inputs.page_size }} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
+          exit 1
+        fi
+        # A build-config fragment, not a Kconfig one: build.sh sources it, and the
+        # POST_DEFCONFIG_CMDS it sets is what merges our config into .config.
+        cp "${{ github.workspace }}/.github/actions/build-kernel/legacy-fragment.config" legacy-fragment.config
+        export BUILD_CONFIG_FRAGMENTS="legacy-fragment.config"
+        BUILD_GKI_ARTIFACTS="" \
+        BUILD_GKI_CERTIFICATION_TOOLS=0 \
+        BUILD_SYSTEM_DLKM=0 \
+        SKIP_VENDOR_BOOT=1 \
+        SKIP_EXT_MODULES=1 \
+        SKIP_CP_KERNEL_HDR=1 \
+        OUT_DIR="/home/runner/out" \
+        LTO=thin \
+        BUILD_CONFIG=common/build.config.gki.aarch64 \
+        build/build.sh -j"$(nproc)"
+
+    - name: 'Build Kernel (Kleaf)'
+      if: steps.build_system.outputs.mode == 'kleaf'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        PAGE_SIZE_FLAGS=()
+        if [ "${{ inputs.page_size }}" = "16k" ]; then
+          PAGE_SIZE_FLAGS+=(--page_size=16k)
+        fi
+        tools/bazel build \
+          --config=fast \
+          "${PAGE_SIZE_FLAGS[@]}" \
+          --defconfig_fragment=//common:wild_defconfig.fragment \
+          //common:kernel_aarch64
     - name: 'Verify Page Size in Generated .config'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
