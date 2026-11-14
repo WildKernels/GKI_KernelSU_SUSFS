@@ -56,7 +56,7 @@ runs:
         else
           echo "mode=kleaf" >> "$GITHUB_OUTPUT"
         fi
-        echo "build system: $(grep -o '[a-z]*' <<< "$( [ -f build/build.sh ] && echo legacy || echo kleaf )")"
+        echo "build system: $([ -f build/build.sh ] && echo build.sh || echo kleaf)"
 
     - name: 'Build Kernel (build.sh)'
       if: steps.build_system.outputs.mode == 'legacy'
