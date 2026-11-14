@@ -77,6 +77,13 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
+        BUILD_CONFIG_FILE="common/build.config.gki.aarch64"
+          if [ ! -f "$BUILD_CONFIG_FILE" ]; then
+            echo "ERROR: Kleaf build config not found: $BUILD_CONFIG_FILE" >&2
+            exit 1
+          fi
+          printf '\n# Reproducible timestamp injected by the CI workflow.\nexport SOURCE_DATE_EPOCH=%q\nexport KBUILD_BUILD_TIMESTAMP=%q\n' \
+            "$SOURCE_DATE_EPOCH" "$KBUILD_BUILD_TIMESTAMP" >> "$BUILD_CONFIG_FILE"
         set -euo pipefail
         PAGE_SIZE_FLAGS=()
         if [ "${{ inputs.page_size }}" = "16k" ]; then
