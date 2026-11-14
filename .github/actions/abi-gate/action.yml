@@ -20,6 +20,12 @@ runs:
         set +e
 
         SYMVERS="./kernel/bazel-bin/common/kernel_aarch64/Module.symvers"
+        # Legacy build.sh writes ${OUT_DIR}/common/Module.symvers (it builds with
+        # O=${OUT_DIR}/common); Kleaf writes the bazel-bin path above and
+        # ${OUT_DIR}/dist from a dist target. Without the middle candidate every
+        # 5.10/5.15 leg failed the gate with "no Module.symvers in this build"
+        # even though the kernel had built.
+        [ -s "$SYMVERS" ] || SYMVERS="${OUT_DIR:-/home/runner/out}/common/Module.symvers"
         [ -s "$SYMVERS" ] || SYMVERS="${OUT_DIR:-/home/runner/out}/dist/Module.symvers"
         echo "ABI gate: symvers=$SYMVERS"
         STG=$(find -L . "${OUT_DIR:-/home/runner/out}" -maxdepth 8 \
