@@ -23,6 +23,15 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
 
+    - name: Patch SUSFS UID filter rename (v2.4.0)
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        sed -i 's/CMD_SUSFS_SET_SUS_PATH_UID_FILTER/CMD_SUSFS_SET_PRIORITY_UID_FILTER/g' \
+          drivers/kernelsu/supercall/dispatch.c
+        sed -i 's/susfs_set_sus_path_uid_filter/susfs_set_priority_uid_filter/g' \
+          drivers/kernelsu/supercall/dispatch.c
+
     - name: Guard the priority-uid-filter credential helpers
       # Upstream added susfs_switch_to_ksu_domain()/susfs_restore_creds() outside
       # the #ifdef that guards their only callers. BakaSU's kernel tree on the
