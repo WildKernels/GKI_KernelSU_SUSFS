@@ -46,20 +46,9 @@ runs:
     #       exit 1
     #     fi
 
-    - name: Detect build system
-      id: build_system
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        if [ -f build/build.sh ]; then
-          echo "mode=legacy" >> "$GITHUB_OUTPUT"
-        else
-          echo "mode=kleaf" >> "$GITHUB_OUTPUT"
-        fi
-        echo "build system: $([ -f build/build.sh ] && echo build.sh || echo kleaf)"
-
     - name: 'Build Kernel (build.sh)'
-      if: steps.build_system.outputs.mode == 'legacy'
+      # android12-* and android13-* are the trees that still use build/build.sh.
+      if: startsWith(inputs.version, 'android12') || startsWith(inputs.version, 'android13')
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
@@ -84,7 +73,7 @@ runs:
         build/build.sh -j"$(nproc)"
 
     - name: 'Build Kernel (Kleaf)'
-      if: steps.build_system.outputs.mode == 'kleaf'
+      if: ${{ !startsWith(inputs.version, 'android12') && !startsWith(inputs.version, 'android13') }}
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
