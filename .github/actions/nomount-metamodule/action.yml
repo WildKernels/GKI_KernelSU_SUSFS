@@ -50,13 +50,18 @@ runs:
         mkdir -p "$source_dir/bin"
         (
           cd "$source_dir/userspace/src"
-          zig cc -target aarch64-linux -Oz -mcmodel=tiny -static -nostdlib \
-            -ffreestanding -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
-            -Wl,--entry=_start nm.c -o ../../bin/nm-arm64
-          zig cc -target arm-linux -Oz -static -nostdlib -ffreestanding \
-            -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
+          # nm.c is a normal libc program now: upstream 611f242 ("module: drop
+          # shell injection pipeline, call nm directly") replaced the freestanding
+          # _start shim with main() and pulls <unistd.h>/<string.h>, so the old
+          # -nostdlib -ffreestanding build dies with
+          #   ./nm.h:4:10: fatal error: 'unistd.h' file not found
+          # Static musl keeps the binaries self-contained (no Android linker
+          # dependency) while giving it the headers and libc it now expects.
+          zig cc -target aarch64-linux-musl -Oz -static -fno-ident \
+            nm.c -o ../../bin/nm-arm64
+          zig cc -target arm-linux-musleabihf -Oz -static -fno-ident \
             -ffunction-sections -fdata-sections -Wl,--gc-sections \
-            -Wl,--entry=_start nm.c -o ../../bin/nm-arm
+            nm.c -o ../../bin/nm-arm
         )
 
         cp -a "$source_dir/module" "$module_dir"
