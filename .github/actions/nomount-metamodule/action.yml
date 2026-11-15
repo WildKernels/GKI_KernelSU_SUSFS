@@ -59,7 +59,10 @@ runs:
           # dependency) while giving it the headers and libc it now expects.
           zig cc -target aarch64-linux-musl -Oz -static -fno-ident \
             nm.c -o ../../bin/nm-arm64
-          zig cc -target arm-linux-musleabihf -Oz -static -fno-ident \
+          # arm-linux-musleabihf is not a triple this zig accepts
+          # ("UnknownApplicationBinaryInterface"); glibc hard-float is, and
+          # -static keeps the binary self-contained just the same.
+          zig cc -target arm-linux-gnueabihf -Oz -static -fno-ident \
             -ffunction-sections -fdata-sections -Wl,--gc-sections \
             nm.c -o ../../bin/nm-arm
         )
