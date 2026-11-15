@@ -50,19 +50,18 @@ runs:
         mkdir -p "$source_dir/bin"
         (
           cd "$source_dir/userspace/src"
-          # nm.c is a normal libc program now: upstream 611f242 ("module: drop
-          # shell injection pipeline, call nm directly") replaced the freestanding
-          # _start shim with main() and pulls <unistd.h>/<string.h>, so the old
-          # -nostdlib -ffreestanding build dies with
+          # nm.c became a normal libc program in upstream 611f242 ("module:
+          # drop shell injection pipeline, call nm directly"): it has main() and
+          # pulls <unistd.h>/<string.h>. Our build added -nostdlib, which removes
+          # the libc headers entirely and died with
           #   ./nm.h:4:10: fatal error: 'unistd.h' file not found
-          # Static musl keeps the binaries self-contained (no Android linker
-          # dependency) while giving it the headers and libc it now expects.
-          zig cc -target aarch64-linux-musl -Oz -static -fno-ident \
-            nm.c -o ../../bin/nm-arm64
-          # arm-linux-musleabihf is not a triple this zig accepts
-          # ("UnknownApplicationBinaryInterface"); glibc hard-float is, and
-          # -static keeps the binary self-contained just the same.
-          zig cc -target arm-linux-gnueabihf -Oz -static -fno-ident \
+          # Upstream's own CI never passed -nostdlib, and drops --entry=_start
+          # now that main() exists, so this mirrors it exactly.
+          zig cc -target aarch64-linux -Oz -mcmodel=tiny -static -ffreestanding \
+            -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
+            -mllvm -enable-machine-outliner=always nm.c -o ../../bin/nm-arm64
+          zig cc -target arm-linux -Oz -static -ffreestanding \
+            -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
             -ffunction-sections -fdata-sections -Wl,--gc-sections \
             nm.c -o ../../bin/nm-arm
         )
