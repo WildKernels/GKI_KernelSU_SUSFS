@@ -9,16 +9,12 @@ runs:
   using: "composite"
   steps:
     - name: Enable CIFS Configs
-      uses: ./.github/actions/set-kernel-config
-      with:
-        config_list: |
-          CONFIG_CIFS=y
-          CONFIG_NETWORK_FILESYSTEMS=y
-          CONFIG_NETFS_SUPPORT=y
-          CONFIG_KEYS=y
-          CONFIG_CIFS_XATTR=y
-          CONFIG_CIFS_POSIX=y
-
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/cifs/enable-cifs-configs.fragment" \
+          --dest wild_defconfig.fragment --label enable-cifs-configs
     - name: Drop now-built-in modules from the GKI module list
       # These configs are =y above, so the modules are not produced, but Kleaf
       # verifies every module in its GKI list exists and fails otherwise:
