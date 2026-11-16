@@ -1,0 +1,3 @@
+# BBRv3 congestion control; the Kconfig entry comes from the patch, so this
+# entry only exists in a tree where the patch landed.
+CONFIG_TCP_CONG_BBR3=y
