@@ -210,6 +210,16 @@ runs:
           python3 "${{ github.workspace }}/.github/scripts/apply_susfs_compat.py" \
             "$PWD" "50_add_susfs_in_gki-${{ inputs.version }}.patch"
         else
+          # 6.18.63 added `mnt->mnt_t_flags = old->mnt_t_flags & T_UNBINDABLE;`
+          # to clone_mnt()'s prologue, which the bundle's fs/namespace.c hunk
+          # anchors on, so the hunk rejected ("Hunk #8 FAILED at 1437") and the
+          # leg died before compiling. Adapt that hunk's pre-image to the shape
+          # the tree actually has rather than hard-coding the new context, which
+          # would break the sublevels that still match the old one.
+          if [ "${{ inputs.version }}" = "android17-6.18" ]; then
+            python3 "${{ github.workspace }}/.github/scripts/susfs_618_namespace_mnt_t_flags.py" \
+              "$PWD" "50_add_susfs_in_gki-${{ inputs.version }}.patch"
+          fi
           # Deliberately no --forward (PR #342 uses --batch --forward here):
           # a reversed/already-applied hunk must fail loudly, not be skipped.
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
