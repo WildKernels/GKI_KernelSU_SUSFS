@@ -21,7 +21,16 @@ name: opencode
 on:
   issues:
     types: [opened]
-  pull_request:
+  # pull_request_target, not pull_request: a fork PR never receives secrets and
+  # needs a maintainer to approve the run, so OpenCode could not comment on
+  # outside contributions at all. pull_request_target runs in the base repo's
+  # context with the secret available and no approval click, which is the only
+  # way this behaves like a normal PR bot.
+  #
+  # Safety: the review job never checks out the PR head - it runs on the base
+  # repo with read-only contents and checks the change through the API. Nothing
+  # from the fork is executed, so untrusted code cannot reach the token.
+  pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -29,12 +38,22 @@ permissions:
   issues: write
   pull-requests: write
 
+# pr-review runs on pull_request_target, where the base repo's token and secrets
+# are present. Keep it out of the code: comment and read only.
+
 concurrency:
   group: opencode-${{ github.event.issue.number || github.event.pull_request.number }}
   cancel-in-progress: false
 
+# GitHub does not allow `secrets` in a job-level if:, so "no key" cannot skip the
+# workflow from an expression. Two layers instead:
+#   * vars.OPENCODE_ENABLED == 'false'  -> every job skips before it starts, so a
+#     repo that has no key (or wants OpenCode paused) pays nothing
+#   * the preflight job probes the secret itself and the real jobs depend on it,
+#     which is the authoritative check for "key missing"
 jobs:
   preflight:
+    if: vars.OPENCODE_ENABLED != 'false'
     # `secrets` is not an allowed context in a job-level `if`, so the key is
     # probed in a step and the real jobs depend on the result. Without it every
     # OpenCode run fails on auth - once per new issue and once per PR push.
@@ -56,9 +75,11 @@ jobs:
   issue-triage:
     needs: preflight
     if: |
+      vars.OPENCODE_ENABLED != 'false' &&
       needs.preflight.outputs.key == 'true' &&
       github.event_name == 'issues' &&
-      !endsWith(github.actor, '[bot]')
+      !endsWith(github.actor, '[bot]') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -94,23 +115,34 @@ jobs:
             Otherwise, do not comment.
 
   pr-review:
-    # Fork PRs get a read-only token and no secrets, and drafts churn on every
-    # push - both are skipped. Bot actors are skipped so the review cannot
-    # re-trigger itself.
+    # Runs for fork PRs too, which is the point: pull_request_target gives it the
+    # base repo's token and the OPENCODE_API_KEY secret without a maintainer
+    # approving each run. Drafts churn on every push and bot actors would
+    # re-trigger the review, so both are skipped.
+    #
+    # The checkout is deliberately the BASE repo at the PR's base ref, never the
+    # fork's head: OpenCode reads the change through the API. Nothing from the
+    # contributor's branch is built or executed here, so a hostile PR cannot
+    # reach the token, and the job is limited to reading plus commenting.
     needs: preflight
     if: |
+      vars.OPENCODE_ENABLED != 'false' &&
       needs.preflight.outputs.key == 'true' &&
-      github.event_name == 'pull_request' &&
+      github.event_name == 'pull_request_target' &&
       !endsWith(github.actor, '[bot]') &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
-      - name: Checkout repository
+      - name: Checkout base repository
         uses: actions/checkout@v7
         with:
-          # full history so the diff against the base branch is available
+          # the base ref, not the PR head - see the note above
+          ref: ${{ github.event.pull_request.base.ref }}
           fetch-depth: 0
 
       - name: Set git identity

@@ -50,13 +50,20 @@ runs:
         mkdir -p "$source_dir/bin"
         (
           cd "$source_dir/userspace/src"
-          zig cc -target aarch64-linux -Oz -mcmodel=tiny -static -nostdlib \
-            -ffreestanding -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
-            -Wl,--entry=_start nm.c -o ../../bin/nm-arm64
-          zig cc -target arm-linux -Oz -static -nostdlib -ffreestanding \
+          # nm.c became a normal libc program in upstream 611f242 ("module:
+          # drop shell injection pipeline, call nm directly"): it has main() and
+          # pulls <unistd.h>/<string.h>. Our build added -nostdlib, which removes
+          # the libc headers entirely and died with
+          #   ./nm.h:4:10: fatal error: 'unistd.h' file not found
+          # Upstream's own CI never passed -nostdlib, and drops --entry=_start
+          # now that main() exists, so this mirrors it exactly.
+          zig cc -target aarch64-linux -Oz -mcmodel=tiny -static -ffreestanding \
+            -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
+            -mllvm -enable-machine-outliner=always nm.c -o ../../bin/nm-arm64
+          zig cc -target arm-linux -Oz -static -ffreestanding \
             -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
             -ffunction-sections -fdata-sections -Wl,--gc-sections \
-            -Wl,--entry=_start nm.c -o ../../bin/nm-arm
+            nm.c -o ../../bin/nm-arm
         )
 
         cp -a "$source_dir/module" "$module_dir"

@@ -1,0 +1,36 @@
+name: 'Set Build Timestamp from Kernel Commit'
+description: 'Set Build Timestamp from Kernel Commit (composite, keeps the workflow to one entry)'
+inputs:
+  os_patch_level:
+    description: 'os_patch_level'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set Build Timestamp from Kernel Commit
+      shell: bash
+      run: |
+        set -x
+        # Hardcode the build timestamp to the 5th day of the patch level
+        # at 04:20 UTC, using the existing timestamp formats expected by the build.
+        OS_PATCH_LEVEL_INPUT="${{ inputs.os_patch_level }}"
+        if [[ "$OS_PATCH_LEVEL_INPUT" == lts* ]]; then
+          if [[ "$OS_PATCH_LEVEL_INPUT" =~ ^lts-([0-9]{2})$ ]]; then
+            OS_PATCH_LEVEL_YM="$(date -u +%Y)-${BASH_REMATCH[1]}"
+          else
+            OS_PATCH_LEVEL_YM="$(date -u +%Y-%m)"
+          fi
+        else
+          OS_PATCH_LEVEL_YM="$OS_PATCH_LEVEL_INPUT"
+        fi
+        FIXED_BUILD_DATE="${OS_PATCH_LEVEL_YM}-05 04:20:00 UTC"
+        SOURCE_DATE_EPOCH=$(date -u -d "$FIXED_BUILD_DATE" +%s)
+        echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >> $GITHUB_ENV
+        KBUILD_TS=$(date -u -d @${SOURCE_DATE_EPOCH} '+%a %b %d %H:%M:%S UTC %Y')
+        echo "KBUILD_BUILD_TIMESTAMP=${KBUILD_TS}" >> $GITHUB_ENV
+        # Keep git metadata aligned with the same fixed timestamp.
+        GIT_DATE=$(date -u -d @${SOURCE_DATE_EPOCH} '+%Y-%m-%dT%H:%M:%SZ')
+        echo "GIT_COMMITTER_DATE=${GIT_DATE}" >> $GITHUB_ENV
+        echo "GIT_AUTHOR_DATE=${GIT_DATE}" >> $GITHUB_ENV
+        echo "Build timestamp set to: $(date -u -d @${SOURCE_DATE_EPOCH} '+%Y-%m-%d %H:%M:%S UTC') (epoch: $SOURCE_DATE_EPOCH)"

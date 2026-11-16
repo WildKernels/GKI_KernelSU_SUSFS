@@ -17,10 +17,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Setup Kernel Configs
-      if: false
-      uses: ./.github/actions/set-kernel-config
-
     # - name: Provide host ld from repo prebuilts
     #   shell: bash
     #   run: |
@@ -50,58 +46,63 @@ runs:
     #       exit 1
     #     fi
 
-    - name: 'Build Kernel'
+    - name: 'Build Kernel (build.sh)'
+      # android12-* and android13-* are the trees that still use build/build.sh.
+      if: startsWith(inputs.version, 'android12') || startsWith(inputs.version, 'android13')
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        PAGE_SIZE="${{ inputs.page_size }}"
-        sed -i 's/check_defconfig//' ./common/build.config.gki
-        if [ -f "build/build.sh" ]; then
-          if [ "$PAGE_SIZE" != "4k" ]; then
-            echo "ERROR: page_size=${PAGE_SIZE} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
-            exit 1
-          fi
-          # Compiler caching was removed on purpose: the ccache save/restore keys
-          # never matched (save omitted the -g<gen> suffix), so no leg ever
-          # restored one and every build was cold anyway; the bazel cache bought
-          # a handful of actions for a multi-GB restore/save. A build that can be
-          # reproduced only when a cache happens to be warm is worse than a slow
-          # build, so the tree now compiles with plain clang every time.
-          BUILD_GKI_ARTIFACTS="" \
-          BUILD_GKI_CERTIFICATION_TOOLS=0 \
-          BUILD_SYSTEM_DLKM=0 \
-          SKIP_VENDOR_BOOT=1 \
-          SKIP_EXT_MODULES=1 \
-          SKIP_CP_KERNEL_HDR=1 \
-          OUT_DIR="/home/runner/out" \
-          LTO=thin \
-          BUILD_CONFIG=common/build.config.gki.aarch64 \
-          build/build.sh -j"$(nproc)"
-        else
-          sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
-          PAGE_SIZE_FLAGS=()
-          if [ "$PAGE_SIZE" = "16k" ]; then
-            PAGE_SIZE_FLAGS+=(--page_size=16k)
-          fi
-          # 6.18 stopped declaring the per-file label //common:kernel_aarch64/Image
-          # even though the macro still emits that file (verified with
-          # `tools/bazel query` / `cquery --output=files` on the 6.18 tree:
-          # the label errors out with "did you mean kernel_aarch64_images?",
-          # cquery lists bazel-out/.../kernel_aarch64/Image). Build the macro
-          # target there; the rest of this action already reads the image from
-          # bazel-bin/common/kernel_aarch64/Image, which is unchanged.
-          if [ "${{ inputs.version }}" = "android17-6.18" ]; then
-            BAZEL_TARGET=//common:kernel_aarch64
-          else
-            BAZEL_TARGET=//common:kernel_aarch64/Image
-          fi
-          tools/bazel build \
-            --config=fast \
-            "${PAGE_SIZE_FLAGS[@]}" \
-            --disk_cache=/home/runner/.cache/bazel \
-            "$BAZEL_TARGET"
+        set -euo pipefail
+        if [ "${{ inputs.page_size }}" != "4k" ]; then
+          echo "ERROR: page_size=${{ inputs.page_size }} is only supported by the Kleaf (Bazel) build; this tree uses build/build.sh." >&2
+          exit 1
         fi
+        # A build-config fragment, not a Kconfig one: build.sh sources it, and the
+        # POST_DEFCONFIG_CMDS it sets is what merges our config into .config.
+        cp "${{ github.workspace }}/.github/actions/build-kernel/legacy-fragment.config" legacy-fragment.config
+        export BUILD_CONFIG_FRAGMENTS="legacy-fragment.config"
+        BUILD_GKI_ARTIFACTS="" \
+        BUILD_GKI_CERTIFICATION_TOOLS=0 \
+        BUILD_SYSTEM_DLKM=0 \
+        SKIP_VENDOR_BOOT=1 \
+        SKIP_EXT_MODULES=1 \
+        SKIP_CP_KERNEL_HDR=1 \
+        OUT_DIR="/home/runner/out" \
+        LTO=thin \
+        BUILD_CONFIG=common/build.config.gki.aarch64 \
+        build/build.sh -j"$(nproc)"
 
+    - name: 'Build Kernel (Kleaf)'
+      if: ${{ !startsWith(inputs.version, 'android12') && !startsWith(inputs.version, 'android13') }}
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        # Kleaf evaluates build.config.gki.aarch64 in its own environment, so the
+        # SOURCE_DATE_EPOCH / KBUILD_BUILD_TIMESTAMP we export job-wide do not
+        # reach the kernel and the build stamp comes out as Unix 0. Exporting
+        # them from the build config does. From sarreos, PR #354, commit ce8873e7
+        # ("Fix kernel build timestamp"); the existence check is ours so a tree
+        # without that config warns instead of failing.
+        BUILD_CONFIG_FILE="common/build.config.gki.aarch64"
+        if [ -f "$BUILD_CONFIG_FILE" ]; then
+          if ! grep -q 'Reproducible timestamp injected by the CI workflow' "$BUILD_CONFIG_FILE"; then
+            printf '\n# Reproducible timestamp injected by the CI workflow.\nexport SOURCE_DATE_EPOCH=%q\nexport KBUILD_BUILD_TIMESTAMP=%q\n' \
+              "${SOURCE_DATE_EPOCH:-0}" "${KBUILD_BUILD_TIMESTAMP:-@0}" >> "$BUILD_CONFIG_FILE"
+            echo "[*] build.config.gki.aarch64: exported SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-0}"
+          fi
+        else
+          echo "::warning title=build timestamp::$BUILD_CONFIG_FILE not present - Kleaf will stamp the build itself"
+        fi
+        PAGE_SIZE_FLAGS=()
+        if [ "${{ inputs.page_size }}" = "16k" ]; then
+          PAGE_SIZE_FLAGS+=(--page_size=16k)
+        fi
+        tools/bazel build \
+          --config=fast \
+          "${PAGE_SIZE_FLAGS[@]}" \
+          --defconfig_fragment=//common:wild_defconfig.fragment \
+          //common:kernel_aarch64
     - name: 'Verify Page Size in Generated .config'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
