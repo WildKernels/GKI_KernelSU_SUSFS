@@ -1,0 +1,9 @@
+# IPC, appended only where task_struct can take it for free.
+#
+# 6.18 is excluded while the SysV task-table port is disabled: enabling these
+# there changes 6,388 exported-symbol CRCs (run 43743517821), which the ABI
+# gate rejects. Re-enable this fragment for 6.18 in the same change that turns
+# the port back on.
+CONFIG_SYSVIPC=y
+CONFIG_POSIX_MQUEUE=y
+CONFIG_IPC_NS=y
