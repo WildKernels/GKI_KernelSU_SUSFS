@@ -21,6 +21,16 @@ if env("PAGE_SIZE","4k")=="16k": feats.append("16 KB page size (ARM64)")
 lines=[]
 lines.append("# Wild Kernels for GKI2 Devices")
 lines.append("")
+# 6.18 is the newest LTS GKI branch and the least exercised: its SUSFS support
+# is a 6.12->6.18 port rather than an upstream branch, DroidSpaces ships without
+# SysV IPC there, and nothing has been verified on a device. Say so in the notes
+# whenever a 6.18 build is part of the release, rather than letting an artifact
+# that only passed CI read like the long-established families.
+_kbv = env("KERNEL_BUILD_VERSION", "All")
+if _kbv == "All" or "6.18" in _kbv:
+    lines.append("> [!WARNING]")
+    lines.append("> **android17-6.18 is experimental and needs testing.** It builds and holds the stock ABI (9,829 symbols compared, 0 differ), but it is the newest GKI branch we ship and the least exercised: SUSFS there is a 6.12 to 6.18 port rather than an upstream branch, DroidSpaces runs without SysV IPC, and no on-device boot, root or SUSFS behaviour has been verified. Back up your boot image before flashing and report what breaks: https://github.com/WildKernels/GKI_KernelSU_SUSFS/issues")
+    lines.append("")
 lines.append("## Root")
 lines.append("")
 ksun_branch=env("KSUN_BRANCH","dev-susfs")
