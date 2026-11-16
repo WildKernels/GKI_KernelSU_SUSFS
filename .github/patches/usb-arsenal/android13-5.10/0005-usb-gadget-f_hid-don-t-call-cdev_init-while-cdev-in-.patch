@@ -1,0 +1,50 @@
+diff --git a/drivers/usb/gadget/function/f_hid.c b/drivers/usb/gadget/function/f_hid.c
+index 3721b18..6f98112 100644
+--- a/drivers/usb/gadget/function/f_hid.c
++++ b/drivers/usb/gadget/function/f_hid.c
+@@ -73,7 +73,7 @@ struct f_hidg {
+ 	struct usb_request		*req;
+ 
+ 	struct device			dev;
+-	struct cdev			cdev;
++	struct cdev			*cdev;
+ 	struct usb_function		func;
+ 
+ 	struct usb_ep			*in_ep;
+@@ -555,8 +555,9 @@ static int f_hidg_release(struct inode *inode, struct file *fd)
+ 
+ static int f_hidg_open(struct inode *inode, struct file *fd)
+ {
++	struct kobject *parent = inode->i_cdev->kobj.parent;
+ 	struct f_hidg *hidg =
+-		container_of(inode->i_cdev, struct f_hidg, cdev);
++		container_of(parent, struct f_hidg, dev.kobj);
+ 
+ 	fd->private_data = hidg;
+ 
+@@ -1017,8 +1018,14 @@ static int hidg_bind(struct usb_configuration *c, struct usb_function *f)
+ 	hidg->req = NULL;
+ 
+ 	/* create char device */
+-	cdev_init(&hidg->cdev, &f_hidg_fops);
+-	status = cdev_device_add(&hidg->cdev, &hidg->dev);
++	hidg->cdev = cdev_alloc();
++	if (!hidg->cdev) {
++		status = -ENOMEM;
++		goto fail_free_descs;
++	}
++	hidg->cdev->ops = &f_hidg_fops;
++
++	status = cdev_device_add(hidg->cdev, &hidg->dev);
+ 	if (status)
+ 		goto fail_free_descs;
+ 
+@@ -1265,7 +1272,7 @@ static void hidg_unbind(struct usb_configuration *c, struct usb_function *f)
+ {
+ 	struct f_hidg *hidg = func_to_hidg(f);
+ 
+-	cdev_device_del(&hidg->cdev, &hidg->dev);
++	cdev_device_del(hidg->cdev, &hidg->dev);
+ 
+ 	usb_free_all_descriptors(f);
+ }
