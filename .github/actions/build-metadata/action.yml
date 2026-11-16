@@ -128,6 +128,7 @@ runs:
           --arg root_commit "${ROOT_COMMIT:-${KSU_COMMIT:-N/A}}" \
           --arg susfs_commit "${SUSFS_COMMIT:-N/A}" \
           --arg nomount_commit "${NOMOUNT_COMMIT:-N/A}" \
+          --arg usba_commit "${USBA_COMMIT:-N/A}" \
           --arg android_branch "${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}" \
           --arg kmi "${{ inputs.android_version }}-${{ inputs.kernel_version }}" \
           --arg page_size "${{ inputs.page_size }}" \
@@ -153,6 +154,7 @@ runs:
             },
             susfs_revision: $susfs_commit,
             nomount_commit: $nomount_commit,
+            usba_commit: $usba_commit,
             android_branch: $android_branch,
             kmi: $kmi,
             page_size: $page_size,

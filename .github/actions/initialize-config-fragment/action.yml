@@ -1,0 +1,11 @@
+name: 'Initialize Config Fragment'
+description: 'Initialize Config Fragment (composite, keeps the workflow to one entry)'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Initialize Config Fragment
+      shell: bash
+      run: |
+        mkdir -p "${{ github.workspace }}/kernel/common"
+        : > "${{ github.workspace }}/kernel/common/wild_defconfig.fragment"

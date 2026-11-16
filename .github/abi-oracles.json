@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Per-release ABI oracle corrections. A key is '<family>-<date>' as it appears in",
+    ".github/config/*.json; the value names an immutable upstream tag whose ABI file",
+    "supersedes the one shipped in that tree.",
+    "",
+    "Only add an entry when the tree's own oracle contradicts the code: same source",
+    "file, different crc, and a neighbouring release agrees with our build. The gate",
+    "prints every override it applies, so nothing here can hide silently.",
+    "",
+    "android12-5.10-2023-09: ashmem.c is byte-identical to 2023-11's, but this tree's",
+    "abi_gki_aarch64.xml lists is_ashmem_file as 0x4bef6e5f while ours (and 2023-11's",
+    "oracle) say 0x94fc40b5 - the file was never regenerated on that retired branch."
+  ],
+  "android12-5.10-2023-09": {
+    "tag": "android12-5.10-2023-11_r14",
+    "path": "android/abi_gki_aarch64.xml",
+    "symbols": ["is_ashmem_file"],
+    "why": "is_ashmem_file crc never regenerated; 2023-11 carries the corrected value"
+  }
+}

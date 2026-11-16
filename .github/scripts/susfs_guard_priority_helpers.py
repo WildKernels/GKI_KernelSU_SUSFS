@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
-"""Guard the SUSFS priority-uid-filter credential helpers (upstream oversight).
+"""Keep the SUSFS credential helpers compiling whether or not the priority-uid
+filter is enabled.
 
-susfs.c defines two static helpers used only by the priority-uid-filter code:
+fs/susfs.c defines two static helpers:
 
   static struct cred *susfs_switch_to_ksu_domain(void)
   static void susfs_restore_creds(struct cred *orig_cred)
 
-Every call site lives inside `#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER`
-(block spans roughly 1376-1805 in the 6.12 tip), but the definitions themselves
-were added outside that guard. When the symbol is not defined - which is the case
-for BakaSU's kernel tree on the older branches, whose Kconfig predates the
-feature - the users compile out and the definitions become dead code, and GKI
-turns that into an error:
+When they were introduced, only the priority-uid-filter switch called them, so
+a tree without CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER - BakaSU's Kconfig has no
+such symbol at all, so olddefconfig drops the entry - compiled them as dead
+code and GKI's -Werror killed the build:
 
   fs/susfs.c:183:21: error: unused function 'susfs_switch_to_ksu_domain'
   fs/susfs.c:217:13: error: unused function 'susfs_restore_creds'
 
-Wrap the definitions in the same switch that guards their only callers. This is
-correct in both directions: with the symbol on, nothing changes; with it off, the
-helpers disappear along with their call sites.
+The old fix wrapped the definitions in the same config guard. That is now wrong:
+the sus_path uid filter path calls susfs_restore_creds as well (the
+susfs_sus_path_app_strings worker's error exits), so with the guard in place and
+the priority symbol off, the definition disappears while those calls remain:
+
+  fs/susfs.c:779:2: error: call to undeclared function 'susfs_restore_creds'
+
+__maybe_unused solves both directions: the helpers stay visible to every caller,
+and a build where nothing calls them no longer trips -Wunused-function. Any
+guard this script added earlier is removed, so re-running on an already-patched
+tree upgrades it.
 
 Idempotent, anchor-checked.
 
@@ -33,29 +40,14 @@ GUARD = "#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER\n"
 ENDIF = "#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER /* credential helpers */\n"
 
 SWITCH_SIG = "static struct cred *susfs_switch_to_ksu_domain(void) {"
+SWITCH_NEW = "static struct cred * __maybe_unused susfs_switch_to_ksu_domain(void) {"
 RESTORE_SIG = "static void susfs_restore_creds(struct cred *orig_cred) {"
+RESTORE_NEW = "static void __maybe_unused susfs_restore_creds(struct cred *orig_cred) {"
 DOC_START = " * Switches the selinux domain of the current process to the KernelSU one"
 
 
 def die(msg: str) -> NoReturn:
     sys.exit(f"ERROR: {msg}")
-
-
-def brace_end(text: str, sig: str) -> int:
-    start = text.find(sig)
-    if start < 0:
-        die(f"signature not found: {sig}")
-    brace = text.find("{", start)
-    depth, i = 0, brace
-    while i < len(text):
-        if text[i] == "{":
-            depth += 1
-        elif text[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return i + 1
-        i += 1
-    die(f"unbalanced braces for {sig}")
 
 
 def main() -> None:
@@ -65,36 +57,54 @@ def main() -> None:
     if not os.path.exists(path):
         die(f"{path}: not found")
     src = open(path, encoding="utf-8").read()
+    original = src
+    notes = []
 
-    if "credential helpers */" in src:
-        print("  susfs.c: credential helpers already guarded")
+    # Upgrade path: undo the guard this script used to insert. It has to be
+    # removed surgically - upstream has its own, legitimate
+    # "#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER" around the switch block
+    # (~line 1785), and removing every occurrence would delete real code.
+    if ENDIF in src:
+        src = src.replace(ENDIF, "", 1)
+        doc_at = src.find(DOC_START)
+        if doc_at > 0:
+            guard_at = src.rfind(GUARD, 0, doc_at)
+            between = src[guard_at + len(GUARD):doc_at] if guard_at >= 0 else None
+            if between is not None and between.strip() in ("/*", ""):
+                src = src[:guard_at] + src[guard_at + len(GUARD):]
+                notes.append("removed our guard around the credential helpers")
+            else:
+                notes.append("removed our guard's #endif; head not adjacent, left alone")
+        else:
+            notes.append("removed our guard's #endif")
+
+    if SWITCH_NEW in src and RESTORE_NEW in src:
+        if src != original:
+            open(path, "w", encoding="utf-8").write(src)
+        print("  susfs.c: credential helpers already __maybe_unused" +
+              ("; " + "; ".join(notes) if notes else ""))
         return
-    if SWITCH_SIG not in src:
+
+    if SWITCH_SIG in src:
+        src = src.replace(SWITCH_SIG, SWITCH_NEW, 1)
+        notes.append("susfs_switch_to_ksu_domain -> __maybe_unused")
+    if RESTORE_SIG in src:
+        src = src.replace(RESTORE_SIG, RESTORE_NEW, 1)
+        notes.append("susfs_restore_creds -> __maybe_unused")
+
+    if src == original:
         print("  susfs.c: credential helpers not present (nothing to do)")
         return
-
-    # comment block that documents susfs_switch_to_ksu_domain()
-    doc = src.find(DOC_START)
-    start = src.rfind("/*", 0, doc) if doc > 0 else src.find(SWITCH_SIG)
-    if start < 0:
-        die("could not locate the helper's doc comment")
-    if SWITCH_SIG not in src[start:start + 4000]:
-        die("doc comment does not precede susfs_switch_to_ksu_domain()")
-
-    end = brace_end(src, RESTORE_SIG)
-    src = src[:end] + "\n" + ENDIF + src[end:]
-    src = src[:start] + GUARD + src[start:]
 
     open(path, "w", encoding="utf-8").write(src)
 
     check = open(path, encoding="utf-8").read()
-    guard_at = check.find(GUARD)
-    switch_at = check.find(SWITCH_SIG)
-    restore_at = check.find(RESTORE_SIG)
-    endif_at = check.find(ENDIF)
-    if not (0 <= guard_at < switch_at < restore_at < endif_at):
-        die("guard did not enclose both helpers after write")
-    print("  susfs.c: credential helpers wrapped in CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER")
+    if ENDIF in check:
+        die("the config guard is still present after rewrite")
+    for sig in (SWITCH_NEW, RESTORE_NEW):
+        if sig not in check:
+            die(f"{sig} missing after rewrite")
+    print("  susfs.c: " + "; ".join(notes))
 
 
 if __name__ == "__main__":

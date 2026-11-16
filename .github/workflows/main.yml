@@ -94,6 +94,10 @@ on:
         description: "DroidSpaces"
         type: boolean
         default: true
+      use_usba:
+        description: "USB Arsenal (USB gadget patches + configs)"
+        type: boolean
+        default: true
       use_ntsync:
         description: "NTSync"
         type: boolean
@@ -106,14 +110,14 @@ on:
         description: "Unicode Fix"
         type: boolean
         default: true
-      use_bpf:
-        description: "BPF Stack (BTF + eBPF + FUSE-BPF)"
-        type: boolean
-        default: true
       use_perf:
         description: "Performance"
         type: boolean
         default: false
+      use_misc:
+        description: 'Misc baseline: OVERLAY_FS, TMPFS_XATTR/POSIX_ACL, KALLSYMS_ALL'
+        type: boolean
+        default: true
       test_release_notes:
         description: "Render release notes preview only (skip all builds + release)"
         type: boolean
@@ -131,6 +135,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       nomount_commit: ${{ steps.resolve.outputs.nomount_commit }}
+      usba_commit: ${{ steps.resolve.outputs.usba_commit }}
       kernelsu_commit: ${{ steps.resolve.outputs.kernelsu_commit }}
       next_base_commit: ${{ steps.resolve.outputs.next_base_commit }}
       kernelsu_branch: ${{ steps.resolve.outputs.kernelsu_branch }}
@@ -233,66 +238,81 @@ jobs:
           }
 
           # Audited pins. Used only when commit_mode=verified.
-          # Refreshed 2026-11-02 to each upstream branch tip.
+          # Refreshed 2026-11-12 to each upstream branch tip.
           # NoMount is deliberately NOT pinned: it is a module-side component
           # with no kernel contract, so it always tracks the dev tip even in
           # verified mode (see the nomount_commit emit below).
-          # KernelSU: official main tip (28db74f6, 2026-11-01, "kernel: Fix
-          # SELinux generation tracking for policy updates (#3964)").
-          PIN_KERNELSU="dbb73665d103da40c7ecbd21ba3b5ac76eb95784"
-          # BakaSU: official main tip (516d3e87, 2026-10-31, "ksuinit: make lint
-          # check happy"). Still tracks latest despite the fa12ffd fake_state
+          # KernelSU: official main tip (64833c00, 2026-11-14, "feat(kernel):
+          # Add LSM hook for inode_setxattr (#3996)"). This one is NOT
+          # userspace-only: it touches kernel/feature/selinux_hide.c,
+          # kernel/selinux/inode.c and selinux.h, which our selinux_hide step
+          # patches, so the next build is the real test of whether those hunks
+          # still apply and whether the KMI holds. Preceded by two ksud clippy
+          # fixes (f5643b0a, 098be426).
+          PIN_KERNELSU="64833c005eca6a8dc3d73ec2d37d84c37e0d9ad2"
+          # BakaSU: official main tip (7b65bde0, 2026-11-16). Still tracks latest
+          # despite the fa12ffd fake_state
           # removal - the 5 older branches (12-5.10/13-5.10/13-5.15/14-5.15/
           # 14-6.1) fs patches reference `fake_state` and will fail to link with
           # latest BakaSU; 6.6/6.12/6.18 are unaffected. Watch those 5 families.
-          PIN_BAKASU="548d1dda060ca198823d8808804d01f5209ef4a9"
-          # SukiSU-Ultra: builtin tip (1cfa5734, 2026-10-31); defines fake_state
+          PIN_BAKASU="7b65bde0710b5e7c6f755545cb15a4abd417f3a8"
+          # SukiSU-Ultra: builtin tip (4bec532d, 2026-11-16); defines fake_state
           # itself and calls the susfs_def.h no_su API -> OK on tips. Note the
           # repo's default branch (main, b8bd4b6c) is used only for SUSFS-off
           # builds, which resolve it at run time rather than from this pin.
-          PIN_SUKISU_ULTRA="f9aa2fec23c3f4a06a935f69dc04cb85b261e7f3"
+          PIN_SUKISU_ULTRA="4bec532dd447e2852aa8932afa768255350c103a"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
-          # master tip 2d5786b9 (2026-11-01, "susfs: Separate provider and
-          # operation state").
-          PIN_FINASU="14a71d953a09e0d706426a17be0f4b422893ab26"
+          # master tip 06d71e8a (2026-11-16).
+          PIN_FINASU="06d71e8a08bb8789563e390ab1e9e6cc78ed1af2"
           # SUSFS (gitlab simonpunk/susfs4ksu): every gki-<family> branch moved
-          # one commit, "KernelSU: Fix compiler error" (2026-10-30) - a compile
-          # fix for newer KernelSU headers, no new config symbol, no ABI change.
+          # two commits (2026-11-06): "KernelSU: Sync with upstream" (the
+          # 10_enable_susfs_for_ksu patch, +9 lines) and "kernel: ratelimit on
+          # logging sus selinux type and rule" (SUSFS_LOGI_RL/SUSFS_LOGE_RL macros,
+          # 6 lines of fs/susfs.c). No new config symbol, no ABI change, and
+          # neither touches the fdinfo/cifs/binder surfaces our fix scripts cover.
           # The previous refresh (2026-10-27) added the priority uid filter
           # ("susfs: Add priority uid filter" + its "Fix UAF bugs and worker not
           # able to run" follow-up), guarded by CONFIG_KSU_SUSFS only;
           # susfs_is_priority_uid_filtered() lives in fs/susfs.c, so the config
           # list still needs no change.
+          # Refreshed 2026-11-16: six of the seven gki-* branches moved again
+          # (14-6.1 unchanged). They all carry
+          # "kernel & ksu_susfs: Add sus_path_uid_filter feature", the API
+          # pershoot's dev-susfs tree calls. Before this the `next` legs for
+          # 5.10/5.15/6.6/6.12 died on an implicit declaration of
+          # susfs_set_sus_path_uid_filter; only 6.1 had it (its stable branch
+          # merged the feature first). Every branch also keeps the earlier
+          # priority uid filter, so the config list needs no change.
           declare -A PIN_SUSFS=(
-            [susfs_commit_android12_5_10]="5436438b5cc77f146e04f71070da153dabe17a9d"
-            [susfs_commit_android13_5_10]="1bea9e8fb4a64920f068e5da43f9751dfe601199"
-            [susfs_commit_android13_5_15]="fe943d15ec6a1891f7a360bf210589bdffe4e318"
-            [susfs_commit_android14_5_15]="10751e3c83f6e63f886cd2af937fd0a34463824b"
-            [susfs_commit_android14_6_1]="69b8e734920b8f9ed885ab8d112969719698e242"
-            [susfs_commit_android15_6_6]="ec03d0c73b821afa1d5037d6d493216f59744fcb"
-            [susfs_commit_android16_6_12]="395a8c0c88d348e9fe7c14f66a456fde4653287c"
+            [susfs_commit_android12_5_10]="784ac9e6fd49bb02499b5b60c57ccc9d0c680204"
+            [susfs_commit_android13_5_10]="d480b312d650601888550529695706f4a112e29e"
+            [susfs_commit_android13_5_15]="c1d1da42b74771944207ec45aaceff9c57e84985"
+            [susfs_commit_android14_5_15]="a293ab199ff84b7482d57ece06b4199411cd5c01"
+            [susfs_commit_android14_6_1]="f76b81f2a6bf98e4029cc0c823c054edbec29803"
+            [susfs_commit_android15_6_6]="f98f08223bbf469cc0a1542166383d253557fc32"
+            [susfs_commit_android16_6_12]="9b0b13f069673b9b07b713a5c66977de4d62b175"
           )
           # BakaSU keeps its own SUSFS pin set (kept separate so it can diverge
           # again). Values = the same verified branch tips as PIN_SUSFS.
           declare -A PIN_SUSFS_BAKASU=(
-            [susfs_commit_android12_5_10]="5436438b5cc77f146e04f71070da153dabe17a9d"
-            [susfs_commit_android13_5_10]="1bea9e8fb4a64920f068e5da43f9751dfe601199"
-            [susfs_commit_android13_5_15]="fe943d15ec6a1891f7a360bf210589bdffe4e318"
-            [susfs_commit_android14_5_15]="10751e3c83f6e63f886cd2af937fd0a34463824b"
-            [susfs_commit_android14_6_1]="69b8e734920b8f9ed885ab8d112969719698e242"
-            [susfs_commit_android15_6_6]="ec03d0c73b821afa1d5037d6d493216f59744fcb"
-            [susfs_commit_android16_6_12]="395a8c0c88d348e9fe7c14f66a456fde4653287c"
+            [susfs_commit_android12_5_10]="784ac9e6fd49bb02499b5b60c57ccc9d0c680204"
+            [susfs_commit_android13_5_10]="d480b312d650601888550529695706f4a112e29e"
+            [susfs_commit_android13_5_15]="c1d1da42b74771944207ec45aaceff9c57e84985"
+            [susfs_commit_android14_5_15]="a293ab199ff84b7482d57ece06b4199411cd5c01"
+            [susfs_commit_android14_6_1]="f76b81f2a6bf98e4029cc0c823c054edbec29803"
+            [susfs_commit_android15_6_6]="f98f08223bbf469cc0a1542166383d253557fc32"
+            [susfs_commit_android16_6_12]="9b0b13f069673b9b07b713a5c66977de4d62b175"
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
-            [susfs_commit_android12_5_10]="5436438b5cc77f146e04f71070da153dabe17a9d"
-            [susfs_commit_android13_5_10]="1bea9e8fb4a64920f068e5da43f9751dfe601199"
-            [susfs_commit_android13_5_15]="fe943d15ec6a1891f7a360bf210589bdffe4e318"
-            [susfs_commit_android14_5_15]="10751e3c83f6e63f886cd2af937fd0a34463824b"
-            [susfs_commit_android14_6_1]="69b8e734920b8f9ed885ab8d112969719698e242"
-            [susfs_commit_android15_6_6]="ec03d0c73b821afa1d5037d6d493216f59744fcb"
-            [susfs_commit_android16_6_12]="395a8c0c88d348e9fe7c14f66a456fde4653287c"
+            [susfs_commit_android12_5_10]="784ac9e6fd49bb02499b5b60c57ccc9d0c680204"
+            [susfs_commit_android13_5_10]="d480b312d650601888550529695706f4a112e29e"
+            [susfs_commit_android13_5_15]="c1d1da42b74771944207ec45aaceff9c57e84985"
+            [susfs_commit_android14_5_15]="a293ab199ff84b7482d57ece06b4199411cd5c01"
+            [susfs_commit_android14_6_1]="f76b81f2a6bf98e4029cc0c823c054edbec29803"
+            [susfs_commit_android15_6_6]="f98f08223bbf469cc0a1542166383d253557fc32"
+            [susfs_commit_android16_6_12]="9b0b13f069673b9b07b713a5c66977de4d62b175"
           )
 
           pick() { # pinned repo ref  -> pinned when verified, else latest
@@ -307,6 +327,11 @@ jobs:
           # NoMount (pinned in verified mode, else dev tip)
           # NoMount always tracks the dev tip - never pinned, in either mode.
           emit nomount_commit "$(resolve_sha https://github.com/maxsteeel/nomount.git refs/heads/dev)"
+
+          # USB-Arsenal has no pin: the build clones its default branch, so the
+          # tip resolved here is what the notes report. Only used for the notes,
+          # never fed back into the build.
+          emit usba_commit "$(resolve_sha https://github.com/ravindu644/USB-Arsenal.git refs/heads/main)"
 
           # KernelSU-Next manager - always built from the official repo's dev branch.
           # pershoot's fork is used only for the kernel SUSFS integration (root_commit below),
@@ -522,14 +547,15 @@ jobs:
           # which is opt-in on dispatch and stays off for nightlies.
           if [ "${{ github.event_name }}" = "schedule" ]; then
             F_SUSFS=true;  F_NOMOUNT=true; F_BBG=true;  F_NET=true
-            F_DS=true;     F_NTSYNC=true;  F_PTRACE=true; F_UNICODE=true
-            F_BPF=true;    F_PERF=false
+            F_DS=true;     F_USBA=true;    F_NTSYNC=true; F_PTRACE=true; F_UNICODE=true
+            F_PERF=false; F_MISC=true
           else
             F_SUSFS="${{ inputs.use_susfs }}";   F_NOMOUNT="${{ inputs.use_nomount }}"
             F_BBG="${{ inputs.use_bbg }}";        F_NET="${{ inputs.use_net }}"
-            F_DS="${{ inputs.use_ds }}";          F_NTSYNC="${{ inputs.use_ntsync }}"
+            F_DS="${{ inputs.use_ds }}";          F_USBA="${{ inputs.use_usba }}"
+            F_NTSYNC="${{ inputs.use_ntsync }}"
             F_PTRACE="${{ inputs.use_ptrace }}";  F_UNICODE="${{ inputs.use_unicode }}"
-            F_BPF="${{ inputs.use_bpf }}";        F_PERF="${{ inputs.use_perf }}"
+            F_PERF="${{ inputs.use_perf }}"; F_MISC="${{ inputs.use_misc }}"
           fi
 
           FEATURES=""
@@ -538,11 +564,12 @@ jobs:
           [ "$F_BBG" = "true" ] && FEATURES="${FEATURES}BBG+"
           [ "$F_NET" = "true" ] && FEATURES="${FEATURES}NET+"
           [ "$F_DS" = "true" ] && FEATURES="${FEATURES}DS+"
+          [ "$F_USBA" = "true" ] && FEATURES="${FEATURES}USBA+"
           [ "$F_NTSYNC" = "true" ] && FEATURES="${FEATURES}NTSync+"
           [ "$F_PTRACE" = "true" ] && FEATURES="${FEATURES}Ptrace+"
           [ "$F_UNICODE" = "true" ] && FEATURES="${FEATURES}Unicode+"
-          [ "$F_BPF" = "true" ] && FEATURES="${FEATURES}BPF+"
           [ "$F_PERF" = "true" ] && FEATURES="${FEATURES}Perf+"
+          [ "$F_MISC" = "true" ] && FEATURES="${FEATURES}Misc+"
           echo "feature_set=${FEATURES%+}" >> "$GITHUB_OUTPUT"
 
       - name: Clone shared source repos once
@@ -1832,8 +1859,12 @@ jobs:
           USE_NTSYNC: ${{ inputs.use_ntsync || (github.event_name == 'schedule' && true) || false }}
           USE_PTRACE: ${{ inputs.use_ptrace || (github.event_name == 'schedule' && true) || false }}
           USE_UNICODE: ${{ inputs.use_unicode || (github.event_name == 'schedule' && true) || false }}
-          USE_BPF: ${{ inputs.use_bpf || (github.event_name == 'schedule' && true) || false }}
+          # BPF stack is disabled in the build (see build.yml); the notes still
+          # list it so users know it is off and where to ask.
+          USE_BPF: 'true'
           USE_PERF: ${{ inputs.use_perf || false }}
+          USE_USBA: ${{ contains(needs.resolve-sources.outputs.feature_set, 'USBA') }}
+          USBA_COMMIT: ${{ needs.resolve-sources.outputs.usba_commit }}
           PAGE_SIZE: ${{ inputs.page_size || '4k' }}
           KERNEL_BUILD_VERSION: ${{ inputs.kernel_build_version || 'All' }}
           NOMOUNT_COMMIT: ${{ needs.resolve-sources.outputs.nomount_commit }}

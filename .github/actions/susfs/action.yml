@@ -84,13 +84,35 @@ runs:
       working-directory: ${{ github.workspace }}/kernel/KernelSU
       run: |
         set -euo pipefail
-        PATCH="${{ github.workspace }}/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-        if [ ! -f "$PATCH" ]; then
-          echo "Missing 10_enable_susfs_for_ksu.patch at $PATCH" >&2
-          exit 1
+        UPSTREAM="${{ github.workspace }}/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+        # The KSU-side enable patch only touches the KernelSU tree, so it is not
+        # kernel-family specific - the seven susfs4ksu copies differ only in how
+        # far behind KernelSU each branch's authoring is. Six of them (all but
+        # 6.1) still describe the pre-#3996 selinux_hide.c layout and fail 6
+        # hunks against KernelSU 64833c0, while 6.1's was rewritten for it:
+        #
+        #   Hunk #1/#2/#3/#10/#13 FAILED at 1/16/24/284/325 (selinux_hide.c)
+        #
+        # So prefer our vendored copy of 6.1's patch, which dry-runs clean,
+        # and fall back to the family's own patch on any tree it does not fit.
+        VENDORED="${{ github.workspace }}/.github/patches/susfs-ksu/10_enable_susfs_for_ksu.patch"
+        PATCH="$UPSTREAM"
+        [ -f "$UPSTREAM" ] || { echo "Missing 10_enable_susfs_for_ksu.patch at $UPSTREAM" >&2; exit 1; }
+        if [ -f "$VENDORED" ] && patch -p1 --dry-run --forward -f < "$VENDORED" >/dev/null 2>&1; then
+          PATCH="$VENDORED"
+          echo "[*] using the vendored SUSFS enable patch (applies clean to this KernelSU)"
+        else
+          echo "[*] vendored enable patch does not fit; using the family's own copy"
         fi
         echo "Applying SUSFS enable patch to KernelSU (tiann) checkout (kernel/KernelSU/kernel)"
-        patch -p1 < "$PATCH"
+        patch -p1 --forward < "$PATCH"
+        # A silently partial apply is the failure mode worth guarding: the
+        # kernel then builds without SUSFS hooks and only fails much later.
+        REJ="$(find . -name '*.rej' -print -quit)"
+        if [ -n "$REJ" ]; then
+          echo "ERROR: $PATCH left rejects ($REJ)" >&2
+          exit 1
+        fi
 
     - name: Pin FinaSU manager as the only trusted manager
       # FinaSU carries its own SUSFS kernel-side glue since 5b83330b
@@ -196,6 +218,10 @@ runs:
     # the gated sources no longer contain it either, so the step was a no-op.)
 
     - name: Fix selinux_hide pointer-bool-conversion on 6.6+ (ALL branches)
+      # Not a SUSFS fix: selinux_hide.c ships in the root flavour's own tree, so this is
+      # needed whenever a root flavour is built, SUSFS or not. With no root there is no
+      # such file and the list below is empty - gated so that case is explicit.
+      if: inputs.root_flavor != '' && inputs.root_flavor != 'none'
       # Runs whether or not SUSFS patches were applied: every root flavor
       # compiles its own selinux_hide.c, and 6.6+ clang turns the bare
       # `if (fn)` forms into -Werror. The file list used to be fed from

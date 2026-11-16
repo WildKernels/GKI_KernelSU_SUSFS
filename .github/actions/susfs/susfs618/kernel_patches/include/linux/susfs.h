@@ -9,18 +9,12 @@
 #include <linux/susfs_def.h>
 #include <linux/statfs.h>
 
-#define SUSFS_VERSION "v2.3.0"
+#define SUSFS_VERSION "v2.4.0"
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 #define SUSFS_VARIANT "NON-GKI"
 #else
 #define SUSFS_VARIANT "GKI"
 #endif
-
-/*********/
-/* MACRO */
-/*********/
-#define getname_safe(name) (name == NULL ? ERR_PTR(-EINVAL) : getname(name))
-#define putname_safe(name) (IS_ERR(name) ? NULL : putname(name))
 
 /********/
 /* ENUM */
@@ -49,6 +43,12 @@ struct st_susfs_sus_path_list {
 	struct list_head                        list;
 	struct st_susfs_sus_path                info;
 	char                                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
+};
+
+/* sus_path uid filter */
+struct st_susfs_sus_path_uid_filter {
+	char                                    app_strings[SUSFS_APP_STR_BUF_SIZE];
+	int                                     err;
 };
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
 
@@ -163,7 +163,6 @@ struct st_susfs_sus_map {
 
 /* getpriority uid filter */
 #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
-#define SUSFS_APP_STR_BUF_SIZE 65535
 struct st_susfs_priority_uid_filter {
 	char                                    app_strings[SUSFS_APP_STR_BUF_SIZE];
 	int                                     err;
@@ -201,6 +200,8 @@ struct st_susfs_version {
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH
 void susfs_add_sus_path(void __user **user_info);
 void susfs_add_sus_path_loop(void __user **user_info);
+void susfs_set_sus_path_uid_filter(void __user **user_info);
+void susfs_parse_sus_path_app_strings(void);
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
 
 /* sus_mount */

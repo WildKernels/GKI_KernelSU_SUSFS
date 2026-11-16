@@ -1,0 +1,16 @@
+name: 'Single manager for SukiSU-Ultra (trim cert table)'
+description: 'Single manager for SukiSU-Ultra (trim cert table) (composite, keeps the workflow to one entry)'
+inputs:
+  root_flavor:
+    description: 'root_flavor'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Single manager for SukiSU-Ultra (trim cert table)
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        python3 "${GITHUB_WORKSPACE}/.github/scripts/trim_sukisu_managers.py" SukiSU-Ultra

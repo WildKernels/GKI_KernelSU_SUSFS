@@ -1,0 +1,46 @@
+name: 'Verify the wild fragment landed in .config'
+description: 'Check every config the fragment asked for against the resolved .config'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Compare wild_defconfig.fragment against the built .config
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -uo pipefail
+        CONFIG_FILE=""
+        for candidate in \
+          bazel-bin/common/kernel_aarch64_config/out_dir/.config \
+          /home/runner/out/.config; do
+          if [ -f "$candidate" ]; then CONFIG_FILE="$candidate"; break; fi
+        done
+        if [ -z "$CONFIG_FILE" ]; then
+          CONFIG_FILE="$(find bazel-bin/common /home/runner/out -maxdepth 4 -name .config -type f 2>/dev/null | head -n1 || true)"
+        fi
+        FRAGMENT="${{ github.workspace }}/kernel/common/wild_defconfig.fragment"
+        if [ -z "${CONFIG_FILE:-}" ]; then
+          echo "::error title=fragment check::no .config in the build output"
+          exit 1
+        fi
+        if [ ! -s "$FRAGMENT" ]; then
+          echo "no wild_defconfig.fragment in this build - nothing to verify"
+          exit 0
+        fi
+        echo "fragment: $FRAGMENT"
+        echo "config:   $CONFIG_FILE"
+        set +e
+        OUT=$(python3 "${{ github.workspace }}/.github/scripts/verify_fragment.py" \
+                "$FRAGMENT" --config "$CONFIG_FILE" 2>&1)
+        rc=$?
+        set -e
+        printf '%s\n' "$OUT"
+        {
+          echo ""
+          echo "### Fragment vs .config"
+          echo ""
+          echo '```'
+          printf '%s\n' "$OUT"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        exit $rc

@@ -1,0 +1,345 @@
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 7feb7dde6..8a6dca3bc 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1206,8 +1206,7 @@ struct task_struct {
+ 	struct nameidata		*nameidata;
+ 
+ #ifdef CONFIG_SYSVIPC
+-	struct sysv_sem			sysvsem;
+-	struct sysv_shm			sysvshm;
++	/* state is in sysv_state.c, keyed by task; see include/linux/sysv_task.h */
+ #endif
+ #ifdef CONFIG_DETECT_HUNG_TASK
+ 	unsigned long			last_switch_count;
+diff --git a/include/linux/shm.h b/include/linux/shm.h
+index 1d3d3ae95..3bb8ee9d6 100644
+--- a/include/linux/shm.h
++++ b/include/linux/shm.h
+@@ -17,7 +17,7 @@ struct sysv_shm {
+ long do_shmat(int shmid, char __user *shmaddr, int shmflg, unsigned long *addr,
+ 	      unsigned long shmlba);
+ void exit_shm(struct task_struct *task);
+-#define shm_init_task(task) INIT_LIST_HEAD(&(task)->sysvshm.shm_clist)
++#define shm_init_task(task) do { } while (0) /* list set up on first use */
+ #else
+ struct sysv_shm {
+ 	/* empty */
+diff --git a/include/linux/sysv_task.h b/include/linux/sysv_task.h
+new file mode 100644
+index 000000000..9f063d9c2
+--- /dev/null
++++ b/include/linux/sysv_task.h
+@@ -0,0 +1,57 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_SYSV_TASK_H
++#define _LINUX_SYSV_TASK_H
++
++#include <linux/list.h>
++#include <linux/types.h>
++
++/*
++ * Per-task System V IPC state, held outside struct task_struct.
++ *
++ * CONFIG_SYSVIPC normally adds two members to task_struct. On 6.18 that moves the
++ * modversion CRC of every symbol whose type graph reaches task_struct (measured:
++ * 6,329 of 9,741), even if the members are relocated into identical padding. This
++ * keeps the member list identical to a stock CONFIG_SYSVIPC=n build and stores the
++ * state in a table keyed by task pointer instead.
++ *
++ * A NULL result means "no state", which every caller treats as empty; the allocation
++ * happens on first use, so a task that never touches SysV IPC never pays for it.
++ */
++
++struct task_struct;
++struct sem_undo_list;
++
++struct sysv_task_state {
++	struct sem_undo_list	*undo_list;
++	struct list_head	 shm_clist;
++};
++
++#ifdef CONFIG_SYSVIPC
++struct sysv_task_state *sysv_task_state_get(struct task_struct *tsk, bool alloc);
++void sysv_task_state_free(struct task_struct *tsk);
++
++/* NULL-safe accessor for callers that only read the undo list (kcmp). */
++static inline struct sem_undo_list *sysv_task_undo(struct task_struct *tsk)
++{
++	struct sysv_task_state *st = sysv_task_state_get(tsk, false);
++
++	return st ? st->undo_list : NULL;
++}
++#else /* CONFIG_SYSVIPC */
++static inline struct sysv_task_state *sysv_task_state_get(struct task_struct *tsk,
++							  bool alloc)
++{
++	return NULL;
++}
++
++static inline void sysv_task_state_free(struct task_struct *tsk)
++{
++}
++
++static inline struct sem_undo_list *sysv_task_undo(struct task_struct *tsk)
++{
++	return NULL;
++}
++#endif /* CONFIG_SYSVIPC */
++
++#endif /* _LINUX_SYSV_TASK_H */
+diff --git a/ipc/sem.c b/ipc/sem.c
+index 0f06e4bd4..e4f8c0cb9 100644
+--- a/ipc/sem.c
++++ b/ipc/sem.c
+@@ -84,6 +84,7 @@
+ #include <linux/rwsem.h>
+ #include <linux/nsproxy.h>
+ #include <linux/ipc_namespace.h>
++#include <linux/sysv_task.h>
+ #include <linux/sched/wake_q.h>
+ #include <linux/nospec.h>
+ #include <linux/rhashtable.h>
+@@ -1849,9 +1850,14 @@ COMPAT_SYSCALL_DEFINE4(old_semctl, int, semid, int, semnum, int, cmd, int, arg)
+  */
+ static inline int get_undo_list(struct sem_undo_list **undo_listp)
+ {
++	struct sysv_task_state *st;
+ 	struct sem_undo_list *undo_list;
+ 
+-	undo_list = current->sysvsem.undo_list;
++	st = sysv_task_state_get(current, true);
++	if (!st)
++		return -ENOMEM;
++
++	undo_list = st->undo_list;
+ 	if (!undo_list) {
+ 		undo_list = kzalloc(sizeof(*undo_list), GFP_KERNEL_ACCOUNT);
+ 		if (undo_list == NULL)
+@@ -1860,7 +1866,7 @@ static inline int get_undo_list(struct sem_undo_list **undo_listp)
+ 		refcount_set(&undo_list->refcnt, 1);
+ 		INIT_LIST_HEAD(&undo_list->list_proc);
+ 
+-		current->sysvsem.undo_list = undo_list;
++		st->undo_list = undo_list;
+ 	}
+ 	*undo_listp = undo_list;
+ 	return 0;
+@@ -2306,16 +2312,23 @@ SYSCALL_DEFINE3(semop, int, semid, struct sembuf __user *, tsops,
+ int copy_semundo(u64 clone_flags, struct task_struct *tsk)
+ {
+ 	struct sem_undo_list *undo_list;
++	struct sysv_task_state *st;
+ 	int error;
+ 
+ 	if (clone_flags & CLONE_SYSVSEM) {
++		st = sysv_task_state_get(tsk, true);
++		if (!st)
++			return -ENOMEM;
+ 		error = get_undo_list(&undo_list);
+ 		if (error)
+ 			return error;
+ 		refcount_inc(&undo_list->refcnt);
+-		tsk->sysvsem.undo_list = undo_list;
+-	} else
+-		tsk->sysvsem.undo_list = NULL;
++		st->undo_list = undo_list;
++	} else {
++		st = sysv_task_state_get(tsk, false);
++		if (st)
++			st->undo_list = NULL;
++	}
+ 
+ 	return 0;
+ }
+@@ -2334,12 +2347,17 @@ int copy_semundo(u64 clone_flags, struct task_struct *tsk)
+  */
+ void exit_sem(struct task_struct *tsk)
+ {
++	struct sysv_task_state *st;
+ 	struct sem_undo_list *ulp;
+ 
+-	ulp = tsk->sysvsem.undo_list;
++	st = sysv_task_state_get(tsk, false);
++	if (!st)
++		return;
++
++	ulp = st->undo_list;
+ 	if (!ulp)
+ 		return;
+-	tsk->sysvsem.undo_list = NULL;
++	st->undo_list = NULL;
+ 
+ 	if (!refcount_dec_and_test(&ulp->refcnt))
+ 		return;
+diff --git a/ipc/shm.c b/ipc/shm.c
+index c77a6c868..0eb11c56a 100644
+--- a/ipc/shm.c
++++ b/ipc/shm.c
+@@ -44,6 +44,7 @@
+ #include <linux/nsproxy.h>
+ #include <linux/mount.h>
+ #include <linux/ipc_namespace.h>
++#include <linux/sysv_task.h>
+ #include <linux/rhashtable.h>
+ #include <linux/nstree.h>
+ 
+@@ -449,15 +450,17 @@ void exit_shm(struct task_struct *task)
+ 	for (;;) {
+ 		struct shmid_kernel *shp;
+ 		struct ipc_namespace *ns;
++		struct sysv_task_state *st;
+ 
+ 		task_lock(task);
+ 
+-		if (list_empty(&task->sysvshm.shm_clist)) {
++		st = sysv_task_state_get(task, false);
++		if (!st || list_empty(&st->shm_clist)) {
+ 			task_unlock(task);
+ 			break;
+ 		}
+ 
+-		shp = list_first_entry(&task->sysvshm.shm_clist, struct shmid_kernel,
++		shp = list_first_entry(&st->shm_clist, struct shmid_kernel,
+ 				shm_clist);
+ 
+ 		/*
+@@ -708,6 +711,7 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
+ 	size_t size = params->u.size;
+ 	int error;
+ 	struct shmid_kernel *shp;
++	struct sysv_task_state *st;
+ 	size_t numpages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+ 	struct file *file;
+ 	char name[13];
+@@ -785,8 +789,14 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
+ 
+ 	shp->ns = ns;
+ 
++	st = sysv_task_state_get(current, true);
++	if (!st) {
++		error = -ENOMEM;
++		goto no_id;
++	}
++
+ 	task_lock(current);
+-	list_add(&shp->shm_clist, &current->sysvshm.shm_clist);
++	list_add(&shp->shm_clist, &st->shm_clist);
+ 	task_unlock(current);
+ 
+ 	/*
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 2cf7909a7..53f6b11c8 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -207,3 +207,4 @@ $(obj)/kheaders.md5: $(obj)/kheaders-srclist FORCE
+ 	$(call filechk,kheaders_md5sum)
+ 
+ clean-files := kheaders.md5 kheaders-srclist kheaders-objlist
++obj-$(CONFIG_SYSVIPC) += sysv_state.o
+diff --git a/kernel/fork.c b/kernel/fork.c
+index 18b34e695..0af766460 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -20,6 +20,7 @@
+ #include <linux/sched/numa_balancing.h>
+ #include <linux/sched/stat.h>
+ #include <linux/sched/task.h>
++#include <linux/sysv_task.h>
+ #include <linux/sched/task_stack.h>
+ #include <linux/sched/cputime.h>
+ #include <linux/sched/ext.h>
+@@ -499,6 +500,7 @@ void free_task(struct task_struct *tsk)
+ 	WARN_ON_ONCE(tsk->seccomp.filter);
+ #endif
+ 	cpufreq_task_times_exit(tsk);
++	sysv_task_state_free(tsk);
+ 	release_user_cpus_ptr(tsk);
+ 	scs_release(tsk);
+ 
+diff --git a/kernel/kcmp.c b/kernel/kcmp.c
+index 7c1a65bd5..c629a1d89 100644
+--- a/kernel/kcmp.c
++++ b/kernel/kcmp.c
+@@ -15,6 +15,7 @@
+ #include <linux/capability.h>
+ #include <linux/list.h>
+ #include <linux/eventpoll.h>
++#include <linux/sysv_task.h>
+ #include <linux/file.h>
+ 
+ #include <asm/unistd.h>
+@@ -196,8 +197,7 @@ SYSCALL_DEFINE5(kcmp, pid_t, pid1, pid_t, pid2, int, type,
+ 		break;
+ 	case KCMP_SYSVSEM:
+ #ifdef CONFIG_SYSVIPC
+-		ret = kcmp_ptr(task1->sysvsem.undo_list,
+-			       task2->sysvsem.undo_list,
++		ret = kcmp_ptr(sysv_task_undo(task1), sysv_task_undo(task2),
+ 			       KCMP_SYSVSEM);
+ #else
+ 		ret = -EOPNOTSUPP;
+diff --git a/kernel/sysv_state.c b/kernel/sysv_state.c
+new file mode 100644
+index 000000000..624d57c96
+--- /dev/null
++++ b/kernel/sysv_state.c
+@@ -0,0 +1,58 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Per-task System V IPC state, keyed by task pointer.
++ *
++ * struct task_struct normally carries sysvsem and sysvshm when CONFIG_SYSVIPC is on.
++ * On 6.18 adding them - or relocating them into equivalent padding - moves 6,329 of
++ * 9,741 modversion CRCs, because the member list itself is what genksyms hashes. So
++ * the members are not declared at all and the state lives here instead, leaving
++ * task_struct byte- and member-identical to a stock CONFIG_SYSVIPC=n build.
++ *
++ * Lookups happen only on SysV IPC paths: semtimedop, exit_sem, shmat/shmdt and kcmp.
++ * The allocation is lazy; NULL means "no state yet" and callers treat it as empty.
++ */
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/xarray.h>
++#include <linux/sysv_task.h>
++
++static DEFINE_XARRAY(sysv_states);
++static DEFINE_SPINLOCK(sysv_states_lock);
++
++struct sysv_task_state *sysv_task_state_get(struct task_struct *tsk, bool alloc)
++{
++	unsigned long key = (unsigned long)tsk;
++	struct sysv_task_state *st, *old;
++
++	st = xa_load(&sysv_states, key);
++	if (st || !alloc)
++		return st;
++
++	st = kzalloc(sizeof(*st), GFP_KERNEL_ACCOUNT);
++	if (!st)
++		return NULL;
++	INIT_LIST_HEAD(&st->shm_clist);
++
++	spin_lock_irq(&sysv_states_lock);
++	old = xa_load(&sysv_states, key);
++	if (old) {
++		spin_unlock_irq(&sysv_states_lock);
++		kfree(st);
++		return old;
++	}
++	xa_store(&sysv_states, key, st, GFP_ATOMIC);
++	spin_unlock_irq(&sysv_states_lock);
++
++	return st;
++}
++
++void sysv_task_state_free(struct task_struct *tsk)
++{
++	struct sysv_task_state *st;
++
++	spin_lock_irq(&sysv_states_lock);
++	st = xa_erase(&sysv_states, (unsigned long)tsk);
++	spin_unlock_irq(&sysv_states_lock);
++	kfree(st);
++}
