@@ -77,7 +77,7 @@ runs:
 
         # Retry policy: googlesource periodically serves deprecated branches
         # at ZERO progress - the fetch hangs with no bytes and only dies when
-        # the timeout wrapper kills it 15 minutes later (run 37814552622,
+        # the timeout wrapper kills it 20 minutes later (run 37814552622,
         # android13-5.10-2022-05: 3 x 15m stalls, all dead time). Two fixes:
         #   1. git's own lowSpeed abort (http.lowSpeedLimit/lowSpeedTime):
         #      die after 60s below 1KB/s instead of idling to the wall clock,
@@ -89,7 +89,11 @@ runs:
         # Backoff graduates 15s/30s/60s/120s/240s so a genuinely bad serving
         # window gets spaced-out retries rather than rapid-fire reruns.
         MAX_RETRIES=5
-        SYNC_TIMEOUT="15m"
+        # Sync wall clock, 20m on every attempt. The first is a cold clone of
+        # every project; the retries are not reliably cheaper either - a retry
+        # that lands mid-serving-window still has to fetch the same manifests,
+        # and 15m cut those short.
+        SYNC_TIMEOUTS=("20m" "20m" "20m" "20m" "20m")
         RETRY_DELAYS=(15 30 60 120 240)
         # --jobs-checkout is the local-work knob (git checkout), so cores are the
         # right input; -j above stays network concurrency. Every GitHub-hosted
@@ -126,6 +130,7 @@ runs:
 
         while [ $attempt -le $MAX_RETRIES ]; do
           CURRENT_DEPTH="${DEPTHS[$((attempt-1))]}"
+          SYNC_TIMEOUT="${SYNC_TIMEOUTS[$((attempt-1))]}"
           echo "Attempt $attempt/$MAX_RETRIES: initialize and sync kernel repository (depth=${CURRENT_DEPTH}, sync timeout $SYNC_TIMEOUT, stall abort: <1KB/s for 60s)..."
           df -h "$PWD" | tail -n +2 || true
           if init_repo "$CURRENT_DEPTH"; then
