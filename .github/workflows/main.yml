@@ -1370,6 +1370,10 @@ jobs:
         with:
           name: AIO-REJ
           path: AIO-REJ.zip
+          # A run with zero rejects is the normal, healthy case: the collector
+          # only writes the zip when it finds something, so a missing file is
+          # not a failure worth an annotation on every green build.
+          if-no-files-found: ignore
 
   release:
     runs-on: ubuntu-latest
@@ -1867,6 +1871,10 @@ jobs:
           USBA_COMMIT: ${{ needs.resolve-sources.outputs.usba_commit }}
           PAGE_SIZE: ${{ inputs.page_size || '4k' }}
           KERNEL_BUILD_VERSION: ${{ inputs.kernel_build_version || 'All' }}
+          # The Root table derives each manager version from the commits API;
+          # without a token that probe is anonymous and gets rate limited, which
+          # silently blanked every version in run 43959326934.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NOMOUNT_COMMIT: ${{ needs.resolve-sources.outputs.nomount_commit }}
           KSU_COMMIT: ${{ needs.resolve-sources.outputs.ksu_commit }}
           BAKASU_COMMIT: ${{ needs.resolve-sources.outputs.bakasu_commit }}

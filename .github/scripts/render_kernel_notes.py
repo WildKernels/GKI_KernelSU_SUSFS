@@ -1,3 +1,4 @@
+import sys
 import json, os, re, time
 def env(n,d=""): return os.environ.get(n,d).strip() or d
 def parse_managers(raw):
@@ -88,6 +89,10 @@ def manager_version(flavour, sha):
         import urllib.request, urllib.error
         url = "https://api.github.com/repos/%s/commits?sha=%s&per_page=1" % (repo, ref)
         token = os.environ.get("GITHUB_TOKEN", "").strip()
+        if not token:
+            sys.stderr.write(
+                "warning: GITHUB_TOKEN is not set; the version probe is "
+                "unauthenticated and may be rate limited\n")
         for _ in range(2):
             try:
                 req = urllib.request.Request(url, method="HEAD")
@@ -100,8 +105,15 @@ def manager_version(flavour, sha):
                 count = int(m.group(1)) if m else 1
                 ver = str(30000 + count)
                 break
-            except Exception:
-                pass
+            except Exception as exc:
+                # Never fall back silently: an empty version is indistinguishable
+                # from a rate-limited probe, which is exactly how every manager
+                # lost its number in run 43959326934.
+                code = getattr(exc, "code", "")
+                sys.stderr.write(
+                    "warning: %s version probe failed (%s%s); showing a dash\n"
+                    % (flavour, type(exc).__name__, " %s" % code if code else ""))
+                break
     _mgr_ver_cache[flavour] = ver
     return ver
 
@@ -112,7 +124,10 @@ for _fl0 in _flavors0:
     if _c and len(_c)==40: _commit=f"[`{_c[:7]}`]({_root_urls[_fl0]}{_c})"
     elif _c: _commit=f"`{_c}`"
     else: _commit="_n/a_"
-    _vcell = _v if _v else "_n/a_"
+    # Deliberately NOT _n/a_: that string is the release job's sentinel for an
+    # unresolved workflow output, so reusing it here made a missing version look
+    # like a broken pipeline and failed the release (#43959326934).
+    _vcell = _v if _v else "\u2014"
     _rc.append("| %s | %s | %s |" % (_labels0.get(_fl0,_fl0), _vcell, _commit))
 if _rc:
     lines.append("| Root | Version | Commit |")
