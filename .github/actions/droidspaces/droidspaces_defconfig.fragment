@@ -36,7 +36,7 @@ CONFIG_CFS_BANDWIDTH=y
 # kernel/cgroup outside its own definition - and genksyms only emits a type CRC
 # for types a symbol's signature names. Nothing else in include/ is conditional
 # on the option, so no struct layout changes and no symbols gain or lose CRCs.
-CONFIG_CGROUP_PIDS=y
+# CONFIG_CGROUP_PIDS=y   [bisect: CFS_BANDWIDTH only]
 
 # optional but recommended: docker's unsafe procfs check
 CONFIG_USER_NS=y
