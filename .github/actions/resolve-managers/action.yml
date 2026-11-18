@@ -244,6 +244,12 @@ runs:
                 "$flavor" "$owner" "$repo" "$stock" "$want"
               return 0
             fi
+            if [[ "$flavor" == "sukisu-nova" ]]; then
+              echo "WARNING: no ${owner}/${repo} manager build for ${stock}; requires build_from_source at that exact commit" >&2
+              printf -v REC '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":null,"stock":"%s","want":"%s","note":"no-ci-run"}' \
+                "$flavor" "$owner" "$repo" "$stock" "$want"
+              return 0
+            fi
             if [[ "$pinned" == "1" && "${INPUT_ALLOW_FALLBACK:-true}" != "true" ]]; then
               echo "ERROR: no ${owner}/${repo} manager build exists for pinned commit ${stock}" >&2
               exit 1
@@ -261,7 +267,6 @@ runs:
             "$flavor" "$owner" "$repo" "$run_id" "$stock" "$want" "$note"
           return 0
         }
-
         FLAVORS="${INPUT_ROOT_FLAVOR:-All}"
         echo "Root flavor: ${FLAVORS}" >&2
         LIST=""
