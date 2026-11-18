@@ -35,6 +35,10 @@ inputs:
     description: 'SukiSU-Ultra commit to match (empty = resolve the main tip)'
     required: false
     default: ''
+  sukisu_nova_commit:
+    description: 'SukiSU-Nova commit to match (empty = resolve the main tip)'
+    required: false
+    default: ''
   finasu_commit:
     description: 'FinaSU commit to match (empty = resolve the master tip)'
     required: false
@@ -60,6 +64,7 @@ runs:
         INPUT_KSU_COMMIT: ${{ inputs.kernelsu_commit }}
         INPUT_BAKASU_COMMIT: ${{ inputs.bakasu_commit }}
         INPUT_SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
+        INPUT_SUKISU_NOVA_COMMIT: ${{ inputs.sukisu_nova_commit }}
         INPUT_FINASU_COMMIT: ${{ inputs.finasu_commit }}
       run: |
         set -euo pipefail
@@ -203,6 +208,11 @@ runs:
               branch="main"; want="Manager,Spoofed-Manager"
               resolve_stock "${mc:-${INPUT_SUKISU_ULTRA_COMMIT:-}}" sukisu_ultra_commit https://github.com/SukiSU-Ultra/SukiSU-Ultra.git main
               ;;
+            sukisu-nova)
+              owner="SukiSU-Nova"; repo="SukiSU-Nova"; wf="manager.yml"
+              branch="main"; want="Manager"
+              resolve_stock "${mc:-${INPUT_SUKISU_NOVA_COMMIT:-}}" sukisu_nova_commit https://github.com/SukiSU-Nova/SukiSU-Nova.git main
+              ;;
             finasu)
               owner="LyraVoid"; repo="FinaSU"; wf="build-manager.yml"
               branch="master"; want="manager"
@@ -234,6 +244,12 @@ runs:
                 "$flavor" "$owner" "$repo" "$stock" "$want"
               return 0
             fi
+            if [[ "$flavor" == "sukisu-nova" ]]; then
+              echo "WARNING: no ${owner}/${repo} manager build for ${stock}; requires build_from_source at that exact commit" >&2
+              printf -v REC '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":null,"stock":"%s","want":"%s","note":"no-ci-run"}' \
+                "$flavor" "$owner" "$repo" "$stock" "$want"
+              return 0
+            fi
             if [[ "$pinned" == "1" && "${INPUT_ALLOW_FALLBACK:-true}" != "true" ]]; then
               echo "ERROR: no ${owner}/${repo} manager build exists for pinned commit ${stock}" >&2
               exit 1
@@ -251,7 +267,6 @@ runs:
             "$flavor" "$owner" "$repo" "$run_id" "$stock" "$want" "$note"
           return 0
         }
-
         FLAVORS="${INPUT_ROOT_FLAVOR:-All}"
         echo "Root flavor: ${FLAVORS}" >&2
         LIST=""
@@ -272,6 +287,7 @@ runs:
           KernelSU) resolve_one kernelsu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           BakaSU) resolve_one bakasu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           SukiSU-Ultra) resolve_one sukisu-ultra; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          SukiSU-Nova) resolve_one sukisu-nova; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           KowSU) resolve_one kowsu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           FinaSU) resolve_one finasu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           *) echo "Skipping manager resolution (no root flavor / none)." >&2 ;;
