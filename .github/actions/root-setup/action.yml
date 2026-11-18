@@ -170,6 +170,12 @@ runs:
         python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
           "${{ github.workspace }}/.github/actions/root-setup/enable-root-configuration.fragment" \
           --dest wild_defconfig.fragment --label enable-root-configuration
+    - name: Enable SUSFS for SukiSU-Nova
+      if: inputs.flavor == 'sukisu-nova'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        echo "CONFIG_KSU_SUSFS=y" >> wild_defconfig.fragment
     - name: Soften KernelSU-Next Kbuild config guard for mrproper
       if: inputs.flavor == 'next'
       shell: bash
