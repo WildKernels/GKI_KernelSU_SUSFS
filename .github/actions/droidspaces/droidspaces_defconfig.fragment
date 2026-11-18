@@ -28,6 +28,16 @@ CONFIG_PID_NS=y
 # does not show it. On 6.18 stock already sets it, so nothing moves there.
 CONFIG_CFS_BANDWIDTH=y
 
+# Container process limits (pids.max). Unlike CFS_BANDWIDTH this needs no ABI
+# shadow: CONFIG_CGROUP_PIDS adds struct pids_cgroup, which is local to
+# kernel/cgroup/pids.c and never embedded anywhere, and one enumerator to
+# 'enum cgroup_subsys_id' via include/linux/cgroup_subsys.h. That enum appears
+# in no exported prototype - 0 occurrences anywhere in include/linux or
+# kernel/cgroup outside its own definition - and genksyms only emits a type CRC
+# for types a symbol's signature names. Nothing else in include/ is conditional
+# on the option, so no struct layout changes and no symbols gain or lose CRCs.
+CONFIG_CGROUP_PIDS=y
+
 # optional but recommended: docker's unsafe procfs check
 CONFIG_USER_NS=y
 # HW access
