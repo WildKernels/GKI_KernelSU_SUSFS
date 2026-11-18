@@ -35,6 +35,10 @@ inputs:
     description: 'SukiSU-Ultra commit to match (empty = resolve the main tip)'
     required: false
     default: ''
+  sukisu_nova_commit:
+    description: 'SukiSU-Nova commit to match (empty = resolve the main tip)'
+    required: false
+    default: ''
   finasu_commit:
     description: 'FinaSU commit to match (empty = resolve the master tip)'
     required: false
@@ -60,6 +64,7 @@ runs:
         INPUT_KSU_COMMIT: ${{ inputs.kernelsu_commit }}
         INPUT_BAKASU_COMMIT: ${{ inputs.bakasu_commit }}
         INPUT_SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
+        INPUT_SUKISU_NOVA_COMMIT: ${{ inputs.sukisu_nova_commit }}
         INPUT_FINASU_COMMIT: ${{ inputs.finasu_commit }}
       run: |
         set -euo pipefail
@@ -203,6 +208,11 @@ runs:
               branch="main"; want="Manager,Spoofed-Manager"
               resolve_stock "${mc:-${INPUT_SUKISU_ULTRA_COMMIT:-}}" sukisu_ultra_commit https://github.com/SukiSU-Ultra/SukiSU-Ultra.git main
               ;;
+            sukisu-nova)
+              owner="SukiSU-Nova"; repo="SukiSU-Nova"; wf="manager.yml"
+              branch="main"; want="Manager"
+              resolve_stock "${mc:-${INPUT_SUKISU_NOVA_COMMIT:-}}" sukisu_nova_commit https://github.com/SukiSU-Nova/SukiSU-Nova.git main
+              ;;
             finasu)
               owner="LyraVoid"; repo="FinaSU"; wf="build-manager.yml"
               branch="master"; want="manager"
@@ -272,6 +282,7 @@ runs:
           KernelSU) resolve_one kernelsu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           BakaSU) resolve_one bakasu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           SukiSU-Ultra) resolve_one sukisu-ultra; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
+          SukiSU-Nova) resolve_one sukisu-nova; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           KowSU) resolve_one kowsu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           FinaSU) resolve_one finasu; LIST=$(jq -c -n '[inputs]' <<< "$REC") ;;
           *) echo "Skipping manager resolution (no root flavor / none)." >&2 ;;
