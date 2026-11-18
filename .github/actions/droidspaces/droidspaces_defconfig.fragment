@@ -26,7 +26,7 @@ CONFIG_PID_NS=y
 # __task_rq_lock, __migrate_task, __balance_callbacks - and their CRCs move.
 # include/ has no CONFIG_CFS_BANDWIDTH reference, which is why grepping headers
 # does not show it. On 6.18 stock already sets it, so nothing moves there.
-CONFIG_CFS_BANDWIDTH=y
+# CONFIG_CFS_BANDWIDTH=y   [bisect: CGROUP_PIDS only]
 
 # Container process limits (pids.max). Unlike CFS_BANDWIDTH this needs no ABI
 # shadow: CONFIG_CGROUP_PIDS adds struct pids_cgroup, which is local to
