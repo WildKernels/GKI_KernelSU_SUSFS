@@ -105,20 +105,28 @@ runs:
         grep -q 'sysv_task_state_get' ipc/sem.c || { echo "ERROR: port applied but sem.c unchanged" >&2; exit 1; }
         echo "task-table port applied"
 
-    - name: Keep CFS_BANDWIDTH out of the exported ABI
-      # Enabling CONFIG_CFS_BANDWIDTH (cpu.max for containers) adds members to
-      # struct cfs_bandwidth and struct cfs_rq; struct rq embeds cfs_rq, so
-      # genksyms expands the type through every exported symbol naming
-      # 'struct rq *' and those CRCs move. Gate the two gated blocks on
-      # !defined(__GENKSYMS__): the compiler gets the real struct, genksyms gets
-      # exactly the stock one, because stock builds with the option off. This is
-      # the same shadowing the BBRv3 ports use, and it is safe here because
-      # kernel/sched/sched.h is not part of the GKI module headers.
+    - name: Keep CFS_BANDWIDTH and CGROUP_PIDS out of the exported ABI
+      # Both options are off in stock GKI and both move genksyms' view of types
+      # that exported symbols reach, so both are shadowed on
+      # !defined(__GENKSYMS__): the compiler gets the real layout, genksyms gets
+      # the stock one, which is what stock builds anyway. Same technique as the
+      # BBRv3 ports, and safe because neither struct is in the GKI module headers.
+      #
+      #   CFS_BANDWIDTH: members in struct cfs_bandwidth / struct cfs_rq; struct
+      #   rq embeds cfs_rq, so every exported symbol naming 'struct rq *' moves
+      #   (__traceiter_android_rvh_*, __task_rq_lock, __migrate_task,
+      #   __balance_callbacks).
+      #
+      #   CGROUP_PIDS: a SUBSYS(pids) entry increments CGROUP_SUBSYS_COUNT, the
+      #   constant that sizes fixed arrays in struct cgroup and struct css_set,
+      #   so both grow and it propagates widely - measured on
+      #   android14-6.1-2026-06 without this guard: 3241 of 8865 symbols drifted
+      #   (job 134742656292), against 0 with the options off (job 133855319348).
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         set -euo pipefail
-        python3 "${{ github.workspace }}/.github/scripts/cfs_bandwidth_kabi_shadow.py" "$PWD"
+        python3 "${{ github.workspace }}/.github/scripts/droidspaces_kabi_shadow.py" "$PWD"
 
     - name: Append the DS configs to the wild fragment
       shell: bash
