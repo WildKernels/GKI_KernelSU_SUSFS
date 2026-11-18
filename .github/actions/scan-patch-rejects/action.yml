@@ -20,7 +20,12 @@ runs:
 
         for REJ in "${REJS[@]}"; do
           REL="${REJ#"$CONFIG_DIR"/}"
-          if [ "$(basename "$REL")" = "i2c-nomadik.c.rej" ]; then
+          # Rejects that are not ours to fix: common/mm/rmap.c.rej ships with
+          # the factory tree, and i2c-nomadik.c.rej is a known stale one. Keep
+          # this list identical to the bundle job's filter in main.yml, or a
+          # green build still produces a *-Rejects artifact (that mismatch is
+          # why 6.6.127-android15-2026-04 collected three of them).
+          if [ "$(basename "$REL")" = "i2c-nomadik.c.rej" ] || [ "$REL" = "common/mm/rmap.c.rej" ]; then
             echo "Skipping $REL because it matches the ignored reject file"
             continue
           fi
