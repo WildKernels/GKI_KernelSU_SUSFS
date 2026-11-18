@@ -1,5 +1,3 @@
-name: Build Kernels
-
 permissions:
   contents: write
   actions: write
@@ -69,6 +67,7 @@ on:
           - KernelSU
           - BakaSU
           - SukiSU-Ultra
+          - SukiSU-Nova
           - KowSU
           - FinaSU
           - No Root
@@ -166,6 +165,7 @@ jobs:
       ksu_commit: ${{ steps.resolve.outputs.ksu_commit }}
       bakasu_commit: ${{ steps.resolve.outputs.bakasu_commit }}
       sukisu_ultra_commit: ${{ steps.resolve.outputs.sukisu_ultra_commit }}
+      sukisu_nova_commit: ${{ steps.resolve.outputs.sukisu_nova_commit }}
       finasu_commit: ${{ steps.resolve.outputs.finasu_commit }}
       kowsu_commit: ${{ steps.resolve.outputs.kowsu_commit }}
       kernel_patches_commit: ${{ steps.resolve.outputs.kernel_patches_commit }}
@@ -261,6 +261,9 @@ jobs:
           # repo's default branch (main, b8bd4b6c) is used only for SUSFS-off
           # builds, which resolve it at run time rather than from this pin.
           PIN_SUKISU_ULTRA="4bec532dd447e2852aa8932afa768255350c103a"
+          # SukiSU-Nova: main tip (1439545f, 2026-11-16); Rust/C root suite with
+          # built-in SUSFS support via its own susfs_extension.c.
+          PIN_SUKISU_NOVA="1439545f12bffe0263690ba862139b70ee5f20cf"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 06d71e8a (2026-11-16).
@@ -362,19 +365,18 @@ jobs:
             BAKASU_COMMIT="$(pick "$PIN_BAKASU" https://github.com/Baka-SU/BakaSU.git refs/heads/main)"
             SUKISU_ULTRA_COMMIT="$(pick "$PIN_SUKISU_ULTRA" https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin)"
             FINASU_COMMIT="$(pick "$PIN_FINASU" https://github.com/LyraVoid/FinaSU.git refs/heads/master)"
+            SUKISU_NOVA_COMMIT="$(pick "$PIN_SUKISU_NOVA" https://github.com/SukiSU-Nova/SukiSU-Nova.git refs/heads/main)"
           else
             KERNELSU_COMMIT="$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)"
             BAKASU_COMMIT="$(resolve_sha https://github.com/Baka-SU/BakaSU.git refs/heads/main)"
             SUKISU_ULTRA_COMMIT="$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)"
             FINASU_COMMIT="$(resolve_sha https://github.com/LyraVoid/FinaSU.git refs/heads/master)"
+            SUKISU_NOVA_COMMIT="$(resolve_sha https://github.com/SukiSU-Nova/SukiSU-Nova.git refs/heads/main)"
           fi
           emit ksu_commit "$KERNELSU_COMMIT"
           emit bakasu_commit "$BAKASU_COMMIT"
           emit sukisu_ultra_commit "$SUKISU_ULTRA_COMMIT"
-          # FinaSU ships susfs kernel-side and hard-depends on it (unguarded
-          # linux/susfs.h includes), so it is only valid with SUSFS on;
-          # susfs-off finasu builds are rejected in build.yml.
-          emit finasu_commit "$FINASU_COMMIT"
+          emit sukisu_nova_commit "$SUKISU_NOVA_COMMIT"
           # KowSU has no SUSFS support, so it always tracks latest on master
           # (it can only ever run with SUSFS off — enforced below).
           KOWSU_COMMIT="$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)"
@@ -447,6 +449,15 @@ jobs:
               echo "root_flavor=sukisu-ultra" >> "$GITHUB_OUTPUT"
               emit root_commit "$SUKISU_ULTRA_COMMIT"
               ROOT_MATRIX="[$(mk_entry sukisu-ultra SukiSU-Ultra "$SUKISU_ULTRA_COMMIT" true)]"
+              ;;
+            SukiSU-Nova)
+              if [ "${{ inputs.use_susfs }}" = "false" ]; then
+                echo "ERROR: SukiSU-Nova requires SUSFS — re-run with SUSFS on." >&2
+                exit 1
+              fi
+              echo "root_flavor=sukisu-nova" >> "$GITHUB_OUTPUT"
+              emit root_commit "$SUKISU_NOVA_COMMIT"
+              ROOT_MATRIX="[$(mk_entry sukisu-nova SukiSU-Nova "$SUKISU_NOVA_COMMIT" true)]"
               ;;
             FinaSU)
               if [ "${{ inputs.use_susfs }}" = "false" ]; then
@@ -524,6 +535,7 @@ jobs:
           allow_fallback: 'true'
           root_matrix: ${{ steps.resolve.outputs.root_matrix }}
           next_commit: ${{ steps.resolve.outputs.next_base_commit }}
+          sukisu_nova_commit: ${{ steps.resolve.outputs.sukisu_nova_commit }}
           finasu_commit: ${{ steps.resolve.outputs.finasu_commit }}
 
       - name: Compose requested feature set
