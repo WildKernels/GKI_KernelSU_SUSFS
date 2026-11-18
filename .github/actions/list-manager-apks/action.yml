@@ -74,12 +74,11 @@ runs:
                 for apk in "_${AID}"/*.apk; do
                   [ -f "$apk" ] || continue
                   NAME="$(basename "$apk")"
-                  # Spoofed-manager artifacts (BakaSU/SukiSU upstream CI)
-                  # package APKs under the SAME filename as the stock
-                  # build. A flat cp -f then silently overwrites stock
-                  # with spoofed (or vice versa) - run 38659164844 lost
-                  # the BakaSU spoofed manager this way and the digest
-                  # had no spoofed download. Disambiguate: when the
+                  # Spoofed-manager artifacts (KernelSU-Next and
+                  # SukiSU-Ultra upstream CI; BakaSU publishes no spoofed
+                  # manager) package APKs under the SAME filename as the
+                  # stock build. A flat cp -f then silently overwrites
+                  # stock with spoofed (or vice versa). Disambiguate: when the
                   # upstream artifact is a spoofed one but the APK name
                   # does not say so, suffix the filename. The digest's
                   # FLAVOR_MANAGERS already expects *-spoofed.apk.
@@ -111,10 +110,12 @@ runs:
             [ -n "$n" ] || continue
             if [ "$o" = "Baka-SU" ] && [ "$r" = "BakaSU" ]; then
               ln=$(echo "$n" | tr '[:upper:]' '[:lower:]')
-              # keep universal (old packaging) or arm64-v8a (new), drop debug
-              if [[ "$ln" != *universal* && "$ln" != *arm64-v8a* ]]; then echo "Dropping BakaSU non-arm64 $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
+              # BakaSU: ship the universal manager only (user preference). The
+              # per-ABI builds (arm64-v8a, armeabi-v7a, riscv64, x86_64) are the
+              # same version, so any of them alongside universal is a duplicate.
+              if [[ "$ln" != *universal* ]]; then echo "Dropping BakaSU non-universal $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
               if [[ "$ln" == *debug* ]]; then echo "Dropping BakaSU debug $n" >&2; rm -f "$OUT_APKS/$n"; continue; fi
-              # now only arm64/universal release + spoofed remain
+              # exactly one BakaSU manager APK remains: the universal build
             fi
             echo "$o|$r|$n" >> "$tmp_manifest"
           done < "$MANIFEST"

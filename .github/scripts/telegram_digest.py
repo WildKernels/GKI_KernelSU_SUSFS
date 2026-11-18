@@ -102,11 +102,11 @@ FLAVOR_MANAGERS = {
     "KernelSU": [("KernelSU_v*", None)],
     "KernelSU-Next": [("KernelSU_Next_v*", "spoofed"),
                       ("KernelSU_Next_v*spoofed*", None)],
-    # BakaSU ships a spoofed manager too (Spoofed-Manager-release in
-    # their Build Manager CI; our publish filter keeps the universal
-    # pair) - link it like KernelSU-Next's.
-    "BakaSU": [("BakaSU_v*", "spoofed"),
-               ("BakaSU_v*spoofed*", None)],
+    # BakaSU ships NO spoofed manager: its Build Manager publishes only
+    # Manager-release (5 per-ABI APKs, none spoofed) and no run in the repo's
+    # history has ever carried a spoofed artifact. One pattern, one link -
+    # a BakaSU_v*spoofed* entry here would silently match nothing.
+    "BakaSU": [("BakaSU_v*", None)],
 }
 
 # Manager-link flavor order (user request 2026-10-13): KernelSU first, then

@@ -189,7 +189,13 @@ runs:
               ;;
             bakasu)
               owner="Baka-SU"; repo="BakaSU"; wf="build-manager.yml"
-              branch="main"; want="Manager-release,Spoofed-Manager-release"
+              # BakaSU publishes exactly one manager artifact: Manager-release
+              # (every artifact name it has ever produced is Manager-release,
+              # Manager-debug, Manager-mappings or Manager-gradle-*). There is no
+              # Spoofed-Manager-release, so asking for one only ever matched
+              # nothing - the digest then looked like it had dropped a spoofed
+              # build that never existed.
+              branch="main"; want="Manager-release"
               resolve_stock "${mc:-${INPUT_BAKASU_COMMIT:-}}" bakasu_commit https://github.com/Baka-SU/BakaSU.git main
               ;;
             sukisu-ultra)
