@@ -14,6 +14,20 @@
 #   CONFIG_IPC_NS: actual '', expected 'y' from common/wild_defconfig.fragment
 CONFIG_PID_NS=y
 
+# Container CPU limits (cpu.max / cgroup v2 CPU bandwidth) for DroidSpaces.
+# Stock GKI 6.1 leaves this off: init/Kconfig defaults it to n and
+# gki_defconfig has no CONFIG_CFS_BANDWIDTH line at all, so cpu.max is absent
+# from every cgroup and containers cannot be rate-limited.
+#
+# Cost, measured before: enabling it changes struct cfs_rq (cfs_bandwidth,
+# throttled lists, throttled_count) and struct rq embeds struct cfs_rq, so
+# genksyms expands the type through every exported symbol that takes
+# 'struct rq *' - the android vendor-hook tracepoints (__traceiter_android_rvh_*),
+# __task_rq_lock, __migrate_task, __balance_callbacks - and their CRCs move.
+# include/ has no CONFIG_CFS_BANDWIDTH reference, which is why grepping headers
+# does not show it. On 6.18 stock already sets it, so nothing moves there.
+CONFIG_CFS_BANDWIDTH=y
+
 # optional but recommended: docker's unsafe procfs check
 CONFIG_USER_NS=y
 # HW access
