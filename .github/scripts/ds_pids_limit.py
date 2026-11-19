@@ -108,6 +108,54 @@ def patch_cgroup_c(root: Path) -> bool:
     return changed
 
 
+def patch_controller_view(root: Path) -> bool:
+    """Advertise pids in cgroup.controllers and accept +pids in subtree_control.
+
+    DroidSpaces does not probe for the file: check.c gates on
+    ds_cgroup_has_controller("pids"), discover.c re-checks it per cgroup, and
+    lifecycle.c only writes "+pids" when the root list names it. Without the
+    advertisement the limit is skipped even though pids.max exists and works.
+
+    Both edits are interface-only - no struct, no symbol, no CRC changes.
+    """
+    p = root / "kernel/cgroup/cgroup.c"
+    t = read(p)
+    changed = False
+
+    show_old = "\tif (printed)\n\t\tseq_putc(seq, '\\n');\n}\n"
+    if "seq_puts(seq, \"pids\")" not in t:
+        if show_old not in t:
+            die("cgroup.c: cgroup_print_ss_mask tail not found")
+        show_new = (
+            "\t/* DroidSpaces: pids limits are provided without a subsystem, so\n"
+            "\t * advertise the controller here rather than registering one. */\n"
+            "\tif (printed)\n"
+            "\t\tseq_putc(seq, ' ');\n"
+            "\tseq_puts(seq, \"pids\");\n"
+            "\tseq_putc(seq, '\\n');\n"
+            "}\n")
+        t = t.replace(show_old, show_new, 1)
+        changed = True
+
+    write_old = "\t\tif (ssid == CGROUP_SUBSYS_COUNT)\n\t\t\treturn -EINVAL;\n"
+    if 'strcmp(tok + 1, "pids")' not in t:
+        if write_old not in t:
+            die("cgroup.c: subtree_control unknown-token path not found")
+        write_new = (
+            "\t\tif (ssid == CGROUP_SUBSYS_COUNT) {\n"
+            "\t\t\t/* pids has no subsystem: accept the token, nothing to enable */\n"
+            '\t\t\tif (!strcmp(tok + 1, "pids"))\n'
+            "\t\t\t\tcontinue;\n"
+            "\t\t\treturn -EINVAL;\n"
+            "\t\t}\n")
+        t = t.replace(write_old, write_new, 1)
+        changed = True
+
+    if changed:
+        p.write_text(t)
+    return changed
+
+
 def patch_fork_c(root: Path) -> bool:
     p = root / "kernel/fork.c"
     t = read(p)
@@ -155,6 +203,7 @@ def main() -> None:
     changed = any([
         patch_cgroup_makefile(root),
         patch_cgroup_c(root),
+        patch_controller_view(root),
         patch_fork_c(root),
     ])
     print("ds pids limit: wired" if changed else "ds pids limit: already wired")
