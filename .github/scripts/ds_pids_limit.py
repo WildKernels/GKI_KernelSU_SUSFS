@@ -71,6 +71,12 @@ def patch_cgroup_c(root: Path) -> bool:
                   "\t},\n"
                   "\t{\n\t\t.name = \"pids.current\",\n"
                   "\t\t.seq_show = ds_pids_current_show,\n"
+                  "\t},\n"
+                  "\t{\n\t\t.name = \"pids.peak\",\n"
+                  "\t\t.seq_show = ds_pids_peak_show,\n"
+                  "\t},\n"
+                  "\t{\n\t\t.name = \"pids.events\",\n"
+                  "\t\t.seq_show = ds_pids_events_show,\n"
                   "\t},\n")
         t = t.replace(anchor, inject + anchor, 1)
         changed = True
@@ -85,6 +91,8 @@ def patch_cgroup_c(root: Path) -> bool:
                 "ssize_t ds_pids_max_write(struct kernfs_open_file *of, char *buf,\n"
                 "\t\t\t   size_t nbytes, loff_t off);\n"
                 "int ds_pids_current_show(struct seq_file *seq, void *v);\n"
+                "int ds_pids_peak_show(struct seq_file *seq, void *v);\n"
+                "int ds_pids_events_show(struct seq_file *seq, void *v);\n"
                 "void ds_pids_limit_free(struct cgroup *cgrp);\n")
         t = t.replace(decl_anchor, decl + decl_anchor, 1)
         changed = True

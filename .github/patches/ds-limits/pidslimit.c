@@ -32,6 +32,8 @@
 
 struct ds_pids_limit {
 	s64 max;		/* <= 0 means unlimited */
+	s64 peak;		/* high-water mark of the task count */
+	u64 events;		/* forks refused because the limit was hit */
 };
 
 static DEFINE_XARRAY(ds_pids_limits);
@@ -108,10 +110,18 @@ int ds_pids_limit_check(struct task_struct *task)
 	for (; cgrp; cgrp = cgroup_parent(cgrp)) {
 		struct ds_pids_limit *lim = ds_pids_limit_get(cgrp);
 
+		int n;
+
 		if (!lim || lim->max <= 0)
 			continue;
-		if (ds_pids_current(cgrp) >= lim->max)
+		n = ds_pids_current(cgrp);
+		if (n >= lim->max) {
+			lim->events++;
 			return -EAGAIN;
+		}
+		/* The child is about to exist, so it counts towards the peak. */
+		if (n + 1 > lim->peak)
+			lim->peak = n + 1;
 	}
 	return 0;
 }
@@ -158,5 +168,35 @@ ssize_t ds_pids_max_write(struct kernfs_open_file *of, char *buf,
 int ds_pids_current_show(struct seq_file *seq, void *v)
 {
 	seq_printf(seq, "%d\n", ds_pids_current(seq_css(seq)->cgroup));
+	return 0;
+}
+
+/*
+ * pids.peak and pids.events exist because the distro inside the container reads
+ * them, not just the DroidSpaces CLI: systemd sets TasksMax and reports the
+ * high-water mark and the number of refused forks.
+ *
+ * A cgroup with no limit has no state, so peak reports the live count (nothing
+ * has ever been capped there) and events reports 0.
+ *
+ * Upstream also makes pids.events pollable via cgroup_file_notify(). That needs
+ * a struct cgroup_file, which lives in the subsystem's css - the thing this port
+ * deliberately does not have. Reads are exact; poll() will not wake.
+ */
+int ds_pids_peak_show(struct seq_file *seq, void *v)
+{
+	struct cgroup *cgrp = seq_css(seq)->cgroup;
+	struct ds_pids_limit *lim = ds_pids_limit_get(cgrp);
+	int n = ds_pids_current(cgrp);
+
+	seq_printf(seq, "%lld\n", lim && lim->peak > n ? lim->peak : (s64)n);
+	return 0;
+}
+
+int ds_pids_events_show(struct seq_file *seq, void *v)
+{
+	struct ds_pids_limit *lim = ds_pids_limit_get(seq_css(seq)->cgroup);
+
+	seq_printf(seq, "max %llu\n", lim ? lim->events : 0ULL);
 	return 0;
 }
