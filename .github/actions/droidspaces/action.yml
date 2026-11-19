@@ -128,6 +128,20 @@ runs:
         set -euo pipefail
         python3 "${{ github.workspace }}/.github/scripts/droidspaces_kabi_shadow.py" "$PWD"
 
+    - name: Provide pids.max without a cgroup subsystem
+      # CONFIG_CGROUP_PIDS is NOT enabled: registering the pids subsystem
+      # increments CGROUP_SUBSYS_COUNT, which resizes arrays inside struct cgroup
+      # and struct css_set, and prebuilt vendor modules then read stock offsets
+      # against a bigger struct (3241 of 8865 symbol CRCs moved; with the CRCs
+      # forced back to stock the device still did not boot). This installs
+      # pids.max / pids.current as cgroup base files with state in an xarray, so
+      # DroidSpaces keeps the feature and no struct changes.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        python3 "${{ github.workspace }}/.github/scripts/ds_pids_limit.py" "$PWD"
+
     - name: Append the DS configs to the wild fragment
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common

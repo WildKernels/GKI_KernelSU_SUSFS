@@ -36,7 +36,11 @@ CONFIG_CFS_BANDWIDTH=y
 # kernel/cgroup outside its own definition - and genksyms only emits a type CRC
 # for types a symbol's signature names. Nothing else in include/ is conditional
 # on the option, so no struct layout changes and no symbols gain or lose CRCs.
-CONFIG_CGROUP_PIDS=y
+# CONFIG_CGROUP_PIDS is deliberately NOT set - the pids controller is replaced
+# by kernel/cgroup/pidslimit.c (installed by .github/scripts/ds_pids_limit.py),
+# which provides pids.max / pids.current with no struct changes. Registering the
+# real subsystem increments CGROUP_SUBSYS_COUNT and grows struct cgroup and
+# struct css_set, which is the ABI break this branch exists to avoid.
 
 # optional but recommended: docker's unsafe procfs check
 CONFIG_USER_NS=y
