@@ -1,4 +1,10 @@
 name: Kernel Build Process
+
+# Per-job step summaries are deliberately disabled: the same information is in
+# the step logs, and a summary per matrix leg is noise on a 400-job run. Pointing
+# GITHUB_STEP_SUMMARY at /dev/null keeps every writer working unchanged.
+env:
+  GITHUB_STEP_SUMMARY: /dev/null
 permissions:
   contents: write
   actions: write
