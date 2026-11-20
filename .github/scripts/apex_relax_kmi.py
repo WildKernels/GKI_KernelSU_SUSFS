@@ -71,6 +71,13 @@ def relax_build_bazel(root: Path) -> list:
     elif '"trim_nonlisted_kmi": False' not in t:
         notes.append("BUILD.bazel: no trim_nonlisted_kmi setting found - nothing to relax")
 
+    # Without trimming the export set is a superset of the list, and strict mode
+    # treats every new export as a violation. Relax it too, or the build fails.
+    s = t.count('"kmi_symbol_list_strict_mode": True')
+    if s:
+        t = t.replace('"kmi_symbol_list_strict_mode": True', '"kmi_symbol_list_strict_mode": False')
+        notes.append(f"BUILD.bazel: kmi_symbol_list_strict_mode True -> False ({s} target(s))")
+
     # no protected-module set at all
     for key in ("protected_modules_list", "protected_module_names_list"):
         pattern = re.compile(r'^\s*"' + key + r'":\s*"[^"]*",\s*$\n?', re.MULTILINE)
