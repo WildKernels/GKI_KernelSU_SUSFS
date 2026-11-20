@@ -142,6 +142,20 @@ runs:
         set -euo pipefail
         python3 "${{ github.workspace }}/.github/scripts/ds_pids_limit.py" "$PWD"
 
+    - name: Provide cpu.max without CFS_BANDWIDTH
+      # CFS_BANDWIDTH grows cfs_rq inside struct rq, which moves fields that
+      # vendor modules read at compile-time offsets - the device stopped booting
+      # with it even when the CRCs were shadowed back to stock (44286900753,
+      # 44466030716), and boots with it off. This enforces the quota from outside
+      # the scheduler: per-cgroup state, a 5 ms sampler, freeze/thaw at the period
+      # boundary. No struct changes. Skipped when the fragment enables the real
+      # CFS_BANDWIDTH.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        python3 "${{ github.workspace }}/.github/scripts/ds_cpu_limit.py" "$PWD"
+
     - name: Append the DS configs to the wild fragment
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
