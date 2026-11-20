@@ -83,7 +83,14 @@ def main() -> None:
     sched = root / S
     if sched.is_file():
         lines = sched.read_text().splitlines(keepends=True)
-        n = sum(shadow_struct(lines, t) for t in BW_STRUCTS)
+        # With the side-table bandwidth port the structs are already stock, so
+        # there is nothing left to hide from genksyms - and rewriting the guards
+        # would only fight that port's own anchors.
+        if "DS_CFS_BANDWIDTH" in sched.read_text():
+            print("droidspaces kabi shadow: CFS sites skipped (side-table port)")
+            n = 0
+        else:
+            n = sum(shadow_struct(lines, t) for t in BW_STRUCTS)
         if n:
             sched.write_text("".join(lines))
         total += n
