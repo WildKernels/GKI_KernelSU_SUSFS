@@ -142,6 +142,18 @@ runs:
         set -euo pipefail
         python3 "${{ github.workspace }}/.github/scripts/ds_pids_limit.py" "$PWD"
 
+    - name: Run the real CFS bandwidth code with side-table state
+      # CONFIG_CFS_BANDWIDTH stays off, so struct cfs_rq and task_group keep their
+      # stock layouts, but the scheduler's own bandwidth code is compiled in and
+      # its state lives in side tables keyed by the cfs_rq / task_group pointers.
+      # That gives the real cpu.max, cpu.max.burst, cpu.stat and slice sysctl
+      # instead of an approximation, with no struct or CRC change.
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        python3 "${{ github.workspace }}/.github/scripts/ds_cfs_bandwidth.py" "$PWD"
+
     - name: Provide cpu.max without CFS_BANDWIDTH
       # CFS_BANDWIDTH grows cfs_rq inside struct rq, which moves fields that
       # vendor modules read at compile-time offsets - the device stopped booting
