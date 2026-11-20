@@ -73,6 +73,11 @@ on:
         required: false
         type: boolean
         default: false
+      no_trim:
+        description: "Opt-in: disable KMI symbol trimming (no CONFIG_TRIM_UNUSED_KSYMS)"
+        required: false
+        type: boolean
+        default: false
       allow_version_mismatch:
         required: false
         type: boolean
@@ -397,6 +402,11 @@ jobs:
 
       - name: Remove Protected Exports
         uses: ./.github/actions/remove-protected-exports
+
+      - name: Disable KMI Symbol Trimming (opt-in)
+        uses: ./.github/actions/kmi-no-trim
+        with:
+          enabled: ${{ inputs.no_trim }}
 
       - name: Clean Kernel Flags
         uses: ./.github/actions/clean-kernel-flags

@@ -1,0 +1,36 @@
+name: 'Disable KMI Symbol Trimming'
+description: >
+  Opt-in. Turns off CONFIG_TRIM_UNUSED_KSYMS, so exports are no longer cut down
+  to android/abi_gki_aarch64.
+
+  Trimming is a size opt-in, not a correctness requirement: symbols missing from
+  the KMI list are removed from the kernel entirely. A vendor module built for an
+  older sublevel that imports one of them then fails with "Unknown symbol" - and
+  if that module is storage, clock, regulator or pinctrl, first-stage init never
+  mounts super and there are no logs at all.
+
+  ABI effect: none for anything that exists today. Trimming only removes exports,
+  so disabling it restores a superset of the current set; every symbol keeps the
+  CRC it already had. MODVERSIONS still refuses genuinely incompatible modules.
+
+  Also relaxes kmi_symbol_list_strict_mode, because without trimming the export
+  set is a superset of the list and strict mode counts every extra export as a
+  violation.
+
+  Default is off, so a normal build is byte-identical to before.
+inputs:
+  enabled:
+    description: 'Disable KMI symbol trimming for this build'
+    required: false
+    type: boolean
+    default: false
+runs:
+  using: composite
+  steps:
+    - name: Disable KMI symbol trimming
+      if: ${{ inputs.enabled == 'true' }}
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        python3 "${{ github.workspace }}/.github/scripts/kmi_no_trim.py" "$PWD"
