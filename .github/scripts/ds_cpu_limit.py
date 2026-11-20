@@ -47,7 +47,11 @@ def read(p: Path) -> str:
 
 def real_bandwidth_enabled(root: Path) -> bool:
     frag = root / "wild_defconfig.fragment"
-    return frag.is_file() and "CONFIG_CFS_BANDWIDTH=y" in read(frag)
+    if frag.is_file() and "CONFIG_CFS_BANDWIDTH=y" in read(frag):
+        return True
+    # the side-table port runs the scheduler's own bandwidth code
+    sched_h = root / "kernel/sched/sched.h"
+    return sched_h.is_file() and "DS_CFS_BANDWIDTH" in read(sched_h)
 
 
 def patch_makefile(root: Path) -> bool:
