@@ -1,0 +1,79 @@
+diff --git a/arch/arm64/configs/gki_defconfig b/arch/arm64/configs/gki_defconfig
+index a0a29cf..a411517 100644
+--- a/arch/arm64/configs/gki_defconfig
++++ b/arch/arm64/configs/gki_defconfig
+@@ -102,6 +102,7 @@ CONFIG_MODVERSIONS=y
+ CONFIG_MODULE_SCMVERSION=y
+ CONFIG_MODULE_SIG=y
+ CONFIG_MODULE_SIG_PROTECT=y
++CONFIG_APEX_RELAX_GKI_MODULE_KMI=y
+ CONFIG_MODPROBE_PATH="/system/bin/modprobe"
+ CONFIG_BLK_DEV_ZONED=y
+ CONFIG_BLK_DEV_THROTTLING=y
+diff --git a/kernel/module/Kconfig b/kernel/module/Kconfig
+index ef58284..cb6bec6 100644
+--- a/kernel/module/Kconfig
++++ b/kernel/module/Kconfig
+@@ -242,6 +242,31 @@ config MODULE_SIG_PROTECT
+ 	    exported by the Android GKI modules. Loading will fail and return
+ 	    -EACCES (Permission denied) if symbol access conditions are not met.
+ 
++config APEX_RELAX_GKI_MODULE_KMI
++	bool "Relax GKI symbol protection for unsigned modules"
++	depends on MODULE_SIG_PROTECT
++	help
++	  Let modules that are not signed with the GKI key import any exported
++	  symbol, not only the ones on the generated unprotected list.
++
++	  With this off, the kernel refuses such a module with -EACCES, which
++	  modprobe reports as "Permission denied". The reason is printed by the
++	  kernel as "Protected symbol: <name>".
++
++	  Why this exists. Vendor modules on a device are built for the sublevel it
++	  shipped with, and the KMI unprotected list is regenerated with every
++	  kernel release. A module importing a symbol the newer list no longer
++	  carries is refused, which is a consequence of the version gap rather
++	  than anything done to the tree.
++
++	  Trade-off. Unsigned modules are no longer confined to a vetted symbol
++	  set. Only the access check is relaxed: gki_is_module_protected_export()
++	  is untouched, so an unsigned module still may not re-export a symbol
++	  that belongs to a protected GKI module.
++
++	  This does NOT weaken CRC checking. A module built against genuinely
++	  incompatible types still fails with "disagrees about version of symbol".
++
+ config MODULE_SIG_ALL
+ 	bool "Automatically sign all modules"
+ 	default y
+diff --git a/kernel/module/gki_module.c b/kernel/module/gki_module.c
+index 65a2883..dd07c7c 100644
+--- a/kernel/module/gki_module.c
++++ b/kernel/module/gki_module.c
+@@ -54,6 +54,20 @@ bool gki_is_module_protected_export(const char *name)
+  */
+ bool gki_is_module_unprotected_symbol(const char *name)
+ {
++#ifdef CONFIG_APEX_RELAX_GKI_MODULE_KMI
++	/*
++	 * Relaxed on purpose, see CONFIG_APEX_RELAX_GKI_MODULE_KMI.
++	 *
++	 * Vendor modules built for the device's original sublevel import symbols
++	 * that the current KMI list no longer carries. Refusing them leaves a
++	 * permanent tail of modprobe failures for modules that are otherwise
++	 * harmless - and for a boot-critical one, no log at all.
++	 *
++	 * Only the access check is relaxed. gki_is_module_protected_export() is
++	 * untouched, and MODVERSIONS CRC verification is untouched.
++	 */
++	return true;
++#else
+ 	if (NR_UNPROTECTED_SYMBOLS) {
+ 		return bsearch(name, gki_unprotected_symbols, NR_UNPROTECTED_SYMBOLS,
+ 				MAX_UNPROTECTED_NAME_LEN, cmp_name) != NULL;
+@@ -65,4 +79,5 @@ bool gki_is_module_unprotected_symbol(const char *name)
+ 		 */
+ 		return true;
+ 	}
++#endif
+ }

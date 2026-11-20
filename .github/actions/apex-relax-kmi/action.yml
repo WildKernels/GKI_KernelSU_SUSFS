@@ -1,0 +1,35 @@
+name: 'Relax GKI KMI Enforcement'
+description: >
+  Opt-in. Reproduces plain-make semantics inside kleaf: no symbol trimming down
+  to the KMI list, no protected-module set, and (6.1/6.6) the
+  CONFIG_APEX_RELAX_GKI_MODULE_KMI import-gate switch.
+
+  Needed for devices whose vendor modules are built for an older sublevel than
+  the kernel being flashed - the KMI unprotected list is regenerated every
+  release, so a module importing a symbol the newer list dropped is refused with
+  -EACCES, and trimming can remove the symbol entirely. For Bluetooth or sound
+  that is a dead feature; for storage, clock, regulator or pinctrl it is
+  first-stage init failing to mount super, which produces no logs at all.
+
+  What this does NOT do: it never weakens MODVERSIONS. A module built against
+  genuinely incompatible types still fails with "disagrees about version of
+  symbol". Loading a layout-mismatched module is the bad_version bypass, a
+  different gate, and is not part of this option.
+
+  Default is off, so a normal build is byte-identical to before.
+inputs:
+  enabled:
+    description: 'Relax KMI enforcement for this build'
+    required: false
+    type: boolean
+    default: false
+runs:
+  using: composite
+  steps:
+    - name: Relax KMI enforcement
+      if: ${{ inputs.enabled == 'true' }}
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        python3 "${{ github.workspace }}/.github/scripts/apex_relax_kmi.py" "$PWD"

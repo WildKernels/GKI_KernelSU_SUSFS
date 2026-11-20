@@ -67,6 +67,11 @@ on:
         required: false
         type: boolean
         default: false
+      relax_kmi:
+        description: "Opt-in: run with plain-make KMI semantics (no trimming, no KMI lists)"
+        required: false
+        type: boolean
+        default: false
       allow_version_mismatch:
         required: false
         type: boolean
@@ -391,6 +396,11 @@ jobs:
 
       - name: Remove Protected Exports
         uses: ./.github/actions/remove-protected-exports
+
+      - name: Relax KMI Enforcement (opt-in)
+        uses: ./.github/actions/apex-relax-kmi
+        with:
+          enabled: ${{ inputs.relax_kmi }}
 
       - name: Clean Kernel Flags
         uses: ./.github/actions/clean-kernel-flags

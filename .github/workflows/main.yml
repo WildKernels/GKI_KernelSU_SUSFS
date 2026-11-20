@@ -53,6 +53,11 @@ on:
         description: "Keep stock KMI generation suffix in kernel version (fix #265)"
         type: boolean
         default: false
+      relax_kmi:
+        description: "Opt-in: plain-make KMI semantics (no symbol trimming, no KMI lists) - for devices whose vendor modules are older than the kernel"
+        required: false
+        type: boolean
+        default: false
       commit_mode:
         description: "latest = branch tips, verified = audited pins"
         required: false
@@ -719,6 +724,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ github.event_name == 'schedule' && 'Wild' || inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
+      relax_kmi: ${{ inputs.relax_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
@@ -749,6 +755,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ github.event_name == 'schedule' && 'Wild' || inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
+      relax_kmi: ${{ inputs.relax_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
@@ -779,6 +786,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ github.event_name == 'schedule' && 'Wild' || inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
+      relax_kmi: ${{ inputs.relax_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
@@ -809,6 +817,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ github.event_name == 'schedule' && 'Wild' || inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
+      relax_kmi: ${{ inputs.relax_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
@@ -839,6 +848,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ github.event_name == 'schedule' && 'Wild' || inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
+      relax_kmi: ${{ inputs.relax_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
@@ -869,6 +879,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ github.event_name == 'schedule' && 'Wild' || inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
+      relax_kmi: ${{ inputs.relax_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
@@ -899,6 +910,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ github.event_name == 'schedule' && 'Wild' || inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
+      relax_kmi: ${{ inputs.relax_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
@@ -934,6 +946,7 @@ jobs:
       droidspaces_commit: ${{ needs.resolve-sources.outputs.droidspaces_commit }}
       brand_name: ${{ github.event_name == 'schedule' && 'Wild' || inputs.brand_name }}
       keep_kmi: ${{ inputs.keep_kmi || false }}
+      relax_kmi: ${{ inputs.relax_kmi || false }}
       os_patch_level: ${{ inputs.os_patch_level || 'All' }}
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       page_size: ${{ inputs.page_size || '4k' }}
