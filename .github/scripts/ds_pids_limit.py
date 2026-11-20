@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wire pids.max / pids.current into a GKI tree without touching the ABI.
+"""Wire the pids controller into a GKI tree without touching the ABI.
 
 DroidSpaces asks for CONFIG_CGROUP_PIDS so a container can be given a process
 limit. Enabling it is what breaks: registering the pids subsystem increments
@@ -8,14 +8,18 @@ css_set, so prebuilt vendor modules read the wrong offsets (measured: 3241 of
 8865 symbol CRCs moved, and even with the CRCs forced back to stock the device
 did not boot).
 
-This installs a controller-free implementation instead:
+This installs a controller-free implementation with the controller's behaviour:
 
-  kernel/cgroup/pidslimit.c   new file: state in an xarray keyed by cgroup,
-                              pids.max / pids.current cftypes, fork check
+  kernel/cgroup/pidslimit.c   counters charged up the hierarchy, can_fork charge
+                              /check/rollback, cancel_fork and exit uncharge,
+                              migration check and charge transfer, the four
+                              pids.* files, pollable pids.events
   kernel/cgroup/Makefile      build it
-  kernel/cgroup/cgroup.c      add the two files to cgroup_base_files[], drop the
-                              state when a cgroup is destroyed
-  kernel/fork.c               refuse the fork when an ancestor is at its limit
+  kernel/cgroup/cgroup.c      the files in cgroup_base_files[], state allocated
+                              at cgroup_create and freed at destroy, hooks in
+                              cancel_fork / exit / migrate, and the controller
+                              advertised in cgroup.controllers
+  kernel/fork.c               ds_pids_can_fork() after cgroup_can_fork()
 
 None of that changes a struct layout, so the ABI stays byte-identical to stock
 and no genksyms shadow is involved.
@@ -27,7 +31,7 @@ import shutil
 import sys
 from pathlib import Path
 
-MARKER = "ds_pids_limit_check"
+MARKER = "ds_pids_can_fork"
 CFTYPES_HOOK = "DroidSpaces pids limits"
 
 
@@ -40,6 +44,12 @@ def read(p: Path) -> str:
     if not p.is_file():
         die(f"{p}: not found")
     return p.read_text()
+
+
+def sub(t: str, old: str, new: str, what: str) -> str:
+    if old not in t:
+        die(f"{what}: anchor not found")
+    return t.replace(old, new, 1)
 
 
 def patch_cgroup_makefile(root: Path) -> bool:
@@ -61,54 +71,99 @@ def patch_cgroup_c(root: Path) -> bool:
     changed = False
 
     if CFTYPES_HOOK not in t:
-        anchor = "\t{\n\t\t.name = \"cpu.stat\","
-        if anchor not in t:
-            die("cgroup.c: cgroup_base_files anchor not found")
+        anchor = '\t{\n\t\t.name = "cpu.stat",'
         inject = ("\t/* DroidSpaces pids limits - no subsystem, no ABI change */\n"
-                  "\t{\n\t\t.name = \"pids.max\",\n"
+                  '\t{\n\t\t.name = "pids.max",\n'
                   "\t\t.seq_show = ds_pids_max_show,\n"
                   "\t\t.write = ds_pids_max_write,\n"
                   "\t},\n"
-                  "\t{\n\t\t.name = \"pids.current\",\n"
+                  '\t{\n\t\t.name = "pids.current",\n'
                   "\t\t.seq_show = ds_pids_current_show,\n"
                   "\t},\n"
-                  "\t{\n\t\t.name = \"pids.peak\",\n"
+                  '\t{\n\t\t.name = "pids.peak",\n'
                   "\t\t.seq_show = ds_pids_peak_show,\n"
                   "\t},\n"
-                  "\t{\n\t\t.name = \"pids.events\",\n"
+                  '\t{\n\t\t.name = "pids.events",\n'
                   "\t\t.seq_show = ds_pids_events_show,\n"
                   "\t},\n")
-        t = t.replace(anchor, inject + anchor, 1)
+        t = sub(t, anchor, inject + anchor, "cgroup.c base files")
         changed = True
 
-    if "int ds_pids_max_show(struct seq_file *seq, void *v);" not in t:
-        # drop the standalone file array from pidslimit.c and declare the two
-        # handlers here instead
+    if "int ds_pids_alloc(struct cgroup *cgrp);" not in t:
         decl_anchor = "static struct cftype cgroup_base_files[];\n"
-        if decl_anchor not in t:
-            die("cgroup.c: forward declaration anchor not found")
-        decl = ("int ds_pids_max_show(struct seq_file *seq, void *v);\n"
+        decl = ("int ds_pids_alloc(struct cgroup *cgrp);\n"
+                "void ds_pids_free(struct cgroup *cgrp);\n"
+                "int ds_pids_can_fork(struct task_struct *task);\n"
+                "void ds_pids_cancel_fork(struct task_struct *task);\n"
+                "void ds_pids_exit(struct task_struct *task);\n"
+                "void ds_pids_migrate(struct task_struct *task, struct cgroup *dst);\n"
+                "int ds_pids_migrate_check(struct cgroup_taskset *tset);\n"
+                "int ds_pids_max_show(struct seq_file *seq, void *v);\n"
                 "ssize_t ds_pids_max_write(struct kernfs_open_file *of, char *buf,\n"
                 "\t\t\t   size_t nbytes, loff_t off);\n"
                 "int ds_pids_current_show(struct seq_file *seq, void *v);\n"
                 "int ds_pids_peak_show(struct seq_file *seq, void *v);\n"
-                "int ds_pids_events_show(struct seq_file *seq, void *v);\n"
-                "void ds_pids_limit_free(struct cgroup *cgrp);\n")
-        t = t.replace(decl_anchor, decl + decl_anchor, 1)
+                "int ds_pids_events_show(struct seq_file *seq, void *v);\n")
+        t = sub(t, decl_anchor, decl + decl_anchor, "cgroup.c declarations")
         changed = True
 
-    if "ds_pids_limit_free(cgrp)" not in t:
-        # The file carries a forward declaration of the same name earlier on, and
-        # the definition has lock-annotation attributes between its signature and
-        # its brace, so take the last occurrence and find the brace after it.
+    if "ds_pids_alloc(cgrp)" not in t:
+        anchor = "\tcgroup_propagate_control(cgrp);\n\n\treturn cgrp;\n"
+        new = ("\tcgroup_propagate_control(cgrp);\n\n"
+               "\t/* DroidSpaces pids: state up front, the charge paths are atomic */\n"
+               "\tif (ds_pids_alloc(cgrp)) {\n"
+               "\t\tret = -ENOMEM;\n"
+               "\t\tgoto out_psi_free;\n"
+               "\t}\n\n"
+               "\treturn cgrp;\n")
+        t = sub(t, anchor, new, "cgroup.c cgroup_create")
+        changed = True
+
+    if "ds_pids_free(cgrp)" not in t:
         sig = "static int cgroup_destroy_locked(struct cgroup *cgrp)\n"
         if sig not in t:
             die("cgroup.c: cgroup_destroy_locked not found")
         idx = t.rindex(sig)
         brace = t.index("\n{\n", idx)
-        # after the locals: a statement before declarations is not kernel style
         decl_end = t.index("\tint ssid;\n", brace) + len("\tint ssid;\n")
-        t = t[:decl_end] + "\n\tds_pids_limit_free(cgrp);\n" + t[decl_end:]
+        t = t[:decl_end] + "\n\tds_pids_free(cgrp);\n" + t[decl_end:]
+        changed = True
+
+    if "ds_pids_cancel_fork(child)" not in t:
+        anchor = ("void cgroup_cancel_fork(struct task_struct *child,\n"
+                  "\t\t\tstruct kernel_clone_args *kargs)\n{\n"
+                  "\tstruct cgroup_subsys *ss;\n\tint i;\n\n")
+        t = sub(t, anchor,
+                anchor + "\t/* DroidSpaces pids: the fork failed, give the charge back */\n"
+                         "\tds_pids_cancel_fork(child);\n\n",
+                "cgroup.c cancel_fork")
+        changed = True
+
+    if "ds_pids_exit(tsk)" not in t:
+        anchor = "\tcss_set_move_task(tsk, cset, NULL, false);\n"
+        t = sub(t, anchor,
+                anchor + "\t/* DroidSpaces pids: the task is leaving the hierarchy */\n"
+                         "\tds_pids_exit(tsk);\n",
+                "cgroup.c cgroup_exit")
+        changed = True
+
+    if "ds_pids_migrate_check(tset)" not in t:
+        anchor = ("\t/*\n"
+                  "\t * Now that we're guaranteed success, proceed to move all tasks to\n")
+        new = ("\t/* DroidSpaces pids: destination limits, before the commit point */\n"
+               "\tret = ds_pids_migrate_check(tset);\n"
+               "\tif (ret) {\n"
+               "\t\tfailed_ssid = CGROUP_SUBSYS_COUNT;\n"
+               "\t\tgoto out_cancel_attach;\n"
+               "\t}\n\n") + anchor
+        t = sub(t, anchor, new, "cgroup.c migrate check")
+        changed = True
+
+    if "ds_pids_migrate(task, to_cset->dfl_cgrp)" not in t:
+        anchor = "\t\t\tcss_set_move_task(task, from_cset, to_cset, true);\n"
+        t = sub(t, anchor,
+                anchor + "\t\t\tds_pids_migrate(task, to_cset->dfl_cgrp);\n",
+                "cgroup.c migrate move")
         changed = True
 
     if changed:
@@ -131,32 +186,26 @@ def patch_controller_view(root: Path) -> bool:
     changed = False
 
     show_old = "\tif (printed)\n\t\tseq_putc(seq, '\\n');\n}\n"
-    if "seq_puts(seq, \"pids\")" not in t:
-        if show_old not in t:
-            die("cgroup.c: cgroup_print_ss_mask tail not found")
-        show_new = (
-            "\t/* DroidSpaces: pids limits are provided without a subsystem, so\n"
-            "\t * advertise the controller here rather than registering one. */\n"
-            "\tif (printed)\n"
-            "\t\tseq_putc(seq, ' ');\n"
-            "\tseq_puts(seq, \"pids\");\n"
-            "\tseq_putc(seq, '\\n');\n"
-            "}\n")
-        t = t.replace(show_old, show_new, 1)
+    if 'seq_puts(seq, "pids")' not in t:
+        show_new = ("\t/* DroidSpaces: pids limits are provided without a subsystem, so\n"
+                    "\t * advertise the controller here rather than registering one. */\n"
+                    "\tif (printed)\n"
+                    "\t\tseq_putc(seq, ' ');\n"
+                    '\tseq_puts(seq, "pids");\n'
+                    "\tseq_putc(seq, '\\n');\n"
+                    "}\n")
+        t = sub(t, show_old, show_new, "cgroup.c controller list")
         changed = True
 
     write_old = "\t\tif (ssid == CGROUP_SUBSYS_COUNT)\n\t\t\treturn -EINVAL;\n"
     if 'strcmp(tok + 1, "pids")' not in t:
-        if write_old not in t:
-            die("cgroup.c: subtree_control unknown-token path not found")
-        write_new = (
-            "\t\tif (ssid == CGROUP_SUBSYS_COUNT) {\n"
-            "\t\t\t/* pids has no subsystem: accept the token, nothing to enable */\n"
-            '\t\t\tif (!strcmp(tok + 1, "pids"))\n'
-            "\t\t\t\tcontinue;\n"
-            "\t\t\treturn -EINVAL;\n"
-            "\t\t}\n")
-        t = t.replace(write_old, write_new, 1)
+        write_new = ("\t\tif (ssid == CGROUP_SUBSYS_COUNT) {\n"
+                     "\t\t\t/* pids has no subsystem: accept the token, nothing to enable */\n"
+                     '\t\t\tif (!strcmp(tok + 1, "pids"))\n'
+                     "\t\t\t\tcontinue;\n"
+                     "\t\t\treturn -EINVAL;\n"
+                     "\t\t}\n")
+        t = sub(t, write_old, write_new, "cgroup.c subtree_control")
         changed = True
 
     if changed:
@@ -173,23 +222,16 @@ def patch_fork_c(root: Path) -> bool:
     anchor = ("\tretval = cgroup_can_fork(p, args);\n"
               "\tif (retval)\n"
               "\t\tgoto bad_fork_cleanup_dmabuf;\n")
-    if anchor not in t:
-        die("fork.c: cgroup_can_fork block not found")
-
     inject = anchor + (
-        "\n\t/* DroidSpaces pids.max: refuse the fork before the child is visible. */\n"
-        "\tretval = ds_pids_limit_check(current);\n"
+        "\n\t/* DroidSpaces pids.max: charge, check, roll back on refusal. */\n"
+        "\tretval = ds_pids_can_fork(current);\n"
         "\tif (retval)\n"
         "\t\tgoto bad_fork_cancel_cgroup;\n")
+    t = sub(t, anchor, inject, "fork.c can_fork")
 
-    decl_anchor = "unsigned long _ksu_get_task_flags"  # not used; keep simple
-    t = t.replace(anchor, inject, 1)
-
-    if "int ds_pids_limit_check(struct task_struct *task);" not in t:
-        inc = "#include <linux/cgroup.h>\n"
-        if inc not in t:
-            die("fork.c: linux/cgroup.h include not found")
-        t = t.replace(inc, inc + "int ds_pids_limit_check(struct task_struct *task);\n", 1)
+    inc = "#include <linux/cgroup.h>\n"
+    t = sub(t, inc, inc + "int ds_pids_can_fork(struct task_struct *task);\n",
+            "fork.c declaration")
 
     p.write_text(t)
     return True

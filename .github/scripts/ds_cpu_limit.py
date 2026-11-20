@@ -7,13 +7,17 @@ device stops booting even when the CRCs are shadowed back to stock (runs
 44286900753 and 44466030716 both passed the ABI gate and neither booted).
 
 This installs an out-of-scheduler quota instead: per-cgroup state in a list, a
-5 ms delayed work that samples summed se.sum_exec_runtime, and freeze/thaw of the
-cgroup's tasks when the period's quota is spent. No struct changes anywhere.
+delayed work that samples summed se.sum_exec_runtime at the interval set by
+sched_cfs_bandwidth_slice_us, freeze/thaw of the cgroup's tasks when the period's
+allowance is spent, and a burst bucket refilled from unused quota. No struct
+changes anywhere.
 
-  kernel/cgroup/cpuquota.c   the enforcer, cpu.max handler, sysctl
+  kernel/cgroup/cpuquota.c   the enforcer, cpu.max / cpu.max.burst handlers,
+                             cpu.stat extras, sysctl
   kernel/cgroup/Makefile     build it
-  kernel/cgroup/cgroup.c     cpu.max in cgroup_base_files[], free the state when
-                             the cgroup goes away. cpu.stat is NOT added:
+  kernel/cgroup/cgroup.c     cpu.max and cpu.max.burst in cgroup_base_files[],
+                             state freed at destroy, and cpu_stat_show() extended
+                             with the throttle/burst counters. No second cpu.stat:
                              cgroup_base_files[] already has one in 6.1.
 
 Skipped when the tree really does enable CFS_BANDWIDTH - then the scheduler's own
@@ -73,6 +77,10 @@ def patch_cgroup_c(root: Path) -> bool:
                   '\t{\n\t\t.name = "cpu.max",\n'
                   '\t\t.seq_show = ds_cpu_max_show,\n'
                   '\t\t.write = ds_cpu_max_write,\n'
+                  '\t},\n'
+                  '\t{\n\t\t.name = "cpu.max.burst",\n'
+                  '\t\t.seq_show = ds_cpu_burst_show,\n'
+                  '\t\t.write = ds_cpu_burst_write,\n'
                   '\t},\n')
         t = t.replace(anchor, inject + anchor, 1)
         changed = True
@@ -84,15 +92,31 @@ def patch_cgroup_c(root: Path) -> bool:
         decl = ("int ds_cpu_max_show(struct seq_file *seq, void *v);\n"
                 "ssize_t ds_cpu_max_write(struct kernfs_open_file *of, char *buf,\n"
                 "\t\t\t   size_t nbytes, loff_t off);\n"
+                "int ds_cpu_burst_show(struct seq_file *seq, void *v);\n"
+                "ssize_t ds_cpu_burst_write(struct kernfs_open_file *of, char *buf,\n"
+                "\t\t\t     size_t nbytes, loff_t off);\n"
+                "void ds_cpu_stat_extra(struct seq_file *seq, struct cgroup *cgrp);\n"
                 "void ds_cpuquota_free(struct cgroup *cgrp);\n")
         t = t.replace(decl_anchor, decl + decl_anchor, 1)
         changed = True
 
     if "ds_cpuquota_free(cgrp)" not in t:
-        anchor = "\tds_pids_limit_free(cgrp);\n"
+        anchor = "\tds_pids_free(cgrp);\n"
         if anchor not in t:
             die("cgroup.c: pids cleanup hook not found")
         t = t.replace(anchor, anchor + "\tds_cpuquota_free(cgrp);\n", 1)
+        changed = True
+
+    if "ds_cpu_stat_extra(seq, cgrp)" not in t:
+        anchor = ("\tcgroup_base_stat_cputime_show(seq);\n"
+                  "#ifdef CONFIG_CGROUP_SCHED\n")
+        if anchor not in t:
+            die("cgroup.c: cpu_stat_show body not found")
+        t = t.replace(anchor,
+                      "\tcgroup_base_stat_cputime_show(seq);\n"
+                      "\t/* DroidSpaces: throttle and burst counters for cpu.stat */\n"
+                      "\tds_cpu_stat_extra(seq, cgrp);\n"
+                      "#ifdef CONFIG_CGROUP_SCHED\n", 1)
         changed = True
 
     if changed:
