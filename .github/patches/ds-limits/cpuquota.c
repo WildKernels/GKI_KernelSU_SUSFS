@@ -8,30 +8,33 @@
  * subscribed to the android vendor-hook tracepoints read rq fields at offsets
  * baked in when they were compiled. Shadowing the CRCs back to stock made the ABI
  * gate pass and the device still failed to boot (runs 44286900753, 44466030716).
+ * With the option off, the same tree boots.
  *
- * So the quota is enforced from outside the scheduler instead:
+ * So the quota is enforced from outside the scheduler:
  *   - state per cgroup in a list, no struct anywhere is touched
- *   - a delayed work samples the cgroup's summed se.sum_exec_runtime every tick
- *   - when the quota for the period is spent, the cgroup's tasks are frozen;
- *     they are thawed when the next period starts
- *
- * Externally this is the same contract as cpu.max: a container may consume
- * quota microseconds of CPU per period microseconds, and no more. The difference
- * is granularity (one sample interval, 5 ms by default, against the scheduler's
- * own slice) and that a task in uninterruptible sleep is frozen when it next
- * becomes freezable rather than descheduled immediately.
+ *   - a delayed work samples the cgroup's summed se.sum_exec_runtime
+ *   - when the period's allowance is spent the cgroup's tasks are frozen, and
+ *     thawed when the next period starts
+ *   - unused quota refills a burst bucket, capped by cpu.max.burst, as upstream
  *
  * Files, matching what DroidSpaces and systemd write and read:
- *   cpu.max    "<quota> <period>" or "max <period>"
- * cpu.stat is left alone: cgroup_base_files[] already provides it in 6.1.
- * plus /proc/sys/kernel/sched_cfs_bandwidth_slice_us, which DroidSpaces probes to
- * decide whether CPU limits are supported at all.
+ *   cpu.max        "<quota> <period>" or "max <period>"
+ *   cpu.max.burst  microseconds of burst
+ *   cpu.stat       extended with nr_periods / nr_throttled / throttled_usec /
+ *                  nr_bursts / burst_usec by a hook in cgroup.c's cpu_stat_show
+ * and /proc/sys/kernel/sched_cfs_bandwidth_slice_us, which DroidSpaces probes to
+ * decide CPU limits are supported, and which here sets the sample interval.
+ *
+ * Remaining difference from the scheduler's own implementation: enforcement
+ * happens at the sample interval rather than inside the scheduler, and a task in
+ * uninterruptible sleep is frozen when it next becomes freezable.
  */
 #include <linux/cgroup.h>
 #include <linux/freezer.h>
 #include <linux/jiffies.h>
 #include <linux/ktime.h>
 #include <linux/list.h>
+#include <linux/minmax.h>
 #include <linux/mutex.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -43,12 +46,16 @@
 #include "cgroup-internal.h"
 
 #define DS_CPU_DEFAULT_PERIOD_US	100000LL
-#define DS_CPU_TICK_MS			5
 
 struct ds_cpuquota {
 	struct cgroup	*cgrp;
 	s64		quota_us;	/* <= 0: unlimited */
 	s64		period_us;
+	s64		burst_us;
+	u64		burst_ns;	/* available burst */
+	u64		burst_used_ns;	/* drawn this period */
+	u64		burst_total_ns;
+	u64		nr_bursts;
 	u64		used_ns;
 	u64		last_sum_ns;
 	u64		period_start_ns;
@@ -65,7 +72,7 @@ static DEFINE_MUTEX(ds_cpuquota_lock);
 static void ds_cpuquota_workfn(struct work_struct *work);
 static DECLARE_DELAYED_WORK(ds_cpuquota_work, ds_cpuquota_workfn);
 
-/* DroidSpaces probes this sysctl; upstream's default slice is 5 ms. */
+/* DroidSpaces probes this sysctl; here it also sets the sample interval. */
 static int ds_sched_cfs_bandwidth_slice_us = 5000;
 
 static struct ctl_table ds_cpuquota_sysctls[] = {
@@ -79,6 +86,13 @@ static struct ctl_table ds_cpuquota_sysctls[] = {
 	},
 	{ }
 };
+
+static unsigned int ds_cpu_tick_jiffies(void)
+{
+	unsigned int us = max_t(int, ds_sched_cfs_bandwidth_slice_us, 1000);
+
+	return max_t(unsigned int, usecs_to_jiffies(us), 1);
+}
 
 static u64 ds_cpu_sum_runtime(struct cgroup *cgrp)
 {
@@ -160,10 +174,11 @@ static void ds_cpuquota_workfn(struct work_struct *work)
 
 	mutex_lock(&ds_cpuquota_lock);
 	list_for_each_entry(q, &ds_cpuquotas, node) {
-		u64 sum, delta, period_ns;
+		u64 sum, delta, period_ns, quota_ns, allowed, over;
 
 		if (q->quota_us <= 0) {
 			if (q->throttled) {
+				q->throttled_ns += now - q->throttle_start_ns;
 				ds_cpu_freeze(q->cgrp, false);
 				q->throttled = false;
 			}
@@ -171,17 +186,24 @@ static void ds_cpuquota_workfn(struct work_struct *work)
 		}
 		active = true;
 		period_ns = (u64)q->period_us * NSEC_PER_USEC;
+		quota_ns = (u64)q->quota_us * NSEC_PER_USEC;
 
 		sum = ds_cpu_sum_runtime(q->cgrp);
 		delta = sum - q->last_sum_ns;
 		q->last_sum_ns = sum;
 
 		if (now - q->period_start_ns >= period_ns) {
+			u64 unused = quota_ns > q->used_ns ? quota_ns - q->used_ns : 0;
+			u64 cap = (u64)q->burst_us * NSEC_PER_USEC;
+
 			if (q->throttled) {
 				q->throttled_ns += now - q->throttle_start_ns;
 				ds_cpu_freeze(q->cgrp, false);
 				q->throttled = false;
 			}
+			/* unused quota refills the burst bucket, capped */
+			q->burst_ns = min(q->burst_ns + unused, cap);
+			q->burst_used_ns = 0;
 			q->used_ns = 0;
 			q->period_start_ns = now;
 			q->nr_periods++;
@@ -189,8 +211,22 @@ static void ds_cpuquota_workfn(struct work_struct *work)
 
 		q->used_ns += delta;
 
-		if (!q->throttled &&
-		    q->used_ns >= (u64)q->quota_us * NSEC_PER_USEC) {
+		/* spend burst for whatever ran past the quota */
+		over = q->used_ns > quota_ns ? q->used_ns - quota_ns : 0;
+		if (over > q->burst_used_ns) {
+			u64 draw = min(over - q->burst_used_ns, q->burst_ns);
+
+			if (draw) {
+				if (!q->burst_used_ns)
+					q->nr_bursts++;
+				q->burst_ns -= draw;
+				q->burst_used_ns += draw;
+				q->burst_total_ns += draw;
+			}
+		}
+
+		allowed = quota_ns + q->burst_used_ns;
+		if (!q->throttled && q->used_ns >= allowed) {
 			ds_cpu_freeze(q->cgrp, true);
 			q->throttled = true;
 			q->throttle_start_ns = now;
@@ -200,8 +236,7 @@ static void ds_cpuquota_workfn(struct work_struct *work)
 	mutex_unlock(&ds_cpuquota_lock);
 
 	if (active)
-		schedule_delayed_work(&ds_cpuquota_work,
-				      msecs_to_jiffies(DS_CPU_TICK_MS));
+		schedule_delayed_work(&ds_cpuquota_work, ds_cpu_tick_jiffies());
 }
 
 int ds_cpu_max_show(struct seq_file *seq, void *v)
@@ -268,6 +303,7 @@ ssize_t ds_cpu_max_write(struct kernfs_open_file *of, char *buf,
 	q->quota_us = quota;
 	q->period_us = period;
 	q->used_ns = 0;
+	q->burst_used_ns = 0;
 	q->period_start_ns = ktime_get_ns();
 	q->last_sum_ns = ds_cpu_sum_runtime(cgrp);
 	if (q->throttled) {
@@ -282,6 +318,78 @@ ssize_t ds_cpu_max_write(struct kernfs_open_file *of, char *buf,
 out:
 	cgroup_kn_unlock(of->kn);
 	return ret;
+}
+
+int ds_cpu_burst_show(struct seq_file *seq, void *v)
+{
+	struct ds_cpuquota *q;
+	s64 burst = 0;
+
+	mutex_lock(&ds_cpuquota_lock);
+	q = ds_cpuquota_get(seq_css(seq)->cgroup);
+	if (q)
+		burst = q->burst_us;
+	mutex_unlock(&ds_cpuquota_lock);
+
+	seq_printf(seq, "%lld\n", burst);
+	return 0;
+}
+
+ssize_t ds_cpu_burst_write(struct kernfs_open_file *of, char *buf,
+			   size_t nbytes, loff_t off)
+{
+	struct cgroup *cgrp = cgroup_kn_lock_live(of->kn, false);
+	struct ds_cpuquota *q;
+	s64 burst;
+	ssize_t ret;
+
+	if (!cgrp)
+		return -ENODEV;
+	if (kstrtoll(strstrip(buf), 0, &burst) || burst < 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	mutex_lock(&ds_cpuquota_lock);
+	q = ds_cpuquota_create(cgrp);
+	if (!q) {
+		mutex_unlock(&ds_cpuquota_lock);
+		ret = -ENOMEM;
+		goto out;
+	}
+	q->burst_us = burst;
+	q->burst_ns = min(q->burst_ns, (u64)burst * NSEC_PER_USEC);
+	mutex_unlock(&ds_cpuquota_lock);
+	ret = nbytes;
+out:
+	cgroup_kn_unlock(of->kn);
+	return ret;
+}
+
+/* Hooked into cgroup.c's cpu_stat_show(), so there is still one cpu.stat. */
+void ds_cpu_stat_extra(struct seq_file *seq, struct cgroup *cgrp)
+{
+	struct ds_cpuquota *q;
+	u64 nr_periods = 0, nr_throttled = 0, throttled = 0;
+	u64 nr_bursts = 0, burst = 0;
+
+	mutex_lock(&ds_cpuquota_lock);
+	q = ds_cpuquota_get(cgrp);
+	if (q) {
+		nr_periods = q->nr_periods;
+		nr_throttled = q->nr_throttled;
+		throttled = q->throttled_ns;
+		if (q->throttled)
+			throttled += ktime_get_ns() - q->throttle_start_ns;
+		nr_bursts = q->nr_bursts;
+		burst = q->burst_total_ns;
+	}
+	mutex_unlock(&ds_cpuquota_lock);
+
+	seq_printf(seq, "nr_periods %llu\nnr_throttled %llu\nthrottled_usec %llu\n",
+		   nr_periods, nr_throttled, throttled / NSEC_PER_USEC);
+	seq_printf(seq, "nr_bursts %llu\nburst_usec %llu\n",
+		   nr_bursts, burst / NSEC_PER_USEC);
 }
 
 static int __init ds_cpuquota_init(void)
