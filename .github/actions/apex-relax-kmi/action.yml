@@ -33,3 +33,17 @@ runs:
       run: |
         set -euo pipefail
         python3 "${{ github.workspace }}/.github/scripts/apex_relax_kmi.py" "$PWD"
+
+    - name: Assert the trim setting in the fragment check
+      # verify-fragment only checks what is in wild_defconfig.fragment, so the
+      # expectation has to live there too - otherwise the relaxed state is only
+      # visible in a .config dump and a future change could re-enable trimming
+      # silently.
+      if: ${{ inputs.enabled == 'true' }}
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/apex-relax-kmi/kmi.fragment" \
+          --dest wild_defconfig.fragment --label apex-relax-kmi
