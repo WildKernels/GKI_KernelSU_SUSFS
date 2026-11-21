@@ -487,5 +487,6 @@ jobs:
           path: |
             /tmp/build-summary-${{ steps.build-summary.outputs.summary_base }}.md
             ${{ github.workspace }}/built.config
+            ${{ github.workspace }}/build-reports/**
           if-no-files-found: warn
           compression-level: 9

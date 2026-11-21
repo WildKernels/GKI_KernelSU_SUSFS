@@ -103,13 +103,13 @@ runs:
           # Nothing found at all: no .stg and no XML anywhere in this tree. Warn
           # loudly rather than pretend the ABI was checked.
           echo "::warning title=ABI gate::no in-tree ABI definition (.stg or .xml) for $VERSION - ABI unverified"
+          mkdir -p "${{ github.workspace }}/build-reports"
           {
+            echo "ABI gate - $VERSION"
             echo ""
-            echo "### ABI gate - $VERSION"
-            echo ""
-            echo "**UNVERIFIED** - this tree ships no \`android/abi_gki_aarch64.stg\` or \`.xml\`, so there is no stock CRC to compare against."
-            echo ""
-          } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            echo "UNVERIFIED - this tree ships no android/abi_gki_aarch64.stg or .xml,"
+            echo "so there is no stock CRC to compare against."
+          } > "${{ github.workspace }}/build-reports/abi-gate.txt"
           exit 0
         fi
 
@@ -127,16 +127,19 @@ runs:
         awk -F'\t' '$2!=$3' /tmp/joined.tsv > /tmp/drift.tsv
         drifted=$(wc -l < /tmp/drift.tsv)
 
+        mkdir -p "${{ github.workspace }}/build-reports"
         {
+          echo "ABI gate - stock ABI of $VERSION"
           echo ""
-          echo "### ABI gate - stock ABI of $VERSION"
-          echo ""
-          echo "| | |"
-          echo "|---|---|"
-          echo "| symbols compared against stock | $compared |"
-          echo "| **differ from stock** | **$drifted** |"
-          echo ""
-        } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo "symbols compared against stock: $compared"
+          echo "differ from stock:              $drifted"
+          if [ "$drifted" -gt 0 ]; then
+            echo ""
+            echo "drifting symbols:"
+            awk -F'\t' '{printf "  %s  ours=%s stock=%s\n", $1,$2,$3}' /tmp/drift.tsv
+          fi
+        } > "${{ github.workspace }}/build-reports/abi-gate.txt"
+        echo "ABI report: ${{ github.workspace }}/build-reports/abi-gate.txt"
 
         if [ "$drifted" -gt 0 ]; then
           echo "ABI gate: $drifted symbol(s) differ from stock:"

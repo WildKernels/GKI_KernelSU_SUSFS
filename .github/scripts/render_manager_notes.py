@@ -41,6 +41,7 @@ for k, v in commits.items():
         lines.append(f"- **{k}:** `{v}`")
 output = "\n".join(lines) + "\n"
 print(output, end="")
+# Same as the kernel notes: the summary is the reviewer-facing copy.
 s = os.environ.get("GITHUB_STEP_SUMMARY")
 if s:
     open(s, "a").write(output)

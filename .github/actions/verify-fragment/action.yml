@@ -35,12 +35,17 @@ runs:
         rc=$?
         set -e
         printf '%s\n' "$OUT"
+        # Report to the BuildInfo artifact, not to the GitHub step summary.
+        # GITHUB_STEP_SUMMARY is rendered per step and is not where build
+        # evidence belongs - the zip travels with the kernel.
+        REPORT_DIR="${{ github.workspace }}/build-reports"
+        mkdir -p "$REPORT_DIR"
         {
+          echo "Fragment vs .config"
+          echo "fragment: $FRAGMENT"
+          echo "config:   $CONFIG_FILE"
           echo ""
-          echo "### Fragment vs .config"
-          echo ""
-          echo '```'
           printf '%s\n' "$OUT"
-          echo '```'
-        } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        } > "$REPORT_DIR/fragment-check.txt"
+        echo "fragment report: $REPORT_DIR/fragment-check.txt"
         exit $rc

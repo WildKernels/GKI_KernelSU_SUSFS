@@ -26,15 +26,7 @@ runs:
         fi
         cp "$CONFIG_FILE" "${{ github.workspace }}/built.config"
         echo "built.config <- $CONFIG_FILE ($(grep -c '^CONFIG_' "$CONFIG_FILE") entries)"
-        {
-          echo ""
-          echo "### Built .config"
-          echo ""
-          echo "| | |"
-          echo "|---|---|"
-          echo "| source | \`$CONFIG_FILE\` |"
-          echo "| CONFIG_ entries | $(grep -c '^CONFIG_' "$CONFIG_FILE") |"
-          echo ""
-        } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        # No step summary: the path and entry count are echoed above, and the whole
+        # .config is dumped below into the job log.
         echo "=== built .config (all $(grep -c '^CONFIG_' "$CONFIG_FILE") entries) ==="
         cat "$CONFIG_FILE"

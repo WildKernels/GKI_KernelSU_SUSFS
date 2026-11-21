@@ -246,5 +246,7 @@ else:
 lines.append("")
 output="\n".join(lines)+"\n"
 print(output,end="")
+# The rendered body is also the run summary: it is what a reviewer reads on
+# the run page. Artifacts carry it too, but the summary is deliberate here.
 s=os.environ.get("GITHUB_STEP_SUMMARY")
 if s: open(s,"a").write(output)

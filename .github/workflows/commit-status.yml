@@ -20,7 +20,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          summary_file="$GITHUB_STEP_SUMMARY"
+          summary_file=/tmp/commit-status.md
+          : > "$summary_file"
 
           sanitize_cell() {
             local value="$1"
@@ -92,3 +93,7 @@ jobs:
           latest_kernelsu_message="$(sanitize_cell "$latest_kernelsu_message")"
 
           printf '| %s | %s | %s |\n' "dev-susfs" "$latest_kernelsu_commit" "$latest_kernelsu_message" >> "$summary_file"
+          # The report lives in the job log: build evidence belongs in the
+          # artifacts that travel with the kernel, not in step summaries.
+          echo "=== upstream branch state ==="
+          cat "$summary_file"
