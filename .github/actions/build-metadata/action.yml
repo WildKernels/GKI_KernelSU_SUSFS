@@ -82,7 +82,7 @@ runs:
                 "${artifacts_api}&page=${page}" -o "$page_file"
 
               match="$(jq -r --arg name "$artifact_name" \
-                '[.artifacts[] | select(.name == $name and .expired == false)] | .[0]
+                '[.artifacts[] | select((.name == $name or (.name | startswith($name))) and .expired == false)] | .[0]
                  | if . == null then "" else (.archive_download_url + "\t" + .digest) end' \
                 "$page_file")"
 

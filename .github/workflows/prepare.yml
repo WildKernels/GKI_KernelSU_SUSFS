@@ -180,7 +180,10 @@ jobs:
     # (with a live-download fallback if they get there too early).
     # Branches that call prepare.yml directly keep the default (true).
     needs: generate-matrix
-    if: inputs.produce_stock_configs != 'false'
+    # Boolean input compared to a bare boolean: 'false' vs false is never
+    # equal in a GitHub expression, which made every leg of an All run
+    # produce its own copy of the same artifact.
+    if: ${{ inputs.produce_stock_configs != false && inputs.produce_stock_configs != 'false' }}
     runs-on: ubuntu-latest
     outputs:
       version_slug: ${{ steps.prep.outputs.version_slug }}

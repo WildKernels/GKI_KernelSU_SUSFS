@@ -669,11 +669,27 @@ jobs:
         with:
           commit: ${{ steps.clone.outputs.commit }}
 
+      - name: Name the NoMount metamodule artifact
+        id: nmname
+        if: env.NOMOUNT_WANTED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Tag from the module's own metadata, plus the pinned commit, so the
+          # artifact says which NoMount it is instead of a bare name.
+          dir="${{ steps.buildmod.outputs.module_dir }}"
+          ver="$(awk -F= '/^version=/{print $2; exit}' "$dir/module.prop" 2>/dev/null || true)"
+          ver="${ver:-unknown}"
+          ver="${ver// /_}"; ver="${ver//\//_}"
+          sha="${{ steps.clone.outputs.commit }}"
+          echo "name=NoMount-Metamodule-${ver}-${sha:0:7}" >> "$GITHUB_OUTPUT"
+          echo "NoMount artifact: NoMount-Metamodule-${ver}-${sha:0:7}"
+
       - name: Upload NoMount metamodule
         if: env.NOMOUNT_WANTED == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: NoMount-Metamodule
+          name: ${{ steps.nmname.outputs.name }}
           path: ${{ steps.buildmod.outputs.module_dir }}
           if-no-files-found: error
           compression-level: 0
@@ -1749,7 +1765,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           path: release-assets
-          pattern: "*NoMount-Metamodule"
+          pattern: "*NoMount-Metamodule*"
           merge-multiple: false
 
       - name: Zip AnyKernel3 for Release
@@ -1784,8 +1800,8 @@ jobs:
           set -euo pipefail
           # The metamodule silently missed r20 (artifact built fine, no zip
           # on the release). Fail loud instead of shipping without it.
-          if ! ls release-assets/NoMount-Metamodule.zip >/dev/null 2>&1; then
-            echo "ERROR: use_nomount is true but release-assets/NoMount-Metamodule.zip is missing" >&2
+          if ! ls release-assets/NoMount-Metamodule*.zip >/dev/null 2>&1; then
+            echo "ERROR: use_nomount is true but no release-assets/NoMount-Metamodule*.zip is present" >&2
             ls release-assets/ >&2
             exit 1
           fi
@@ -2012,7 +2028,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           path: release-assets
-          pattern: '*NoMount-Metamodule'
+          pattern: '*NoMount-Metamodule*'
           merge-multiple: false
 
       - name: Zip artifacts for Release
