@@ -34,3 +34,17 @@ runs:
       run: |
         set -euo pipefail
         python3 "${{ github.workspace }}/.github/scripts/kmi_no_trim.py" "$PWD"
+
+    - name: Assert the trim setting in the fragment check
+      # verify-fragment only checks entries present in wild_defconfig.fragment, so
+      # the expectation has to live there too - otherwise the relaxed state is
+      # only visible in a .config dump and a future change could re-enable
+      # trimming without the check noticing.
+      if: ${{ inputs.enabled == 'true' }}
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+        python3 "${{ github.workspace }}/.github/scripts/append_fragment.py" \
+          "${{ github.workspace }}/.github/actions/kmi-no-trim/kmi.fragment" \
+          --dest wild_defconfig.fragment --label kmi-no-trim
