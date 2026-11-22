@@ -92,12 +92,38 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Download Prefetched Stock Configs
+        # Hard requirement: without the stock configs there is nothing to build
+        # against, so this waits for the producer leg and then fails the job
+        # rather than falling through to a live download.
+        #
+        # The wait is needed because each family leg calls this workflow
+        # separately: the producing leg uploads stock-configs-<family> while a
+        # consuming leg may already be running, and GitHub indexes artifacts a
+        # few seconds after the upload reports success.
         if: inputs.stock_config_artifact != ''
-        continue-on-error: true
-        uses: actions/download-artifact@v7
-        with:
-          name: ${{ inputs.stock_config_artifact }}
-          path: stock-configs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ inputs.stock_config_artifact }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p stock-configs
+          for attempt in $(seq 1 40); do
+            if gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate \
+                 --jq '.artifacts[].name' 2>/dev/null | grep -Fxq "$ARTIFACT"; then
+              gh run download "$RUN_ID" --repo "$REPO" -n "$ARTIFACT" -D stock-configs
+              n=$(find stock-configs -name 'stock_*.config' | wc -l)
+              echo "stock configs: $n file(s) from $ARTIFACT"
+              [ "$n" -gt 0 ] || { echo "::error title=stock configs::$ARTIFACT is empty"; exit 1; }
+              exit 0
+            fi
+            echo "stock configs: $ARTIFACT not uploaded yet (attempt $attempt/40), waiting 15s"
+            sleep 15
+          done
+          echo "::error title=stock configs::$ARTIFACT was never uploaded - refusing to build without the stock configs"
+          exit 1
 
       - name: Validate Page Size
         uses: ./.github/actions/validate-page-size
