@@ -570,6 +570,8 @@ jobs:
           [ "$F_UNICODE" = "true" ] && FEATURES="${FEATURES}Unicode+"
           [ "$F_PERF" = "true" ] && FEATURES="${FEATURES}Perf+"
           [ "$F_MISC" = "true" ] && FEATURES="${FEATURES}Misc+"
+          # BPF stack (BTF + eBPF + FUSE-BPF): always on, see build.yml.
+          FEATURES="${FEATURES}BPF+"
           echo "feature_set=${FEATURES%+}" >> "$GITHUB_OUTPUT"
 
       - name: Clone shared source repos once
@@ -1887,9 +1889,8 @@ jobs:
           USE_NTSYNC: ${{ inputs.use_ntsync || (github.event_name == 'schedule' && true) || false }}
           USE_PTRACE: ${{ inputs.use_ptrace || (github.event_name == 'schedule' && true) || false }}
           USE_UNICODE: ${{ inputs.use_unicode || (github.event_name == 'schedule' && true) || false }}
-          # BPF stack is disabled in the build (see build.yml); the notes still
-          # list it so users know it is off and where to ask.
-          USE_BPF: 'true'
+          # BPF stack is built whenever feature_set carries BPF (see build.yml).
+          USE_BPF: ${{ contains(needs.resolve-sources.outputs.feature_set, 'BPF') }}
           USE_PERF: ${{ inputs.use_perf || false }}
           USE_USBA: ${{ contains(needs.resolve-sources.outputs.feature_set, 'USBA') }}
           USBA_COMMIT: ${{ needs.resolve-sources.outputs.usba_commit }}

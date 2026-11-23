@@ -377,19 +377,17 @@ jobs:
           sublevel: ${{ steps.extract.outputs.sublevel }}
           variant: ${{ inputs.variant }}
 
-      # DISABLED: the BPF stack (BTF + eBPF + FUSE-BPF) is off until there is a
-      # concrete need for it. Most of it is already in stock GKI (BPF_SYSCALL,
-      # DEBUG_INFO_BTF, FUSE_FS are =y on 5.15+), so the action was mainly adding
-      # BPF_EVENTS/kprobe/uprobe events and FUSE_BPF - tracing plumbing and an
-      # experimental FUSE-over-eBPF path that nothing here uses - at the cost of build
-      # time and extra config surface. If you require it, open an issue.
-      # - name: Enable BPF Stack (BTF + eBPF + FUSE-BPF)
-      #   if: contains(inputs.feature_set, 'BPF')
-      #   uses: ./.github/actions/btf
-      #   with:
-      #     version: ${{ inputs.version }}
-      #     kernel_version: ${{ inputs.kernel_version }}
-      #     sublevel: ${{ steps.extract.outputs.sublevel }}
+      # BPF stack (BTF + eBPF + FUSE-BPF). Most of it is already in stock GKI
+      # (BPF_SYSCALL, DEBUG_INFO_BTF, FUSE_FS are =y on 5.15+); this action mainly
+      # adds BPF_EVENTS/kprobe/uprobe events and FUSE_BPF, at the cost of build
+      # time and extra config surface.
+      - name: Enable BPF Stack (BTF + eBPF + FUSE-BPF)
+        if: contains(inputs.feature_set, 'BPF')
+        uses: ./.github/actions/btf
+        with:
+          version: ${{ inputs.version }}
+          kernel_version: ${{ inputs.kernel_version }}
+          sublevel: ${{ steps.extract.outputs.sublevel }}
 
       - name: Apply Device-Specific Patches
         uses: ./.github/actions/apply-device-patches
