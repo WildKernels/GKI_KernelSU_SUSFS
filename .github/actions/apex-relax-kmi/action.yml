@@ -27,6 +27,7 @@ runs:
   using: composite
   steps:
     - name: Relax KMI enforcement
+      id: relax
       if: ${{ inputs.enabled == 'true' }}
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
@@ -35,11 +36,13 @@ runs:
         python3 "${{ github.workspace }}/.github/scripts/apex_relax_kmi.py" "$PWD"
 
     - name: Assert the trim setting in the fragment check
+      # Only after the tree really was relaxed: asserting trim-off on a tree that
+      # still trims fails the config check with "actual 'y', expected ''".
       # verify-fragment only checks what is in wild_defconfig.fragment, so the
       # expectation has to live there too - otherwise the relaxed state is only
       # visible in a .config dump and a future change could re-enable trimming
       # silently.
-      if: ${{ inputs.enabled == 'true' }}
+      if: ${{ inputs.enabled == 'true' && steps.relax.outcome == 'success' }}
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |

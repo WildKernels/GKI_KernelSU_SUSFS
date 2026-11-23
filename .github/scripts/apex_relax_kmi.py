@@ -64,18 +64,26 @@ def relax_build_bazel(root: Path) -> list:
     t = read(p)
     orig = t
 
-    n = t.count('"trim_nonlisted_kmi": True')
-    if n:
-        t = t.replace('"trim_nonlisted_kmi": True', '"trim_nonlisted_kmi": False')
-        notes.append(f"BUILD.bazel: trim_nonlisted_kmi True -> False ({n} target(s))")
-    elif '"trim_nonlisted_kmi": False' not in t:
-        notes.append("BUILD.bazel: no trim_nonlisted_kmi setting found - nothing to relax")
+    # Two spellings across the families: a dict entry on 6.1/6.6
+    # ("trim_nonlisted_kmi": True) and a named argument on 6.12/6.18
+    # (trim_nonlisted_kmi = True). Matching only the first made this a no-op on
+    # 6.18 while the fragment still asked for trim to be off, and kleaf failed
+    # with "CONFIG_TRIM_UNUSED_KSYMS: actual 'y', expected ''".
+    n = 0
+    for form in ('"trim_nonlisted_kmi": True', 'trim_nonlisted_kmi = True'):
+        n += t.count(form)
+        t = t.replace(form, form[:-len("True")] + "False")
 
     # Without trimming the export set is a superset of the list, and strict mode
     # treats every new export as a violation. Relax it too, or the build fails.
-    s = t.count('"kmi_symbol_list_strict_mode": True')
+    s = 0
+    for form in ('"kmi_symbol_list_strict_mode": True', 'kmi_symbol_list_strict_mode = True'):
+        s += t.count(form)
+        t = t.replace(form, form[:-len("True")] + "False")
+
+    if n:
+        notes.append(f"BUILD.bazel: trim_nonlisted_kmi True -> False ({n} target(s))")
     if s:
-        t = t.replace('"kmi_symbol_list_strict_mode": True', '"kmi_symbol_list_strict_mode": False')
         notes.append(f"BUILD.bazel: kmi_symbol_list_strict_mode True -> False ({s} target(s))")
 
     # no protected-module set at all
@@ -85,6 +93,11 @@ def relax_build_bazel(root: Path) -> list:
         if removed:
             t = pattern.sub("", t)
             notes.append(f"BUILD.bazel: removed {key} ({removed} occurrence(s))")
+
+    if (n == 0 and '"trim_nonlisted_kmi": False' not in t
+            and 'trim_nonlisted_kmi = False' not in t):
+        die("BUILD.bazel: no trim_nonlisted_kmi setting in either spelling - "
+            "refusing to report the tree as relaxed")
 
     if t != orig:
         p.write_text(t)
