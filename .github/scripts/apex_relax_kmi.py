@@ -96,6 +96,19 @@ def relax_build_bazel(root: Path) -> list:
                 notes.append(f"BUILD.bazel: injected trim_nonlisted_kmi False ({k} target(s), tree never set it)")
                 break
         if injected == 0:
+            # 5.10 (and any build.sh tree) carries the same knobs as build-config
+            # variables instead of Bazel attributes.
+            cfg = root / "build.config.gki.aarch64"
+            if cfg.is_file():
+                c = cfg.read_text()
+                c2 = re.sub(r"^TRIM_NONLISTED_KMI=.*$", "TRIM_NONLISTED_KMI=0", c, flags=re.MULTILINE)
+                c2 = re.sub(r"^KMI_SYMBOL_LIST_STRICT_MODE=.*$", "KMI_SYMBOL_LIST_STRICT_MODE=0", c2,
+                            flags=re.MULTILINE)
+                if c2 != c:
+                    cfg.write_text(c2)
+                    notes.append("build.config.gki.aarch64: TRIM_NONLISTED_KMI=0, "
+                                 "KMI_SYMBOL_LIST_STRICT_MODE=0 (build.sh tree)")
+                    return notes
             notes.append("BUILD.bazel: no KMI knobs at all - cannot relax this tree")
             if t != orig:
                 p.write_text(t)
