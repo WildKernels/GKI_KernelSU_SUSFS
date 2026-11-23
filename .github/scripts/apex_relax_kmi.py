@@ -64,26 +64,46 @@ def relax_build_bazel(root: Path) -> list:
     t = read(p)
     orig = t
 
-    # Two spellings across the families: a dict entry on 6.1/6.6
+    # Two spellings across the families: a dict entry on 5.10-6.6
     # ("trim_nonlisted_kmi": True) and a named argument on 6.12/6.18
-    # (trim_nonlisted_kmi = True). Matching only the first made this a no-op on
-    # 6.18 while the fragment still asked for trim to be off, and kleaf failed
-    # with "CONFIG_TRIM_UNUSED_KSYMS: actual 'y', expected ''".
-    n = 0
-    for form in ('"trim_nonlisted_kmi": True', 'trim_nonlisted_kmi = True'):
-        n += t.count(form)
-        t = t.replace(form, form[:-len("True")] + "False")
+    # (trim_nonlisted_kmi = True). Match the value, not the spelling, so a tree
+    # that already says False is not counted twice.
+    trim_re = re.compile(r'("trim_nonlisted_kmi"\s*:\s*|\btrim_nonlisted_kmi\s*=\s*)True\b')
+    strict_re = re.compile(r'("kmi_symbol_list_strict_mode"\s*:\s*|\bkmi_symbol_list_strict_mode\s*=\s*)True\b')
 
-    # Without trimming the export set is a superset of the list, and strict mode
-    # treats every new export as a violation. Relax it too, or the build fails.
-    s = 0
-    for form in ('"kmi_symbol_list_strict_mode": True', 'kmi_symbol_list_strict_mode = True'):
-        s += t.count(form)
-        t = t.replace(form, form[:-len("True")] + "False")
-
+    n = len(trim_re.findall(t))
     if n:
+        t = trim_re.sub(lambda m: m.group(1) + "False", t)
         notes.append(f"BUILD.bazel: trim_nonlisted_kmi True -> False ({n} target(s))")
+
+    # 5.10/5.15/6.1 never set trim_nonlisted_kmi at all: kleaf's default is True,
+    # so turning trimming off means stating it. Inject next to the strict-mode
+    # knob in whichever spelling the tree uses - before that knob is flipped, so
+    # the anchor is still readable.
+    if n == 0 and "trim_nonlisted_kmi" not in t:
+        injected = 0
+        for anchor, line in (
+                ('"kmi_symbol_list_strict_mode": True,', '"trim_nonlisted_kmi": False,'),
+                ('"kmi_symbol_list_strict_mode": False,', '"trim_nonlisted_kmi": False,'),
+                ("kmi_symbol_list_strict_mode = True,", "trim_nonlisted_kmi = False,"),
+                ("kmi_symbol_list_strict_mode = False,", "trim_nonlisted_kmi = False,")):
+            if anchor in t:
+                k = t.count(anchor)
+                indent = re.search(r"^([ \t]*)" + re.escape(anchor), t, re.MULTILINE)
+                pad = indent.group(1) if indent else "        "
+                t = t.replace(anchor, anchor + "\n" + pad + line)
+                injected += k
+                notes.append(f"BUILD.bazel: injected trim_nonlisted_kmi False ({k} target(s), tree never set it)")
+                break
+        if injected == 0:
+            notes.append("BUILD.bazel: no KMI knobs at all - cannot relax this tree")
+            if t != orig:
+                p.write_text(t)
+            return notes
+
+    s = len(strict_re.findall(t))
     if s:
+        t = strict_re.sub(lambda m: m.group(1) + "False", t)
         notes.append(f"BUILD.bazel: kmi_symbol_list_strict_mode True -> False ({s} target(s))")
 
     # no protected-module set at all
@@ -93,11 +113,6 @@ def relax_build_bazel(root: Path) -> list:
         if removed:
             t = pattern.sub("", t)
             notes.append(f"BUILD.bazel: removed {key} ({removed} occurrence(s))")
-
-    if (n == 0 and '"trim_nonlisted_kmi": False' not in t
-            and 'trim_nonlisted_kmi = False' not in t):
-        die("BUILD.bazel: no trim_nonlisted_kmi setting in either spelling - "
-            "refusing to report the tree as relaxed")
 
     if t != orig:
         p.write_text(t)
@@ -109,7 +124,10 @@ def relax_modules_bzl(root: Path) -> list:
     p = root / "modules.bzl"
     if not p.is_file():
         return ["modules.bzl: not present - skipped"]
-    t = read(p)
+    try:
+        t = p.read_text()
+    except (UnicodeDecodeError, OSError):
+        return ["modules.bzl: unreadable - skipped"]
     orig = t
 
     # top-level assignment form
@@ -171,6 +189,22 @@ def main() -> None:
     notes = relax_build_bazel(root) + relax_modules_bzl(root) + apply_relax_patch(root)
     for n in notes:
         print(f"apex relax: {n}")
+
+    if any("no KMI knobs at all" in n for n in notes):
+        print("apex relax: skipped - this tree has no KMI knobs to relax")
+        return
+
+    # Only now ask the fragment check to assert trim-off: it is a claim about the
+    # tree, and a tree that still trims fails kleaf with
+    # "CONFIG_TRIM_UNUSED_KSYMS: actual 'y', expected ''".
+    gh = PATCH.parents[2]          # .github
+    frag = gh / "actions/apex-relax-kmi/kmi.fragment"
+    if frag.is_file():
+        subprocess.run([sys.executable,
+                        str(gh / "scripts/append_fragment.py"),
+                        str(frag), "--dest", "wild_defconfig.fragment",
+                        "--label", "apex-relax-kmi"], cwd=root, check=True)
+
     print("apex relax: KMI enforcement relaxed for this build")
 
 
