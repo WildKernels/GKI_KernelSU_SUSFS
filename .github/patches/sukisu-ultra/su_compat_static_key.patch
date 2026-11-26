@@ -1,0 +1,60 @@
+--- a/kernel/feature/sucompat.c
++++ b/kernel/feature/sucompat.c
+@@ -1,7 +1,16 @@
+ #define SU_PATH "/system/bin/su"
+ #define SH_PATH "/system/bin/sh"
+ 
++#ifdef CONFIG_KSU_SUSFS
++/*
++ * The SUSFS hooks in fs/exec.c, fs/open.c and fs/stat.c declare this symbol as
++ * `struct static_key_true` and test it with static_branch_likely(), the way
++ * susfs4ksu's own 10_enable_susfs_for_ksu.patch defines it.
++ */
++DEFINE_STATIC_KEY_TRUE(ksu_su_compat_enabled);
++#else
+ bool ksu_su_compat_enabled __read_mostly = true;
++#endif
+ 
+ static const char su_path[] = SU_PATH;
+ static const char sh_path[] = SH_PATH;
+@@ -9,14 +18,25 @@ static const char ksud_path[] = KSUD_PATH;
+ 
+ static int su_compat_feature_get(u64 *value)
+ {
++#ifdef CONFIG_KSU_SUSFS
++    *value = static_key_enabled(&ksu_su_compat_enabled) ? 1 : 0;
++#else
+     *value = ksu_su_compat_enabled ? 1 : 0;
++#endif
+     return 0;
+ }
+ 
+ static int su_compat_feature_set(u64 value)
+ {
+     bool enable = value != 0;
++#ifdef CONFIG_KSU_SUSFS
++    if (enable)
++        static_branch_enable(&ksu_su_compat_enabled);
++    else
++        static_branch_disable(&ksu_su_compat_enabled);
++#else
+     ksu_su_compat_enabled = enable;
++#endif
+     pr_info("su_compat: set to %d\n", enable);
+     return 0;
+ }
+--- a/kernel/feature/sucompat.h
++++ b/kernel/feature/sucompat.h
+@@ -3,7 +3,12 @@
+ #include <asm/ptrace.h>
+ #include <linux/types.h>
+ 
++#ifdef CONFIG_KSU_SUSFS
++#include <linux/jump_label.h>
++extern struct static_key_true ksu_su_compat_enabled;
++#else
+ extern bool ksu_su_compat_enabled;
++#endif
+ 
+ #ifdef CONFIG_KSU_SUSFS
+ int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode, int *__unused_flags);

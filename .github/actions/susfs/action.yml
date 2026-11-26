@@ -213,6 +213,45 @@ runs:
         sublevel: ${{ inputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
 
+    - name: Make ksu_su_compat_enabled a static key (SukiSU-Ultra)
+      # SukiSU-Ultra's builtin branch carries its own SUSFS integration, so the
+      # 10_enable_susfs_for_ksu patch is not applied for it - but it still
+      # defines ksu_su_compat_enabled as a plain bool, while the 50_add GKI
+      # patch declares it `extern struct static_key_true` in fs/exec.c,
+      # fs/open.c and fs/stat.c and tests it with static_branch_likely().
+      # Builds and links without a warning; at boot jump_label_init() treats
+      # the 1-byte bool as a 16-byte static key and writes the jump entries
+      # pointer over the 8 bytes after it, and the manager's su_compat switch
+      # never flips the branches in the SUSFS hooks. Reported upstream as
+      # SukiSU-Nova/SukiSU-Nova#1071 (fix in #1072); this step skips itself
+      # once the root tree defines the static key.
+      if: inputs.enabled == 'true' && inputs.root_flavor == 'sukisu-ultra'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/SukiSU-Ultra
+      run: |
+        set -euo pipefail
+        PATCH="${{ github.workspace }}/.github/patches/sukisu-ultra/su_compat_static_key.patch"
+        SRC=kernel/feature/sucompat.c
+        HOOK="${{ github.workspace }}/kernel/common/fs/exec.c"
+        if grep -q 'DEFINE_STATIC_KEY_TRUE(ksu_su_compat_enabled)' "$SRC"; then
+          echo "[*] $SRC already defines ksu_su_compat_enabled as a static key; nothing to do"
+          exit 0
+        fi
+        if ! grep -q 'extern struct static_key_true ksu_su_compat_enabled' "$HOOK"; then
+          echo "[-] fs/exec.c does not use ksu_su_compat_enabled as a static key; nothing to do"
+          exit 0
+        fi
+        echo "[*] SUSFS hooks use ksu_su_compat_enabled as a static key but $SRC defines a bool; patching"
+        patch -p1 --forward < "$PATCH"
+        REJ="$(find kernel -name '*.rej' -print -quit)"
+        if [ -n "$REJ" ]; then
+          echo "ERROR: $PATCH left rejects ($REJ)" >&2
+          exit 1
+        fi
+        grep -q 'DEFINE_STATIC_KEY_TRUE(ksu_su_compat_enabled)' "$SRC" \
+          || { echo "ERROR: $SRC still lacks the static key after patching" >&2; exit 1; }
+        echo "[+] ksu_su_compat_enabled is now a static key"
+
     # (susfs-revert-patches removed 2026-10-27: its only live step rewrote
     # `goto show_pad;`, a line SUSFS stopped emitting in ef16cbc (2026-05-10);
     # the gated sources no longer contain it either, so the step was a no-op.)
