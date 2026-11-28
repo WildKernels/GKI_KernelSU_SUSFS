@@ -1,5 +1,5 @@
 name: 'Remove Protected Exports'
-description: 'Remove ABI protected exports and protected modules for Bazel builds with verification'
+description: 'Remove ABI protected exports and protected modules, and disable modpost protected flags plus export trimming, for Bazel builds with verification'
 
 runs:
   using: "composite"
@@ -10,11 +10,21 @@ runs:
       run: |
         set -euo pipefail
 
+        # Legacy build.sh trees (android12/android13) enforce KMI at runtime in
+        # kernel/module/gki_module.c and have no Bazel attributes to strip.
         if [ -f "build/build.sh" ]; then
           exit 0
         fi
 
-        rm -rf common/android/abi_gki_protected_exports_*
+        HANDLED=0
+
+        if ls -1 common/android/abi_gki_protected_exports_* >/dev/null 2>&1; then
+          rm -rf common/android/abi_gki_protected_exports_*
+          HANDLED=$((HANDLED + 1))
+          echo "removed common/android/abi_gki_protected_exports_*"
+        else
+          echo "no common/android/abi_gki_protected_exports_* in this tree"
+        fi
 
         if ls -1 common/android/abi_gki_protected_exports_* >/dev/null 2>&1; then
           echo "Error: abi_gki_protected_exports_* still exists after removal"
@@ -34,6 +44,8 @@ runs:
             echo "Error: protected_exports_list reference still present in common/BUILD.bazel"
             exit 1
           fi
+          HANDLED=$((HANDLED + 1))
+          echo "removed protected_exports_list from common/BUILD.bazel"
         fi
 
         if grep -q '^protected_modules = ' common/modules.bzl; then
@@ -48,6 +60,8 @@ runs:
             echo "Error: protected_modules was not set to [] in common/modules.bzl"
             exit 1
           fi
+          HANDLED=$((HANDLED + 1))
+          echo "cleared protected_modules in common/modules.bzl"
         fi
 
         # Remove protected_module_names_list for 6.12+ kernels (Bazel build system).
@@ -69,4 +83,79 @@ runs:
             grep -n 'protected_module_names_list' common/BUILD.bazel || true
             exit 1
           fi
+          HANDLED=$((HANDLED + 1))
+          echo "removed protected_module_names_list from common/BUILD.bazel"
         fi
+
+        # 6.13+ (present in 6.18, absent in 6.12 and older): both symbol gates
+        # moved into modpost, and neither has a file to delete any more - the
+        # protected set is the complement of the -u whitelist and the trimmed set
+        # is derived from module imports. Disable both at the source:
+        #
+        #   case 'u'  default_symbol_protected_status = true
+        #       -> every export outside the whitelist is KSYM_FLAG_PROTECTED, and
+        #          kernel/module/main.c refuses those imports from an unverified
+        #          module: "Cannot use protected symbol" (err -13, EACCES)
+        #   case 't'  trim_unused_exports = true
+        #       -> every export no in-tree module imports is dropped from
+        #          __ksymtab: "Unknown symbol" (err -2) for a stock vendor module
+        #
+        # CONFIG is untouched, so Kleaf's TRIM_UNUSED_KSYMS assertion is not
+        # involved and kmi_symbol_list_strict_mode still passes (verify_ksymtab.py
+        # only rejects a *listed* symbol that is missing from ksymtab, never an
+        # extra export). Patched per tree, so a drifted modpost fails loudly here
+        # instead of shipping a build with the gates still closed.
+        MODPOST=common/scripts/mod/modpost.c
+        MODPOST_PATCH="${{ github.workspace }}/.github/patches/kmi/0001-modpost-no-protect-no-trim.patch"
+        if [ -f "$MODPOST" ]; then
+          if grep -q 'default_symbol_protected_status = true;' "$MODPOST"; then
+            if [ ! -f "$MODPOST_PATCH" ]; then
+              echo "Error: $MODPOST_PATCH not found" >&2
+              exit 1
+            fi
+            if ! patch -p1 --batch --fuzz=0 --no-backup-if-mismatch -d common --dry-run -i "$MODPOST_PATCH" >/dev/null 2>&1; then
+              echo "Error: modpost patch does not apply - the tree drifted from" >&2
+              echo "the context in $MODPOST_PATCH" >&2
+              patch -p1 --batch --fuzz=0 --no-backup-if-mismatch -d common --dry-run -i "$MODPOST_PATCH" || true
+              exit 1
+            fi
+            patch -p1 --batch --fuzz=0 --no-backup-if-mismatch -d common -i "$MODPOST_PATCH"
+            for pattern in 'default_symbol_protected_status = true;' 'trim_unused_exports = true;'; do
+              if grep -q "$pattern" "$MODPOST"; then
+                echo "Error: '$pattern' still present in modpost after patching" >&2
+                exit 1
+              fi
+            done
+            # The declarations must survive: get_symbol_flags() and the trim sites
+            # still read them, they are simply never set now.
+            grep -q 'static bool default_symbol_protected_status;' "$MODPOST" || {
+              echo "Error: modpost declaration for default_symbol_protected_status vanished" >&2
+              exit 1
+            }
+            grep -q 'static bool trim_unused_exports;' "$MODPOST" || {
+              echo "Error: modpost declaration for trim_unused_exports vanished" >&2
+              exit 1
+            }
+            HANDLED=$((HANDLED + 1))
+            echo "modpost: protected flags and export trimming disabled"
+          elif grep -q 'static bool default_symbol_protected_status;' "$MODPOST"; then
+            HANDLED=$((HANDLED + 1))
+            echo "modpost: already patched (no protected flags, no trimming)"
+          else
+            echo "modpost: no protected-symbol default in this tree (6.12 and older)"
+          fi
+        else
+          echo "no common/scripts/mod/modpost.c in this tree"
+        fi
+
+        if [ "$HANDLED" = "0" ]; then
+          echo "Error: no protected-export mechanism matched in this tree." >&2
+          echo "Checked: common/android/abi_gki_protected_exports_*" >&2
+          echo "         protected_exports_list, protected_modules (modules.bzl)," >&2
+          echo "         protected_module_names_list, modpost protected flags" >&2
+          echo "The tree changed scheme or this step went stale - fix the step rather" >&2
+          echo "than shipping a build with symbol protection still enabled." >&2
+          exit 1
+        fi
+
+        echo "protected-export stripping complete (mechanisms handled: $HANDLED)"

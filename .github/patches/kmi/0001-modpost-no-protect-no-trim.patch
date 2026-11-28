@@ -1,0 +1,49 @@
+Disable modpost's two build-time KMI gates introduced with the 6.13+ trees.
+
+Contents of scripts/mod/modpost.c changed:
+
+  case 't'  trim_unused_exports = true    ->  removed
+      Drops every export that no in-tree module imports, so an export that
+      only a stock/vendor module needs disappears from __ksymtab and the
+      module fails with "Unknown symbol <sym>" (err -2). Example on 6.18:
+      get_fs_type (fs/filesystems.c) and d_alloc_name (fs/dcache.c).
+
+  case 'u'  default_symbol_protected_status = true  ->  removed
+      Flags every export that is not named in the -u whitelist as
+      KSYM_FLAG_PROTECTED. kernel/module/main.c then refuses imports of
+      those symbols from a module whose signature did not verify:
+      "<mod>: Cannot use protected symbol <sym>" (err -13, EACCES).
+
+Both are reversed here at the source because neither has a file to delete on
+these trees: the protected set is the complement of the KMI list, and the
+trim set is derived from module imports.
+
+CONFIG is deliberately untouched:
+  - CONFIG_TRIM_UNUSED_KSYMS stays y, so Kleaf's
+    "actual 'y', expected ''" assertion is not involved;
+  - the -u whitelist is still passed, so handle_white_list_exports() keeps
+    marking those symbols used/unprotected;
+  - kmi_symbol_list_strict_mode still passes: verify_ksymtab.py only fails
+    when a symbol that is *listed* is missing from ksymtab
+    (set(kmi_symbols) - set(ksymtab_symbols)), never on extra exports.
+  - __kexporttab (-p) is unaffected; the protected_module_names_list strip
+    in the same CI step removes it.
+
+Effect on the ABI: no CRC changes. Exports are a superset, so Module.symvers
+gains names; the ABI gate joins on name and compares CRCs, so additions do
+not register as drift.
+
+--- a/scripts/mod/modpost.c
++++ b/scripts/mod/modpost.c
+@@ -2359,11 +2359,9 @@
+ 			files_source = optarg;
+ 			break;
+ 		case 't':
+-			trim_unused_exports = true;
+ 			break;
+ 		case 'u':
+ 			unused_exports_white_list = optarg;
+-			default_symbol_protected_status = true;
+ 			break;
+ 		case 'W':
+ 			extra_warn = true;
