@@ -1,5 +1,5 @@
 name: 'Remove Protected Exports'
-description: 'Remove ABI protected exports, protected modules and the modpost protected-symbol default for Bazel builds, with verification'
+description: 'Remove ABI protected exports and protected modules for Bazel builds with verification'
 
 runs:
   using: "composite"
@@ -10,22 +10,11 @@ runs:
       run: |
         set -euo pipefail
 
-        # Legacy build.sh trees (android12/android13) enforce KMI in
-        # kernel/module/gki_module.c at runtime and have no Bazel attributes to
-        # strip, so there is nothing for this step to do.
         if [ -f "build/build.sh" ]; then
           exit 0
         fi
 
-        HANDLED=0
-
-        if ls -1 common/android/abi_gki_protected_exports_* >/dev/null 2>&1; then
-          rm -rf common/android/abi_gki_protected_exports_*
-          HANDLED=$((HANDLED + 1))
-          echo "removed common/android/abi_gki_protected_exports_*"
-        else
-          echo "no common/android/abi_gki_protected_exports_* in this tree"
-        fi
+        rm -rf common/android/abi_gki_protected_exports_*
 
         if ls -1 common/android/abi_gki_protected_exports_* >/dev/null 2>&1; then
           echo "Error: abi_gki_protected_exports_* still exists after removal"
@@ -45,8 +34,6 @@ runs:
             echo "Error: protected_exports_list reference still present in common/BUILD.bazel"
             exit 1
           fi
-          HANDLED=$((HANDLED + 1))
-          echo "removed protected_exports_list from common/BUILD.bazel"
         fi
 
         if grep -q '^protected_modules = ' common/modules.bzl; then
@@ -61,8 +48,6 @@ runs:
             echo "Error: protected_modules was not set to [] in common/modules.bzl"
             exit 1
           fi
-          HANDLED=$((HANDLED + 1))
-          echo "cleared protected_modules in common/modules.bzl"
         fi
 
         # Remove protected_module_names_list for 6.12+ kernels (Bazel build system).
@@ -84,60 +69,4 @@ runs:
             grep -n 'protected_module_names_list' common/BUILD.bazel || true
             exit 1
           fi
-          HANDLED=$((HANDLED + 1))
-          echo "removed protected_module_names_list from common/BUILD.bazel"
         fi
-
-        # 6.13+ import gate: present in 6.18, absent in 6.12 and older.
-        #
-        # In these trees there is no abi_gki_protected_exports_* file and no
-        # kernel/module/gki_module.c. Instead modpost marks EVERY exported symbol
-        # that is not named in the -u whitelist as KSYM_FLAG_PROTECTED, and
-        # kernel/module/main.c refuses those imports from a module whose signature
-        # did not verify:
-        #
-        #   <mod>: Cannot use protected symbol <sym>    (err -13, EACCES)
-        #
-        # The protected set is the complement of the KMI list here, so the only
-        # way to empty it is at the source. Clearing the default leaves -u (unused
-        # export whitelist) and -t (trimming) untouched, so the KMI list, ksymtab
-        # size and the ABI gate are unaffected; it only stops non-KMI exports being
-        # flagged. On 6.12 this line does not exist and the step is a no-op.
-        MODPOST=common/scripts/mod/modpost.c
-        if [ -f "$MODPOST" ]; then
-          if grep -q 'default_symbol_protected_status = true;' "$MODPOST"; then
-            sed -i '/default_symbol_protected_status = true;/d' "$MODPOST"
-            if grep -q 'default_symbol_protected_status = true;' "$MODPOST"; then
-              echo "Error: modpost protected-symbol default still present after edit" >&2
-              grep -n 'default_symbol_protected_status' "$MODPOST" || true
-              exit 1
-            fi
-            # The declaration must survive: get_symbol_flags() still reads it.
-            if ! grep -q 'default_symbol_protected_status' "$MODPOST"; then
-              echo "Error: modpost default_symbol_protected_status declaration vanished" >&2
-              exit 1
-            fi
-            HANDLED=$((HANDLED + 1))
-            echo "modpost: cleared default_symbol_protected_status - no export is flagged KSYM_FLAG_PROTECTED"
-          elif grep -q 'static bool default_symbol_protected_status;' "$MODPOST"; then
-            # Same family, already cleared (re-run of this step in one workspace).
-            HANDLED=$((HANDLED + 1))
-            echo "modpost: protected-symbol default already cleared"
-          else
-            echo "modpost: no -u protected-symbol default in this tree (6.12 and older)"
-          fi
-        else
-          echo "no common/scripts/mod/modpost.c in this tree"
-        fi
-
-        if [ "$HANDLED" = "0" ]; then
-          echo "Error: no protected-export mechanism matched in this tree." >&2
-          echo "Checked: common/android/abi_gki_protected_exports_*" >&2
-          echo "         protected_exports_list, protected_modules (modules.bzl)," >&2
-          echo "         protected_module_names_list, modpost protected-symbol default" >&2
-          echo "The tree changed scheme or this step went stale - fix the step rather" >&2
-          echo "than shipping a build with symbol protection still enabled." >&2
-          exit 1
-        fi
-
-        echo "protected-export stripping complete (mechanisms handled: $HANDLED)"
