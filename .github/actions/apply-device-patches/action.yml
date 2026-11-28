@@ -205,16 +205,45 @@ runs:
         #   sym->protected = false -> not KSYM_FLAG_PROTECTED, so an unverified
         #                             module may import it
         #
-        # get_fs_type is exported by this tree (fs/filesystems.c:298) but named
-        # by no KMI list, so -t drops it from __ksymtab and a vendor module that
-        # imports it fails with "Unresolved symbol get_fs_type" (err -2) - seen
-        # for nothing_disk_usage on the Nothing/MTK bugreport.
+        # Symbols that stock Nothing/MTK modules import, that this tree exports,
+        # and that no KMI list names:
+        #   get_fs_type           fs/filesystems.c    nothing_disk_usage   err -2 (trimmed)
+        #   d_alloc_name          fs/dcache.c         nothing_disk_usage   err -13
+        #   disable_delayed_work  kernel/workqueue.c  bluetooth.ko         err -13 (GPL)
+        #   __skb_tstamp_tx       net/core/skbuff.c   bluetooth.ko         err -13 (GPL)
+        #   scm_recv              net/core/scm.c      bluetooth.ko         err -13
+        #   ida_find_first_range  lib/idr.c           bluetooth.ko         err -13
+        #
+        # The four bluetooth.ko entries are the ones that bring back Wi-Fi, not
+        # just Bluetooth. That module is the GKI HCI core: without it bt_drv_6886
+        # cannot resolve hci_recv_frame/hci_register_dev, so /dev/stpbt is never
+        # created and MTK conninfra's pre-cal never runs - the BT callback is the
+        # trigger. Wi-Fi power-on then times out 29s into boot with
+        # "[wlan] wlan_func_on_by_chrdev: Timeout, pre_cal_flow: 0" followed by
+        # "[MTK-WIFI] WIFI_write_on[E]: WMT turn on WIFI fail!".
+        # In the previous boot, where bluetooth.ko did load, pre-cal completed and
+        # logged "WMT turn on WIFI success!", which is the control for this chain.
+        #
+        # Two of them are EXPORT_SYMBOL_GPL. That is fine for bluetooth.ko, which
+        # is in-tree and GPL; a proprietary module importing a GPL-only symbol is
+        # still refused by the licence check, independently of this list.
         #
         # One symbol at a time on purpose: nothing here can create an export the
         # tree does not define, and kmi_symbol_list_strict_mode = True fails the
         # build on a listed symbol that is missing, so each name is checked first.
         LIST=gki/aarch64/symbols/mtk
-        SYMBOLS="get_fs_type"
+
+        # get_fs_type and d_alloc_name are trimmed on both Kleaf families, so they
+        # are whitelisted for 6.12 and 6.18 alike.
+        SYMBOLS="get_fs_type d_alloc_name"
+
+        # The bluetooth.ko set only exists as a problem where the modpost import
+        # gate does (6.13+). On 6.12 disable_delayed_work is already listed and
+        # scm_recv / ida_find_first_range are not exported at all, so listing them
+        # there would fail kmi_symbol_list_strict_mode.
+        if [ "${{ inputs.version }}" = "android17-6.18" ]; then
+          SYMBOLS="$SYMBOLS disable_delayed_work __skb_tstamp_tx scm_recv ida_find_first_range"
+        fi
 
         if [ ! -f "$LIST" ]; then
           echo "Error: $LIST not found - this tree moved its KMI lists" >&2
