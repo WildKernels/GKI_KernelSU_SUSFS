@@ -188,3 +188,65 @@ runs:
       run: |
         SYMBOL_LIST=android/abi_gki_aarch64_xiaomi
         echo "device_find_any_child" >> $SYMBOL_LIST
+
+    - name: Whitelist get_fs_type in the MTK KMI list (6.12+ Kleaf layout)
+      if: inputs.version == 'android16-6.12' || inputs.version == 'android17-6.18'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        set -euo pipefail
+
+        # Same intent as the Xiaomi 6.6 step above, different layout. On 6.12+
+        # the KMI lists are gki/aarch64/symbols/* and are already wired into
+        # BUILD.bazel's aarch64_additional_kmi_symbol_lists, which Kleaf merges
+        # into CONFIG_UNUSED_KSYMS_WHITELIST. A name listed there is, per
+        # scripts/mod/modpost.c handle_white_list_exports():
+        #   sym->used = true       -> survives -t, so the export is not trimmed
+        #   sym->protected = false -> not KSYM_FLAG_PROTECTED, so an unverified
+        #                             module may import it
+        #
+        # get_fs_type is exported by this tree (fs/filesystems.c:298) but named
+        # by no KMI list, so -t drops it from __ksymtab and a vendor module that
+        # imports it fails with "Unresolved symbol get_fs_type" (err -2) - seen
+        # for nothing_disk_usage on the Nothing/MTK bugreport.
+        #
+        # One symbol at a time on purpose: nothing here can create an export the
+        # tree does not define, and kmi_symbol_list_strict_mode = True fails the
+        # build on a listed symbol that is missing, so each name is checked first.
+        LIST=gki/aarch64/symbols/mtk
+        SYMBOLS="get_fs_type"
+
+        if [ ! -f "$LIST" ]; then
+          echo "Error: $LIST not found - this tree moved its KMI lists" >&2
+          exit 1
+        fi
+
+        for sym in $SYMBOLS; do
+          if ! grep -rqE "^EXPORT_SYMBOL(_GPL)?\(${sym}\)" --include='*.c' .; then
+            echo "Error: ${sym} is not exported by this tree - refusing to list it" >&2
+            exit 1
+          fi
+          if grep -qE "^[[:space:]]*${sym}[[:space:]]*$" "$LIST"; then
+            echo "already listed: ${sym}"
+          else
+            printf '  %s\n' "${sym}" >> "$LIST"
+            echo "listed ${sym} in ${LIST}"
+          fi
+        done
+
+        # Keep the file canonical: "[abi_symbol_list]" and comments first, symbols
+        # two-space indented and sorted, the way --add_to_symbol_list writes it.
+        TMP="$(mktemp)"
+        {
+          grep -E '^\[|^[[:space:]]*#' "$LIST" || true
+          grep -vE '^\[|^[[:space:]]*#' "$LIST" \
+            | sed -e 's/^[[:space:]]*//' -e '/^$/d' \
+            | LC_ALL=C sort -u \
+            | sed -e 's/^/  /'
+        } > "$TMP"
+        mv "$TMP" "$LIST"
+
+        for sym in $SYMBOLS; do
+          grep -qxF "  ${sym}" "$LIST" || { echo "Error: ${sym} missing from $LIST after write" >&2; exit 1; }
+        done
+        echo "normalised ${LIST}: $(grep -c '^  ' "$LIST") symbols"
